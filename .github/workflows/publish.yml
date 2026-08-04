@@ -1,0 +1,31 @@
+name: Publish
+
+# Deliberately manual: this only fires when a GitHub Release is published
+# (Releases → Draft a new release → Publish release), never on a plain push
+# or tag creation. Nothing publishes to npm until that step is taken by
+# hand. Requires an `NPM_TOKEN` repository secret (an npm automation token)
+# to be added before this can succeed.
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

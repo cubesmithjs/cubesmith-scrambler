@@ -1,0 +1,60 @@
+{
+  "name": "@cubesmith/scrambler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Dependency-free WCA scramble generation. Pure computation only — no Web Workers, no DOM, no browser-only APIs — so it runs identically in Node, Bun, Vite, and both Next.js server and client contexts.",
+  "license": "MIT",
+  "author": "",
+  "homepage": "https://github.com/<your-github-username>/cubesmith-scrambler#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<your-github-username>/cubesmith-scrambler.git"
+  },
+  "bugs": {
+    "url": "https://github.com/<your-github-username>/cubesmith-scrambler/issues"
+  },
+  "keywords": [
+    "rubiks-cube",
+    "cube",
+    "scramble",
+    "speedcubing",
+    "wca",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "bench": "vitest bench --run",
+    "ci": "npm run typecheck && npm run test:coverage && npm run build"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.5",
+    "tsup": "^8.5.0",
+    "typescript": "^5",
+    "vitest": "^4.1.5"
+  }
+}
