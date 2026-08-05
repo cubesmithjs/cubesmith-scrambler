@@ -256,7 +256,7 @@ two phase solver".
   pattern databases, combined as `max(...)` — an admissible heuristic — driving
   IDA*.
 
-### Open question, to be settled by computation
+### Open question — **answered in step 2**
 
 Phase 2 needs the set of moves that **preserve cube shape**. Layer turns by
 multiples of 3 obviously do. Whether a single `/` does is **not** obvious, and
@@ -265,16 +265,24 @@ on the slot model:
 
 Because `/` *reverses* the moving arc (§4), and a cube-shape half always reads
 `C E C E` — never a palindrome, for any of the four valid cut diameters — a
-single slice appears **not** to preserve absolute cube shape. If that is right,
-the phase-2 move set must be built from *composite* moves that return to cube
-shape, which is also consistent with how real Square-1 algorithms look (they
-visibly pass through non-cube shapes).
+single slice appears **not** to preserve absolute cube shape.
 
-**This will not be guessed.** Once the state model is verified (step 2) and the
-shape space enumerated (step 3), the cube-shape-preserving subgroup will be
-*computed* from the model — the same approach used for the Skewb, whose
-coordinates were discovered by BFS rather than designed. The phase-2 move set
-is therefore deliberately left undetermined in this document.
+That is now computed rather than supposed, and it is what the model says
+(`state.test.ts`, "a single slice does not preserve cube shape from solved").
+Geometrically it has to be so: the cut of a cube-shaped layer runs **15° off a
+face normal** — the four valid diameters are at 15° or 75° from one — and a cube
+has no 180° symmetry about an axis 15° off a face normal, so the rotation cannot
+map the solid to itself.
+
+The refinement that matters for phase 2: a slice **does** preserve cube shape
+when the two rings sit in *complementary* alignments, because then the reversed
+`C E C E` arriving from one ring is exactly the `E C E C` the other ring wants.
+A cube-shaped ring has three alignments (corners starting at slots `≡ 0`, `1` or
+`2 mod 3`), of which `2` is not twistable — so cube shape is preserved by
+`/` from alignment pairs `(0,1)` and `(1,0)`, and broken from `(0,0)` and
+`(1,1)`. Phase 2's move set is therefore built from **composite** moves, which
+is also consistent with how real Square-1 algorithms look: they visibly pass
+through non-cube shapes.
 
 Note also that the scrambler does **not** need optimal solutions — only the
 distance *check* in §9 needs exactness. That gives phase 2 useful freedom.
@@ -343,6 +351,53 @@ Per the project's existing standards, plus the checkpoint the plan calls for.
   (scramble → apply → solve → solved); and the same **independent validator**
   treatment the other events get, with rules rewritten from the notation docs
   rather than reusing the package's own parser.
+
+---
+
+## 11. What the first three steps actually found
+
+Recorded as they landed, because several of them change what later steps can
+assume.
+
+**Two conventions the sources do not state, pinned against external data
+(step 2).** Neither Speedsolving's notation page nor Jaap's says which eye the
+lower layer's "clockwise" is measured with, and neither fixes which of the two
+twistable cube alignments is solved. Tracing the attested official scramble of
+§2 through all four candidate models — with an applier sharing no code with
+`state.ts` — leaves **exactly one** standing; the other three jam at move 1 or
+5. A slice is blocked roughly half the time, so twelve surviving in a row is not
+something a wrong model gets away with. `y` is measured from *outside* the lower
+face, and solved is the alignment with corners on slots `(0,1) (3,4) (6,7)
+(9,10)`.
+
+Two gauge facts keep that claim the right size: relabelling `i → 11 − i` on both
+rings maps the model onto itself while flipping both signs, so only the
+*relative* sign is physical; and reflecting through the cut (`i → 5 − i`) maps
+one solved alignment onto the other while negating both amounts, so alignment is
+a chirality convention. The test pins the pair, which is what matters.
+
+**The checkpoint numbers (step 3).** All reproduced, by two enumerations that
+share nothing — one combinatorial (corner starts are an independent set of the
+12-cycle), one by breadth-first search over the real move model:
+
+| Count | Result |
+|---|---|
+| absolute shapes, all rings | **19,305** — and *every one* is reachable |
+| twistable shapes | **3,678** ✓ published |
+| twistable positions | **11,958,666,854,400** ✓ published |
+| shape pairs up to rotation | **170** ✓ published |
+| shape-only diameter | **14** moves |
+
+Consequences for the solver: phase 1 needs no reachability filter, since the
+shape graph is the whole space; and 14 is an exact bound on the shape phase
+rather than an estimate.
+
+**No parity constraint (step 3).** The `× 8! × 8! × 2` factorisation is only
+honest if shape, corner permutation, edge permutation and the middle bit are
+independent. Returning 200 scrambled states to the solved *shape* and reading
+the three parities there produces **all eight** combinations, so no constraint
+links them — unlike every other puzzle in this package, none of the permutation
+parities is pinned.
 
 ---
 
