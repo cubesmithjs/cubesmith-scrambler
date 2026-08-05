@@ -1,9 +1,9 @@
 {
   "name": "@cubesmith/scrambler",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": true,
   "description": "Dependency-free WCA scramble generation. Pure computation only — no Web Workers, no DOM, no browser-only APIs — so it runs identically in Node, Bun, Vite, and both Next.js server and client contexts.",
   "license": "MIT",
   "author": "DrSiroukane",

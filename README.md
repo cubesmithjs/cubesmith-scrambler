@@ -25,9 +25,11 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**Phase 1 (architecture) and part of Phase 2 (3x3 building blocks) are
-done. `generateScramble()` does not yet produce a scramble for any event —
-every call currently throws `UnimplementedEventError`.**
+**`generateScramble('333')` works end to end** — a uniformly random,
+physically-reachable state is generated, solved via a two-phase
+(Kociemba-style) IDA* search with pruning tables, and the solution's
+inverse is returned as the scramble. Every other event still throws
+`UnimplementedEventError`.
 
 | Piece | Status |
 |---|---|
@@ -37,10 +39,20 @@ every call currently throws `UnimplementedEventError`.**
 | Shared face-turn notation (`U`, `R'`, `F2`, …) | ✅ Done |
 | 3x3x3 cube state model + all 18 move tables, invariant-tested | ✅ Done |
 | 3x3x3 uniformly-random, physically-reachable state generation | ✅ Done |
-| 3x3x3 two-phase (Kociemba-style) solver + pruning tables — the piece that turns a random *state* into an actual scramble *string* | 🚧 Not started |
+| 3x3x3 two-phase (Kociemba-style) solver + pruning tables | ✅ Done |
+| **`generateScramble('333')`** | ✅ **Done** |
 | Every other event (222, 444, …, clock) | Not started — folders exist, no implementation |
 
-## Usage (once the solver lands)
+Known limitation: pruning tables (~2M states across phase 1, ~1M across
+phase 2) are built lazily in memory on first use of each phase, not
+precomputed and shipped as a serialized asset. Measured on this machine:
+the first scramble in a process pays a **~11s** one-time table-build cost;
+every scramble after that (tables now cached) takes **~7-400ms** (mean
+~100ms — IDA* search depth varies per random state). Precomputing and
+shipping serialized tables to eliminate that cold-start cost is the
+natural next optimization, not yet done. See `npm run bench`.
+
+## Usage
 
 ```ts
 import { generateScramble } from '@cubesmith/scrambler';
@@ -69,10 +81,18 @@ const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' 
 - **`src/puzzles/333/`** — the 3x3x3 cube state model (`CubeState`), its 18
   move tables (derived geometrically from 3D rotation matrices rather than
   hand-transcribed, and cross-checked against known mathematical invariants
-  of the cube group — see the module doc comments), and a
-  parity-correct uniformly-random state generator. Not yet exported from
-  the package's public entry point — it's real, tested code, just not wired
-  to `generateScramble` until the solver exists.
+  of the cube group — see the module doc comments), a parity-correct
+  uniformly-random state generator, and the two-phase solver:
+  `coordinates.ts`/`phase2-coordinates.ts` (state → small integers a search
+  can reason about), `phase1-tables.ts`/`phase2-tables.ts` (per-move
+  transitions in that coordinate space, derived from the same verified
+  `CubeState` move application — never re-derived by hand a second time),
+  `phase1-pruning.ts`/`phase2-pruning.ts` (BFS-built admissible IDA*
+  heuristics), and `phase1-search.ts`/`phase2-search.ts`/`solve.ts` (the
+  search itself, and `generate333Scramble` — solve a random state, invert
+  the solution). Only `register333Scrambler` (called once, explicitly, from
+  `src/index.ts`) is part of the public contract; everything else here is
+  an internal implementation detail.
 - **`src/puzzles/{222,444,555,666,777,skewb,pyraminx,megaminx,square1,clock}/`**
   — empty. Deliberately: an empty directory isn't a placeholder
   implementation, but a stub file pretending to be a working API would be.

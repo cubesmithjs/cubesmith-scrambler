@@ -1,11 +1,9 @@
 /**
- * Internal barrel for the 3x3x3 puzzle module — building blocks for the
- * eventual `generateScramble('333')` support (M4/M5: pruning tables + the
- * two-phase IDA* search), not yet re-exported from the package's top-level
- * `src/index.ts`. Nothing here is registered with `core/scrambler-registry`
- * yet, so `generateScramble('333')` still throws `UnimplementedEventError`
- * until that lands — this module is real, tested code, just not yet wired
- * to the public scramble-generation contract.
+ * Internal barrel for the 3x3x3 puzzle module. `register333Scrambler()` is
+ * the intentional bridge to the public API — `src/index.ts` calls it
+ * explicitly so `generateScramble('333')` actually produces a scramble;
+ * everything else here is internal building blocks not re-exported from
+ * the package's top-level entry point.
  */
 export {
   applyMove,
@@ -19,3 +17,4 @@ export {
 } from './state';
 export { getMoveTable, allFaceMoves, moveKey, type MoveTable } from './move-tables';
 export { randomState } from './random-state';
+export { solve333, generate333Scramble, register333Scrambler } from './solve';
