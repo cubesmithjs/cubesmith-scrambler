@@ -15,13 +15,21 @@ import {
   solvePyraminx,
   SOLVED_PYRAMINX_STATE,
 } from './puzzles/pyraminx';
+import {
+  applySkewbMoves,
+  isSolvedSkewb,
+  parseSkewbMove,
+  solveSkewb,
+  SOLVED_SKEWB_STATE,
+} from './puzzles/skewb';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('333, 222 and pyram are implemented; other events still throw UnimplementedEventError', async () => {
+  it('333, 222, pyram and skewb are implemented; other events still throw UnimplementedEventError', async () => {
     expect(isImplementedEvent('333')).toBe(true);
     expect(isImplementedEvent('222')).toBe(true);
     expect(isImplementedEvent('pyram')).toBe(true);
+    expect(isImplementedEvent('skewb')).toBe(true);
     expect(isImplementedEvent('444')).toBe(false);
     await expect(generateScramble('444')).rejects.toBeInstanceOf(UnimplementedEventError);
     await expect(generateScramble('555')).rejects.toBeInstanceOf(UnimplementedEventError);
@@ -122,6 +130,29 @@ describe('@cubesmith/scrambler public entry point', () => {
       expect(isSolvedPyraminx(scrambledState)).toBe(false);
       const solution = solvePyraminx(scrambledState);
       expect(isSolvedPyraminx(applyPyraminxMoves(scrambledState, solution))).toBe(true);
+    }
+  });
+
+  it('generateScramble("skewb") returns a well-formed result that genuinely scrambles and re-solves', async () => {
+    const result = await generateScramble('skewb', { seed: 'skewb-end-to-end' });
+    expect(result.event).toBe('skewb');
+    expect(result.quality).toBe('random-state');
+    expect(result.moves.split(' ')).toHaveLength(11);
+
+    const moves = result.moves.split(' ').map(parseSkewbMove);
+    const scrambledState = applySkewbMoves(SOLVED_SKEWB_STATE, moves);
+    expect(isSolvedSkewb(scrambledState)).toBe(false);
+
+    expect(isSolvedSkewb(applySkewbMoves(scrambledState, solveSkewb(scrambledState)))).toBe(true);
+  });
+
+  it('holds across many different seeds for skewb, not just one', async () => {
+    for (let i = 0; i < 15; i += 1) {
+      const result = await generateScramble('skewb', { seed: `skewb-seed-${i}` });
+      const moves = result.moves.split(' ').map(parseSkewbMove);
+      const scrambledState = applySkewbMoves(SOLVED_SKEWB_STATE, moves);
+      expect(isSolvedSkewb(scrambledState)).toBe(false);
+      expect(isSolvedSkewb(applySkewbMoves(scrambledState, solveSkewb(scrambledState)))).toBe(true);
     }
   });
 });

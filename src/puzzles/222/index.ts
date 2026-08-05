@@ -14,5 +14,10 @@ export {
   type Cube222State,
 } from './state';
 export { randomState222 } from './random-state';
-export { solve222 } from './search';
-export { generate222Scramble, register222Scrambler } from './solve';
+export { solve222, solve222InExactly, solveDistance222 } from './search';
+export {
+  generate222Scramble,
+  MIN_222_SCRAMBLE_LENGTH,
+  MIN_222_SOLVE_DISTANCE,
+  register222Scrambler,
+} from './solve';

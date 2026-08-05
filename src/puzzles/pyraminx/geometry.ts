@@ -44,9 +44,18 @@
  * comment.
  */
 
+import {
+  rotate120,
+  vecAdd,
+  vecEquals,
+  vecHalve,
+  vecLess,
+  vecNegate,
+  type Vec3,
+} from '../../utils/vec3';
 import { PYRAMINX_VERTICES, type PyraminxVertex } from './notation';
 
-export type Vec3 = readonly [number, number, number];
+export { rotate120, type Vec3 };
 
 export const VERTEX_POSITIONS: Readonly<Record<PyraminxVertex, Vec3>> = {
   U: [1, 1, 1],
@@ -71,66 +80,10 @@ export const VERTEX_COUNT_PYRAMINX = PYRAMINX_VERTICES.length; // 4
 
 export const EDGE_NAMES: readonly string[] = EDGE_VERTEX_PAIRS.map(([a, b]) => `${a}${b}`);
 
-function add(a: Vec3, b: Vec3): Vec3 {
-  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-}
-
-function negate(a: Vec3): Vec3 {
-  return [-a[0], -a[1], -a[2]];
-}
-
-function halve(a: Vec3): Vec3 {
-  return [a[0] / 2, a[1] / 2, a[2] / 2];
-}
-
-function dot(a: Vec3, b: Vec3): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
-}
-
-function vecEquals(a: Vec3, b: Vec3): boolean {
-  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-}
-
-/** Total order on vectors, used only to pick each edge slot's reference face deterministically. */
-function vecLess(a: Vec3, b: Vec3): boolean {
-  if (a[0] !== b[0]) return a[0] < b[0];
-  if (a[1] !== b[1]) return a[1] < b[1];
-  return a[2] < b[2];
-}
-
 /** Edge slot midpoints — always integral in this embedding (see the module note). */
 export const EDGE_POSITIONS: readonly Vec3[] = EDGE_VERTEX_PAIRS.map(([a, b]) =>
-  halve(add(VERTEX_POSITIONS[a], VERTEX_POSITIONS[b])),
+  vecHalve(vecAdd(VERTEX_POSITIONS[a], VERTEX_POSITIONS[b])),
 );
-
-/**
- * 120° rotation about the axis through vertex `axis`. `sign = -1` is
- * clockwise viewed from outside that vertex — the direction an uppercase
- * Pyraminx move means.
- */
-export function rotate120(axis: Vec3, v: Vec3, sign: 1 | -1): Vec3 {
-  const d = dot(axis, v);
-  const c = cross(axis, v);
-  const out: Vec3 = [
-    (-v[0] + axis[0] * d + sign * c[0]) / 2,
-    (-v[1] + axis[1] * d + sign * c[1]) / 2,
-    (-v[2] + axis[2] * d + sign * c[2]) / 2,
-  ];
-  if (!out.every(Number.isInteger)) {
-    throw new Error(
-      `pyraminx-geometry: rotating [${v.join(',')}] about [${axis.join(',')}] left the integer lattice`,
-    );
-  }
-  return out;
-}
 
 function edgeIndexAt(position: Vec3): number {
   const index = EDGE_POSITIONS.findIndex((p) => vecEquals(p, position));
@@ -149,7 +102,7 @@ function edgeIndexAt(position: Vec3): number {
 function faceNormalsOfEdge(index: number): readonly [Vec3, Vec3] {
   const [a, b] = EDGE_VERTEX_PAIRS[index]!;
   const others = PYRAMINX_VERTICES.filter((v) => v !== a && v !== b);
-  return [negate(VERTEX_POSITIONS[others[0]!]), negate(VERTEX_POSITIONS[others[1]!])];
+  return [vecNegate(VERTEX_POSITIONS[others[0]!]), vecNegate(VERTEX_POSITIONS[others[1]!])];
 }
 
 /**

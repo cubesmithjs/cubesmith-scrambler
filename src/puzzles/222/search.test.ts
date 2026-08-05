@@ -3,7 +3,8 @@ import { createRandomSource } from '../../random/random-source';
 import { randomInt } from '../../utils/random-int';
 import { toCoordinate222 } from './coordinates';
 import { distance222 } from './pruning';
-import { solve222 } from './search';
+import { solve222, solve222InExactly, solveDistance222 } from './search';
+import { randomState222 } from './random-state';
 import { applyMoves222, isSolved222, SOLVED_222_STATE } from './state';
 import { ALL_MOVES_222 } from './tables';
 
@@ -52,5 +53,42 @@ describe('solve222', () => {
         expect(solution[i]!.face).not.toBe(solution[i - 1]!.face);
       }
     }
+  });
+});
+
+/**
+ * Fixed-length solving is what lets a scramble be padded to a presentable
+ * length without changing the state it reaches — see
+ * `core/scramble-shape.ts`.
+ */
+describe('solve222InExactly', () => {
+  it('returns a solution of exactly that length that still solves the cube', () => {
+    const random = createRandomSource('222-exact-length');
+    for (let trial = 0; trial < 200; trial += 1) {
+      const state = randomState222(random);
+      const d = solveDistance222(state);
+
+      if (d > 0) expect(solve222InExactly(state, d - 1)).toBeNull();
+
+      for (let length = d; length <= d + 3; length += 1) {
+        const solution = solve222InExactly(state, length);
+        if (solution === null) continue;
+        expect(solution).toHaveLength(length);
+        expect(isSolved222(applyMoves222(state, solution))).toBe(true);
+      }
+    }
+  });
+
+  it('agrees with solve222 at the optimal length', () => {
+    const random = createRandomSource('222-exact-vs-optimal');
+    for (let trial = 0; trial < 100; trial += 1) {
+      const state = randomState222(random);
+      expect(solve222InExactly(state, solveDistance222(state))).toEqual(solve222(state));
+    }
+  });
+
+  it('handles the solved state at length 0', () => {
+    expect(solve222InExactly(SOLVED_222_STATE, 0)).toEqual([]);
+    expect(solve222InExactly(applyMoves222(SOLVED_222_STATE, [{ face: 'R', amount: 1 }]), 0)).toBeNull();
   });
 });

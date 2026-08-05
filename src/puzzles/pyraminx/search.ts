@@ -33,18 +33,45 @@ export function solvePyraminxLayers(
   state: PyraminxState,
   moveOrder: readonly number[] = DEFAULT_MOVE_ORDER,
 ): PyraminxMove[] {
-  const start = toPyraminxCoordinate(state);
-  const bound = distancePyraminx(start);
-  if (bound === UNVISITED_DISTANCE_PYRAMINX) {
-    throw new Error('solvePyraminxLayers: state is not reachable on a real Pyraminx');
-  }
-  if (isSolvedPyraminxCoordinate(start)) return [];
-
-  const path: PyraminxMove[] = [];
-  if (!dfs(start, 0, bound, path, moveOrder)) {
+  const solution = solvePyraminxLayersInExactly(
+    state,
+    pyraminxLayerSolveDistance(state),
+    moveOrder,
+  );
+  if (!solution) {
     throw new Error('solvePyraminxLayers: no solution within the exact known distance');
   }
-  return [...path];
+  return solution;
+}
+
+/** The exact number of layer turns needed to solve `state`'s edges and axials. Throws if it isn't a real Pyraminx position. */
+export function pyraminxLayerSolveDistance(state: PyraminxState): number {
+  const distance = distancePyraminx(toPyraminxCoordinate(state));
+  if (distance === UNVISITED_DISTANCE_PYRAMINX) {
+    throw new Error('pyraminxLayerSolveDistance: state is not reachable on a real Pyraminx');
+  }
+  return distance;
+}
+
+/**
+ * A layer solution of *exactly* `length` turns, or `null` if none exists.
+ * Requesting a fixed length rather than the shortest one is what lets a
+ * scramble be padded to a presentable size without changing the state it
+ * reaches — see `core/scramble-shape.ts`.
+ */
+export function solvePyraminxLayersInExactly(
+  state: PyraminxState,
+  length: number,
+  moveOrder: readonly number[] = DEFAULT_MOVE_ORDER,
+): PyraminxMove[] | null {
+  const start = toPyraminxCoordinate(state);
+  if (distancePyraminx(start) === UNVISITED_DISTANCE_PYRAMINX) {
+    throw new Error('solvePyraminxLayersInExactly: state is not reachable on a real Pyraminx');
+  }
+  if (length === 0) return isSolvedPyraminxCoordinate(start) ? [] : null;
+
+  const path: PyraminxMove[] = [];
+  return dfs(start, 0, length, path, moveOrder) ? [...path] : null;
 }
 
 function dfs(
@@ -56,7 +83,7 @@ function dfs(
 ): boolean {
   const h = distancePyraminx(coord);
   if (g + h > bound) return false;
-  if (isSolvedPyraminxCoordinate(coord)) return true;
+  if (g === bound) return h === 0;
 
   const lastMove = path[path.length - 1];
   for (const m of moveOrder) {

@@ -1,20 +1,41 @@
 import type { RandomSource } from '../../random/random-source';
 import { inverseMoves, movesToString } from '../../notation/move';
 import { registerScrambler } from '../../core/scrambler-registry';
+import {
+  drawStateAtLeastMovesFromSolved,
+  solveAtLeastLength,
+} from '../../core/scramble-shape';
+import { randomPermutation } from '../../utils/permutation';
 import { randomState222 } from './random-state';
-import { solve222 } from './search';
+import { solve222InExactly, solveDistance222 } from './search';
+import { ALL_MOVES_222 } from './tables';
 import type { Cube222State } from './state';
 
+/** WCA Regulation 4b3b: a 2x2x2 scramble's state must require at least 4 moves to solve. */
+export const MIN_222_SOLVE_DISTANCE = 4;
+
+/** WCA's scrambler pads 2x2x2 sequences to 11 moves so a short solution can't be spotted on a scramble sheet — see `core/scramble-shape.ts`. */
+export const MIN_222_SCRAMBLE_LENGTH = 11;
+
 /**
- * Draws a uniformly random reachable 2x2x2 state and solves it optimally
- * (see `search.ts` — the pruning table holds exact distances for this
- * puzzle, so the solution is always shortest-possible). The scramble
- * returned is the *inverse* of that solution — same convention as
- * `puzzles/333/solve.ts`.
+ * Draws a uniformly random reachable 2x2x2 state that is far enough from
+ * solved to be a legal scramble, then returns the inverse of a solution
+ * long enough to be presentable. The scramble is the *inverse* of that
+ * solution — same convention as `puzzles/333/solve.ts`.
  */
 export function generate222Scramble(random: RandomSource): string {
-  const state: Cube222State = randomState222(random);
-  const solution = solve222(state);
+  const state: Cube222State = drawStateAtLeastMovesFromSolved(
+    random,
+    randomState222,
+    solveDistance222,
+    MIN_222_SOLVE_DISTANCE,
+  );
+  const moveOrder = randomPermutation(random, ALL_MOVES_222.length);
+  const solution = solveAtLeastLength(
+    solveDistance222(state),
+    MIN_222_SCRAMBLE_LENGTH,
+    (length) => solve222InExactly(state, length, moveOrder),
+  );
   return movesToString(inverseMoves(solution));
 }
 

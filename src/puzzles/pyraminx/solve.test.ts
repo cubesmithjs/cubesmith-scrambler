@@ -4,8 +4,13 @@ import { distancePyraminx } from './pruning';
 import { toPyraminxCoordinate } from './coordinates';
 import { parsePyraminxMove, PYRAMINX_VERTICES } from './notation';
 import { randomPyraminxState } from './random-state';
-import { solvePyraminxLayers } from './search';
-import { generatePyraminxScramble, solvePyraminx } from './solve';
+import { pyraminxLayerSolveDistance, solvePyraminxLayers } from './search';
+import {
+  generatePyraminxScramble,
+  MIN_PYRAMINX_SCRAMBLE_LENGTH,
+  MIN_PYRAMINX_SOLVE_DISTANCE,
+  solvePyraminx,
+} from './solve';
 import { applyPyraminxMoves, isSolvedPyraminx, SOLVED_PYRAMINX_STATE } from './state';
 
 describe('solvePyraminxLayers', () => {
@@ -144,9 +149,26 @@ describe('generatePyraminxScramble output shape', () => {
     }
   });
 
-  it('is never longer than God’s number (11) plus the four tips', () => {
+  it('always has exactly 11 layer turns — the length WCA scramble sheets print', () => {
     for (const scramble of scrambles) {
-      expect(scramble.split(' ').length).toBeLessThanOrEqual(15);
+      const layers = scramble
+        .split(' ')
+        .map(parsePyraminxMove)
+        .filter((m) => !m.tip);
+      expect(layers).toHaveLength(MIN_PYRAMINX_SCRAMBLE_LENGTH);
+    }
+  });
+
+  /** WCA Regulation 4b3f — a claim about the state, not the printed length. */
+  it('the state it reaches always needs at least 6 layer turns to solve (Regulation 4b3f)', () => {
+    for (const scramble of scrambles) {
+      const state = applyPyraminxMoves(
+        SOLVED_PYRAMINX_STATE,
+        scramble.split(' ').map(parsePyraminxMove),
+      );
+      expect(pyraminxLayerSolveDistance(state)).toBeGreaterThanOrEqual(
+        MIN_PYRAMINX_SOLVE_DISTANCE,
+      );
     }
   });
 

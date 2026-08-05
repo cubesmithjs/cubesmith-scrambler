@@ -27,5 +27,15 @@ export {
   type PyraminxState,
 } from './state';
 export { randomPyraminxState } from './random-state';
-export { solvePyraminxLayers } from './search';
-export { generatePyraminxScramble, registerPyraminxScrambler, solvePyraminx } from './solve';
+export {
+  pyraminxLayerSolveDistance,
+  solvePyraminxLayers,
+  solvePyraminxLayersInExactly,
+} from './search';
+export {
+  generatePyraminxScramble,
+  MIN_PYRAMINX_SCRAMBLE_LENGTH,
+  MIN_PYRAMINX_SOLVE_DISTANCE,
+  registerPyraminxScrambler,
+  solvePyraminx,
+} from './solve';

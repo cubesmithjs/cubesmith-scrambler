@@ -25,10 +25,10 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')`, `('222')` and `('pyram')` all work end to
-end.** Each generates a uniformly random, physically-reachable state and
-solves it via IDA* with pruning-table heuristics; the solution's inverse is
-returned as the scramble. Every other event still throws
+**`generateScramble('333')`, `('222')`, `('pyram')` and `('skewb')` all work
+end to end.** Each generates a uniformly random, physically-reachable state
+and solves it via IDA* with pruning-table heuristics; the solution's inverse
+is returned as the scramble. Every other event still throws
 `UnimplementedEventError`.
 
 | Piece | Status |
@@ -37,21 +37,23 @@ returned as the scramble. Every other event still throws
 | `generateScramble()` / registry / typed "not implemented" errors | ✅ Done |
 | Seeded (`RandomSource`) / cryptographically-random number generation | ✅ Done |
 | Shared face-turn notation (`U`, `R'`, `F2`, …) | ✅ Done |
+| WCA Regulation 4b3 scramble shaping (per-event minimum distance to solved, presentable sequence length) | ✅ Done |
 | **`generateScramble('333')`** — cube state model + all 18 move tables (invariant-tested), parity-correct random-state generation, two-phase (Kociemba-style) solver + pruning tables | ✅ **Done** |
 | **`generateScramble('222')`** — single-phase solver (the whole 3,674,160-state group fits in one pruning table, confirmed by BFS reaching every entry — no two-phase decomposition needed) | ✅ **Done** |
 | **`generateScramble('pyram')`** — tetrahedral geometry derived on an exact integer lattice, single exact pruning table, optimal solve + WCA-shaped tip moves | ✅ **Done** |
+| **`generateScramble('skewb')`** — corner-turning, deep-cut geometry; BFS-discovered coordinates reproducing the puzzle's 3,149,280 states exactly | ✅ **Done** |
 | Every other event (444, 555, …, clock) | Not started — folders exist, no implementation |
 
 Known limitation: pruning tables are built lazily in memory on first use,
 not precomputed and shipped as a serialized asset. Measured on this
 machine: **333** — ~11s one-time cold-build, then ~7-400ms per scramble
 (mean ~100ms; search depth varies per state). **222** — ~5.75s cold-build,
-then **~0.01ms per scramble** (mean, ~100,000/sec). **pyram** — ~1s
-cold-build, then **~0.014ms per scramble** (mean, ~74,000/sec). For 222 and
-pyram the pruning table holds the *exact* distance for the whole group, so
-search is essentially free once built. Precomputing and shipping serialized
-tables to eliminate the cold-start cost is the natural next optimization,
-not yet done. See `npm run bench`.
+then ~0.017ms per scramble (~59,000/sec). **pyram** — ~1s cold-build, then
+~0.020ms (~50,000/sec). **skewb** — ~1.5s cold-build, then ~0.014ms
+(~72,000/sec). For 222, pyram and skewb the pruning table holds the *exact*
+distance for the whole group, so search is essentially free once built.
+Precomputing and shipping serialized tables to eliminate the cold-start cost
+is the natural next optimization, not yet done. See `npm run bench`.
 
 ## Usage
 
@@ -61,9 +63,30 @@ import { generateScramble } from '@cubesmith/scrambler';
 const { moves } = await generateScramble('333');
 const { moves: pocketCube } = await generateScramble('222');
 const { moves: pyraminx } = await generateScramble('pyram');
+const { moves: skewb } = await generateScramble('skewb');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
+
+## Scramble shape — what the WCA Regulations require beyond "random state"
+
+A scramble is not just the inverse of a random state's solution. Two extra
+rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
+
+- **A minimum number of moves to solve.** Regulation 4b3 sets a floor of 2
+  moves, with per-puzzle exceptions: **2x2x2 ≥ 4** (4b3b), **Skewb ≥ 7**
+  (4b3c), **Square-1 ≥ 11** (4b3d), **Pyraminx ≥ 6** (4b3f). Enforced by
+  redrawing, which is what keeps the "equal probability for each state" the
+  regulation also demands — the conditional distribution of a uniform draw is
+  uniform on the condition.
+- **A minimum sequence length.** The regulation constrains the state, not
+  the printed sequence — but a scrambler that always prints the *optimal*
+  solution leaks the state's difficulty, so a short sequence on a scramble
+  sheet advertises an easy scramble. WCA's own scrambler pads to 11 moves
+  for this reason ([incident 28](https://www.worldcubeassociation.org/incidents/28)).
+  Padding here asks the solver for a solution of a given *exact* length
+  rather than the shortest one, so the state reached is unchanged and still
+  uniformly random.
 
 ## Design
 
@@ -124,9 +147,24 @@ const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' 
   Tips are modelled but not searched: nothing on the puzzle can observe a
   tip, and an uppercase turn carries its own tip along, so they're
   reconciled after the layer solve and emitted last, as WCA scrambles do.
-- **`src/puzzles/{444,555,666,777,skewb,megaminx,square1,clock}/`** —
-  empty. Deliberately: an empty directory isn't a placeholder
-  implementation, but a stub file pretending to be a working API would be.
+- **`src/puzzles/skewb/`** — a *corner*-turning, deep-cut puzzle: every turn
+  rotates half the cube by 120° about a body diagonal, so `geometry.ts`
+  reuses the same exact-integer 120° rotation as the Pyraminx (`utils/vec3.ts`)
+  but applies it to whole cube corners and face centers. WCA **Fixed Corner
+  Notation** holds one corner still and turns the four whose moving half
+  excludes it; `geometry.test.ts` reconstructs the official holding position
+  (white up, green front-left) and checks each letter lands on the corner the
+  regulation describes, rather than taking the assignment on trust.
+  Coordinates are *discovered* rather than designed: the corner permutation
+  alone has `8! = 40,320` encodable values of which only **36** occur, so a
+  closed-form product would be a 227 MB table that is almost entirely holes.
+  Instead each projection is BFS-closed from solved and re-indexed densely,
+  landing on 8,748 corner states × 360 center states = **3,149,280** — the
+  published Skewb position count — with the pruning BFS then reaching every
+  one of them at a maximum distance of 11, the published God's number.
+- **`src/puzzles/{444,555,666,777,megaminx,square1,clock}/`** — empty.
+  Deliberately: an empty directory isn't a placeholder implementation, but a
+  stub file pretending to be a working API would be.
 
 ## Independence note
 

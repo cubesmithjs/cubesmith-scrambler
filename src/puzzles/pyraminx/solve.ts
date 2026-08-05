@@ -1,4 +1,8 @@
 import { registerScrambler } from '../../core/scrambler-registry';
+import {
+  drawStateAtLeastMovesFromSolved,
+  solveAtLeastLength,
+} from '../../core/scramble-shape';
 import type { RandomSource } from '../../random/random-source';
 import { randomPermutation } from '../../utils/permutation';
 import {
@@ -9,7 +13,11 @@ import {
   type PyraminxMove,
 } from './notation';
 import { randomPyraminxState } from './random-state';
-import { solvePyraminxLayers } from './search';
+import {
+  pyraminxLayerSolveDistance,
+  solvePyraminxLayers,
+  solvePyraminxLayersInExactly,
+} from './search';
 import {
   applyPyraminxMoves,
   SOLVED_PYRAMINX_STATE,
@@ -51,20 +59,47 @@ export function solvePyraminx(
   return [...layerMoves, ...tipMoves(afterLayers.tipOrientation, SOLVED_PYRAMINX_STATE.tipOrientation)];
 }
 
+/** WCA Regulation 4b3f: a Pyraminx scramble's state must require at least 6 moves to solve. */
+export const MIN_PYRAMINX_SOLVE_DISTANCE = 6;
+
 /**
- * Draws a uniformly random reachable Pyraminx state, solves its layers
- * optimally, and returns the inverse of that solution — then appends the
- * tip turns that bring the tips to the drawn state's tip values.
+ * WCA's scrambler pads Pyraminx sequences to 11 layer turns so a short
+ * solution can't be spotted on a printed scramble sheet — see
+ * `core/scramble-shape.ts`. Tip turns are appended after and don't count
+ * toward it; they carry no difficulty.
+ *
+ * The regulation's ≥ 6 is about the *state*, this is about the *sequence*,
+ * and 11 is also this puzzle's God's number — so a padded scramble is
+ * frequently a deliberately non-optimal route to a state only 8 or 9 turns
+ * from solved.
+ */
+export const MIN_PYRAMINX_SCRAMBLE_LENGTH = 11;
+
+/**
+ * Draws a uniformly random reachable Pyraminx state that is far enough from
+ * solved to be a legal scramble, solves its layers, and returns the inverse
+ * of that solution — then appends the tip turns that bring the tips to the
+ * drawn state's tip values.
  *
  * Tips are reconciled at the end rather than by inverting the solution's own
  * tip moves, so they land where WCA scrambles put them without relying on a
  * commutation argument to reorder anything after the fact.
  */
 export function generatePyraminxScramble(random: RandomSource): string {
-  const state = randomPyraminxState(random);
+  const state = drawStateAtLeastMovesFromSolved(
+    random,
+    randomPyraminxState,
+    pyraminxLayerSolveDistance,
+    MIN_PYRAMINX_SOLVE_DISTANCE,
+  );
   const moveOrder = randomPermutation(random, ALL_LAYER_MOVES_PYRAMINX.length);
 
-  const layerScramble = inversePyraminxMoves(solvePyraminxLayers(state, moveOrder));
+  const layerSolution = solveAtLeastLength(
+    pyraminxLayerSolveDistance(state),
+    MIN_PYRAMINX_SCRAMBLE_LENGTH,
+    (length) => solvePyraminxLayersInExactly(state, length, moveOrder),
+  );
+  const layerScramble = inversePyraminxMoves(layerSolution);
   const afterScramble = applyPyraminxMoves(SOLVED_PYRAMINX_STATE, layerScramble);
 
   return pyraminxMovesToString([
