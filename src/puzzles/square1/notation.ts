@@ -160,6 +160,42 @@ export function parseSquare1Scramble(text: string): Square1Move[] {
 }
 
 /**
+ * Removes what a sequence can shed without changing where it ends up:
+ * consecutive layer turns merge into one, a merged turn of `(0,0)` disappears,
+ * and two consecutive slices cancel.
+ *
+ * This matters at a **phase boundary**. Each phase of the solver produces a
+ * properly alternating sequence, but phase 1 may end on a turn and phase 2
+ * begin with one, and concatenating them would spend two moves where one does
+ * the same job. Dropping a merged `(0,0)` can leave two slices adjacent, which
+ * then cancel in the same pass.
+ */
+export function compressSquare1Moves(moves: readonly Square1Move[]): Square1Move[] {
+  const compressed: Square1Move[] = [];
+
+  for (const move of moves) {
+    const last = compressed[compressed.length - 1];
+
+    if (last !== undefined && isLayerTurn(move) && isLayerTurn(last)) {
+      compressed.pop();
+      const top = normalizeUnits(last.top + move.top);
+      const bottom = normalizeUnits(last.bottom + move.bottom);
+      if (top !== 0 || bottom !== 0) compressed.push({ kind: 'turn', top, bottom });
+      continue;
+    }
+
+    if (last !== undefined && !isLayerTurn(move) && !isLayerTurn(last)) {
+      compressed.pop();
+      continue;
+    }
+
+    compressed.push(move);
+  }
+
+  return compressed;
+}
+
+/**
  * The inverse of a single move. A slice is its own inverse (it is a 180°
  * turn); a layer turn negates both amounts.
  */

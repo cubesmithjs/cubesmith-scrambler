@@ -267,9 +267,45 @@ export function isRingCubeShaped(state: Square1State, ring: number): boolean {
   return kinds.every((isCorner, index) => isCorner !== kinds[(index + 1) % kinds.length]!);
 }
 
-/** Both rings alternate: the puzzle is a cube again, whatever its alignment. */
-export function isSquare1CubeShaped(state: Square1State): boolean {
+/**
+ * Both rings alternate — each layer is a square. **Not** the same as the puzzle
+ * being a cube: two square layers rotated 30° from each other are two squares,
+ * not a cube. This larger set is the one phase 2 of the solver lives in, and it
+ * is the set a slice can keep you inside.
+ */
+export function hasSquareLayers(state: Square1State): boolean {
   return SQUARE1_RINGS.every((ring) => isRingCubeShaped(state, ring));
+}
+
+/**
+ * Where each ring's corners start, `mod 3` — the three rotational alignments a
+ * square layer can sit in. `undefined` when that ring is not square.
+ *
+ * Alignment `2` puts corners on slots `(2,3)` and `(8,9)`, straddling both cuts,
+ * so a square layer in alignment 2 can never be sliced.
+ */
+export function square1Alignments(
+  state: Square1State,
+): readonly [number, number] | undefined {
+  if (!hasSquareLayers(state)) return undefined;
+  const alignments = SQUARE1_RINGS.map((ring) => {
+    for (let i = 0; i < RING_SLOTS; i += 1) {
+      const piece = state.slots[ring + i]!;
+      const previous = state.slots[ring + ((i + RING_SLOTS - 1) % RING_SLOTS)]!;
+      if (isCornerPiece(piece) && piece !== previous) return i % 3;
+    }
+    throw new Error('@cube/scrambler: a square Square-1 ring with no corners');
+  });
+  return [alignments[0]!, alignments[1]!];
+}
+
+/**
+ * A cube: both layers square **and** in the same alignment, so a corner sits
+ * directly above a corner. This is what "cube shape" means on the puzzle.
+ */
+export function isSquare1CubeShaped(state: Square1State): boolean {
+  const alignments = square1Alignments(state);
+  return alignments !== undefined && alignments[0] === alignments[1];
 }
 
 /**

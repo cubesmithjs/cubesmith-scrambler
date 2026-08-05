@@ -392,12 +392,107 @@ Consequences for the solver: phase 1 needs no reachability filter, since the
 shape graph is the whole space; and 14 is an exact bound on the shape phase
 rather than an estimate.
 
-**No parity constraint (step 3).** The `× 8! × 8! × 2` factorisation is only
-honest if shape, corner permutation, edge permutation and the middle bit are
-independent. Returning 200 scrambled states to the solved *shape* and reading
-the three parities there produces **all eight** combinations, so no constraint
-links them — unlike every other puzzle in this package, none of the permutation
-parities is pinned.
+**No parity constraint on the puzzle (step 3).** The `× 8! × 8! × 2`
+factorisation is only honest if shape, corner permutation, edge permutation and
+the middle bit are independent. Returning 200 scrambled states to the solved
+*shape* and reading the three parities there produces **all eight**
+combinations, so no constraint links them — unlike every other puzzle in this
+package, none of the permutation parities is pinned. (Inside phase 2's move
+set, one *is* — see below. The two statements are about different move sets and
+both hold.)
+
+---
+
+## 12. The solver, as built (step 4)
+
+### Architecture
+
+| | Phase 1 | Phase 2 |
+|---|---|---|
+| Goal | square layers, correct parity | solved |
+| Coordinate | shape (19,305) × parity (2) | alignment (9) × middle (2) × corners (8!) × edges (8!) |
+| Size | 38,610 | 29,262,643,200 |
+| Method | exact breadth-first table, no search | IDA\* + meet in the middle |
+| Optimal? | yes, per ending | yes, per ending |
+
+"Square layers" means both rings alternate corner-edge. It is **not** cube
+shape, which additionally requires the two squares to be aligned with each
+other; the larger set is the one a slice can keep you inside, and the one real
+Square-1 algorithms move through.
+
+### The invariant, and the deviation that wasn't
+
+Phase 2 reaches **exactly 36 of the 72** `(alignment, middle, corner parity,
+edge parity)` classes. So phase 1 must deliver parity as well as shape — the
+classic decomposition's "a cube with an even permutation", in this package's
+coordinates. This was got wrong twice before the tests settled it, once by
+asserting the invariant with a wrong argument and once by dropping it on the
+strength of a walk that had only been changing alignment. The class table is
+now *computed*, and phase 1's goal parity is read out of it rather than written
+down.
+
+### Heuristic, and why it is admissible
+
+`max(h(corners), h(edges))`, each an exact breadth-first distance over the
+projection that forgets the other permutation. Dropping a coordinate is a
+homomorphic projection — every move acts on the projection using only the
+projection — so any real solution solves the projection in the same number of
+moves, and the projection's *shortest* distance can therefore never exceed the
+truth. The maximum of two lower bounds is a lower bound.
+
+One surprise: the corner and edge tables come out **identical**, entry for
+entry, because the moves act on the eight edge positions exactly as they act on
+the eight corner positions. One table is built and looked up twice, and a test
+builds the other to check.
+
+### Meet in the middle
+
+The search stops eight moves short and finishes from a table of every state
+within eight moves of solved (905,728 of them). The frontier grows unevenly —
+a turn opens 143 ways, a slice one — which makes radius 8 a bargain at 19% more
+states than radius 7 and an order of magnitude less than radius 9.
+
+### Sweeping endings
+
+Phase 2's difficulty depends enormously on *which* square-layer state phase 1
+hands it: the same puzzle through two equally short endings took 41ms one way
+and 5.7s the other. So endings are enumerated **lazily** and swept at a fixed
+relaxation — every ending asked for a solution of exactly its lower bound
+first, two moves of slack only if all refuse. Enumerating endings eagerly cost
+between 150ms and 37s depending on the state, so the laziness is not a
+micro-optimisation.
+
+### Measured
+
+On this machine, Node 22:
+
+| | |
+|---|---|
+| Table construction, once | ~12s (backward table ~6s, pruning ~2.5s, phase-1 ~1.4s) |
+| Typed-array memory | 21.3 MB (18.0 MB of it the backward table) |
+| Solve, median | 139 ms |
+| Solve, 90th percentile | 888 ms |
+| Solve, worst of 60 | 2.3 s |
+| Solution length | mean 24.6, range 18–28 |
+
+Official Square-1 scrambles run about 24 moves in this metric, so lengths are
+comparable. Trading the backward radius from 8 to 7 moves startup to ~7.5s and
+the median to ~205ms — kept at 8 because a scrambler makes many scrambles per
+process.
+
+### Compromises, stated plainly
+
+- **The total is not optimal.** Each phase is optimal in itself, and the phase
+  boundary is compressed, but the split itself gives up optimality. Official
+  scrambles do the same.
+- **The sweep returns the first ending that fits, not the best.** Searching the
+  rest of a sweep costs as much again per ending for a move or two of length.
+- **A ~12s first-scramble cost.** Every table is lazy and memoised, so it is
+  paid once per process, but it is real.
+- **The heuristic is ~4 moves short of the truth** on a typical state, which is
+  what the meet-in-the-middle table and the ending sweep exist to absorb. A
+  stronger heuristic would need a joint corner/edge table an order of magnitude
+  larger, which this package's size budget does not have room for.
 
 ---
 

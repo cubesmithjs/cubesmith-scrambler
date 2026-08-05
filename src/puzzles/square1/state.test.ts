@@ -15,6 +15,7 @@ import {
   applySquare1Moves,
   applySquare1Slice,
   cornersPerRing,
+  hasSquareLayers,
   isSliceLegal,
   isSquare1CubeShaped,
   isSquare1Solved,
@@ -23,6 +24,7 @@ import {
   RING_SLOTS,
   sliceUnchecked,
   SOLVED_SQUARE1_STATE,
+  square1Alignments,
   square1ShapeKey,
   Square1IllegalSliceError,
   square1StatesEqual,
@@ -284,28 +286,61 @@ describe('shape transitions', () => {
    * answered — and the answer is the counter-intuitive one.
    *
    * A slice is a 180° rotation about the axis perpendicular to the cut, so it
-   * brings the moving arc back **reversed**. A cube-shaped half always reads
+   * brings the moving arc back **reversed**. A square layer's half always reads
    * `C E C E`, never a palindrome, so reversing it yields `E C E C` — which
    * fits only if the *receiving* ring was itself aligned the other way. From
    * solved, where both rings share one alignment, a single slice therefore
-   * leaves cube shape. Geometrically it must: the cut of a cube-shaped layer
-   * runs 15° off a face normal, and a cube has no 180° symmetry about an axis
-   * 15° off a face normal.
+   * leaves square layers entirely. Geometrically it must: the cut of a square
+   * layer runs 15° off a face normal, and a cube has no 180° symmetry about an
+   * axis 15° off a face normal.
    *
    * With the lower ring shifted one unit into the complementary alignment, the
-   * same slice preserves cube shape. That is where the cube-shape-preserving
-   * subgroup phase 2 needs will come from — composite moves, not `/` alone.
+   * same slice keeps both layers square. Note what it does *not* do: the two
+   * squares end up 30° out of step, which is two squares and not a cube. That
+   * larger "square layers" set, not cube shape, is what phase 2 of the solver
+   * moves inside — real Square-1 algorithms pass through exactly these states.
    */
-  it('a single slice does not preserve cube shape from solved, but does from the complementary alignment', () => {
+  it('a single slice leaves square layers from solved, but keeps them from the complementary alignment', () => {
     const sliced = applySquare1Slice(SOLVED_SQUARE1_STATE);
     expect(isWellFormedSquare1State(sliced)).toBe(true);
-    expect(isSquare1CubeShaped(sliced)).toBe(false);
+    expect(hasSquareLayers(sliced)).toBe(false);
     expect(cornersPerRing(sliced)).toEqual([4, 4]);
 
     const complementary = applySquare1LayerTurn(SOLVED_SQUARE1_STATE, layerTurn(0, -1));
-    expect(isSquare1CubeShaped(complementary)).toBe(true);
+    expect(square1Alignments(complementary)).toEqual([0, 1]);
+    expect(isSquare1CubeShaped(complementary)).toBe(false);
+    expect(hasSquareLayers(complementary)).toBe(true);
     expect(isSliceLegal(complementary)).toBe(true);
-    expect(isSquare1CubeShaped(applySquare1Slice(complementary))).toBe(true);
+
+    // And it comes back to the *same* alignment pair, not the mirrored one:
+    // each ring keeps its two fixed corner starts and receives the other ring's
+    // two moving ones reflected onto exactly the slots it just vacated. So a
+    // slice never moves between (0,1) and (1,0) — phase 2 changes alignment
+    // only by turning.
+    const stillSquare = applySquare1Slice(complementary);
+    expect(hasSquareLayers(stillSquare)).toBe(true);
+    expect(isSquare1CubeShaped(stillSquare)).toBe(false);
+    expect(square1Alignments(stillSquare)).toEqual([0, 1]);
+  });
+
+  /**
+   * Cube shape is the *aligned* subset: alignment `2` is never twistable, so of
+   * the nine square-layer alignment pairs only `(0,1)` and `(1,0)` admit a
+   * slice that keeps the layers square, and neither of those is a cube.
+   */
+  it('separates "both layers square" from "the puzzle is a cube"', () => {
+    expect(isSquare1CubeShaped(SOLVED_SQUARE1_STATE)).toBe(true);
+    expect(square1Alignments(SOLVED_SQUARE1_STATE)).toEqual([0, 0]);
+    for (const amount of [1, 2, 3]) {
+      const turned = applySquare1LayerTurn(SOLVED_SQUARE1_STATE, layerTurn(amount, amount));
+      expect(hasSquareLayers(turned)).toBe(true);
+      // A turn of both layers the same way is *not* the same alignment shift:
+      // `y` runs the other way round the ring, so (a, a) becomes (a+x, a-x).
+      const alignments = square1Alignments(turned)!;
+      expect(alignments).toEqual([amount % 3, (3 - (amount % 3)) % 3]);
+      expect(isSquare1CubeShaped(turned)).toBe(amount % 3 === 0);
+    }
+    expect(square1Alignments(applySquare1Slice(SOLVED_SQUARE1_STATE))).toBeUndefined();
   });
 
   it('keeps every ring between two and six corners, always', () => {
