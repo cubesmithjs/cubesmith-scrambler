@@ -16,11 +16,11 @@ export async function generateScramble(
   event: WcaEventId,
   options: GenerateScrambleOptions = {},
 ): Promise<ScrambleResult> {
-  const scrambler = getScrambler(event);
-  if (!scrambler) {
+  const registration = getScrambler(event);
+  if (!registration) {
     throw new UnimplementedEventError(event);
   }
   const random = createRandomSource(options.seed);
-  const moves = scrambler(random, options);
-  return { event, moves, quality: 'random-state' };
+  const moves = registration.scramble(random, options);
+  return { event, moves, quality: registration.quality };
 }

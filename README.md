@@ -25,11 +25,12 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')`, `('222')`, `('pyram')`, `('skewb')` and
-`('clock')` all work end to end.** Each generates a uniformly random,
-physically-reachable state; the four twisty puzzles solve it via IDA* with
-pruning-table heuristics and return the solution's inverse, while Clock —
-whose group is abelian — reads the scramble straight off a linear system.
+**`generateScramble('333')`, `('222')`, `('pyram')`, `('skewb')`, `('clock')`
+and `('minx')` all work end to end.** The four twisty random-state puzzles
+draw a uniformly random reachable state and solve it via IDA* with
+pruning-table heuristics, returning the solution's inverse; Clock — whose
+group is abelian — reads its scramble straight off a linear system; and
+Megaminx is random-*moves*, which is what WCA Regulation 4b3e requires for it.
 Every other event still throws `UnimplementedEventError`.
 
 | Piece | Status |
@@ -44,6 +45,7 @@ Every other event still throws `UnimplementedEventError`.
 | **`generateScramble('pyram')`** — tetrahedral geometry derived on an exact integer lattice, single exact pruning table, optimal solve + WCA-shaped tip moves | ✅ **Done** |
 | **`generateScramble('skewb')`** — corner-turning, deep-cut geometry; BFS-discovered coordinates reproducing the puzzle's 3,149,280 states exactly | ✅ **Done** |
 | **`generateScramble('clock')`** — dials and pins, no cube geometry; the official 14-token template proved to be a unimodular basis for all 12^14 states | ✅ **Done** |
+| **`generateScramble('minx')`** — dodecahedral geometry, Pochmann notation, 77 random moves per Regulation 4b3e (**not** random-state — see below) | ✅ **Done** |
 | Every other event (444, 555, …, sq1) | Not started — folders exist, no implementation |
 
 Known limitation: pruning tables are built lazily in memory on first use,
@@ -68,6 +70,7 @@ const { moves: pocketCube } = await generateScramble('222');
 const { moves: pyraminx } = await generateScramble('pyram');
 const { moves: skewb } = await generateScramble('skewb');
 const { moves: clock } = await generateScramble('clock');
+const { moves: megaminx } = await generateScramble('minx');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
@@ -83,6 +86,12 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   redrawing, which is what keeps the "equal probability for each state" the
   regulation also demands — the conditional distribution of a uniform draw is
   uniform on the condition.
+- **Random-state is not always the right method.** Regulation 4b3e specifies
+  *random moves* for **5x5x5, 6x6x6, 7x7x7 and Megaminx** — for those events a
+  random-state scramble would be the non-conforming one, and WCA's own
+  scrambler doesn't do one either. `ScrambleResult.quality` reports which
+  method was used (`'random-state'` or `'random-moves'`) rather than always
+  claiming the stronger one.
 - **A minimum sequence length.** The regulation constrains the state, not
   the printed sequence — but a scrambler that always prints the *optimal*
   solution leaks the state's difficulty, so a short sequence on a scramble
@@ -95,10 +104,13 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
 ## Design
 
 - **`src/core/`** — the public entry point (`generateScramble`), the
-  per-event scrambler registry, and shared types. `WcaEventId` lists the
-  full target event surface as a type; only events actually registered
-  (currently: none) are callable — everything else throws a typed
-  `UnimplementedEventError` rather than a placeholder result.
+  per-event scrambler registry, and shared types. `WcaEventId` lists the full
+  target event surface as a type; only events actually registered are
+  callable — everything else throws a typed `UnimplementedEventError` rather
+  than returning a placeholder result. The registry also records each event's
+  scramble *quality*, so `generateScramble` reports the method actually used
+  instead of always claiming random-state. `scramble-shape.ts` holds the two
+  WCA rules that apply on top of "draw a random state" (see above).
 - **`src/random/`** — `RandomSource`, the only thing any scrambler is
   allowed to draw randomness from. Seeded via a tiny deterministic PRNG
   (mulberry32) when `options.seed` is given; backed by
@@ -188,9 +200,30 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   constraint to satisfy, and solving one is a single matrix multiply
   (`utils/mod-matrix.ts`, which inverts mod 4 and mod 3 and recombines by
   CRT, because `Z12` is not a field and a column can lack a pivot entirely).
-- **`src/puzzles/{444,555,666,777,megaminx,square1}/`** — empty.
-  Deliberately: an empty directory isn't a placeholder implementation, but a
-  stub file pretending to be a working API would be.
+- **`src/puzzles/megaminx/`** — the only **random-moves** event implemented so
+  far, and the only puzzle here with no solver. That's Regulation 4b3e, not a
+  shortcut: a random-state Megaminx scramble would not be an official one.
+  WCA's Pochmann notation has just six tokens, two of which *hold* a face and
+  turn everything else — `R±±` holds L, `D±±` holds U, `U`/`U'` turns the top
+  layer — so the derivation takes "which pieces move" as a parameter rather
+  than assuming it's the turning layer. Centers are modelled precisely because
+  those bulk turns carry them: a Megaminx scramble genuinely leaves the puzzle
+  reoriented, and the center permutation being confined to the dodecahedron's
+  60 rotations is one of the sharper checks on the geometry.
+
+  This is also the one puzzle that can't live on an integer lattice — `φ` and
+  `sin 72°` are irrational and dodecahedral rotations aren't expressible over
+  the integers the way the cube-family and tetrahedral ones are. So positions
+  are floats matched within a tolerance, which is sound because the structure
+  is discrete and well separated: the closest two distinct positions of a kind
+  are 1 apart against a 1e-6 tolerance and ~1e-15 of rotation error, and
+  `geometry.test.ts` *measures* that margin instead of assuming it. Because
+  there's no solver, the end-to-end gate is scramble-then-invert rather than
+  scramble-then-solve, plus a check that 77 random moves really does displace
+  essentially every piece.
+- **`src/puzzles/{444,555,666,777,square1}/`** — empty. Deliberately: an
+  empty directory isn't a placeholder implementation, but a stub file
+  pretending to be a working API would be.
 
 ## Independence note
 

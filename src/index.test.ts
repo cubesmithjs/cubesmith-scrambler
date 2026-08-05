@@ -29,18 +29,33 @@ import {
   solveClock,
   SOLVED_CLOCK_STATE,
 } from './puzzles/clock';
+import {
+  applyMegaminxMoves,
+  inverseMegaminxMoves,
+  isSolvedMegaminx,
+  parseMegaminxMove,
+  SOLVED_MEGAMINX_STATE,
+} from './puzzles/megaminx';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('333, 222, pyram, skewb and clock are implemented; other events still throw UnimplementedEventError', async () => {
-    expect(isImplementedEvent('333')).toBe(true);
-    expect(isImplementedEvent('222')).toBe(true);
-    expect(isImplementedEvent('pyram')).toBe(true);
-    expect(isImplementedEvent('skewb')).toBe(true);
-    expect(isImplementedEvent('clock')).toBe(true);
+  it('333, 222, pyram, skewb, clock and minx are implemented; other events still throw UnimplementedEventError', async () => {
+    for (const event of ['333', '222', 'pyram', 'skewb', 'clock', 'minx'] as const) {
+      expect(isImplementedEvent(event)).toBe(true);
+    }
     expect(isImplementedEvent('444')).toBe(false);
     await expect(generateScramble('444')).rejects.toBeInstanceOf(UnimplementedEventError);
     await expect(generateScramble('555')).rejects.toBeInstanceOf(UnimplementedEventError);
+  });
+
+  /**
+   * The one event so far whose `quality` is not `random-state`. WCA
+   * Regulation 4b3e specifies random-*moves* for Megaminx, so reporting
+   * random-state would overclaim.
+   */
+  it('reports the quality actually used per event', async () => {
+    expect((await generateScramble('333', { seed: 'q' })).quality).toBe('random-state');
+    expect((await generateScramble('minx', { seed: 'q' })).quality).toBe('random-moves');
   });
 
   it('generateScramble("333") returns a well-formed, random-state-quality result', async () => {
@@ -183,6 +198,25 @@ describe('@cubesmith/scrambler public entry point', () => {
       const scrambledState = applyClockTokens(SOLVED_CLOCK_STATE, parseClockScramble(result.moves));
       expect(isSolvedClock(scrambledState)).toBe(false);
       expect(isSolvedClock(applyClockTokens(scrambledState, solveClock(scrambledState)))).toBe(true);
+    }
+  });
+
+  /**
+   * Megaminx is random-moves, so there is no solver to round-trip against —
+   * the check is scramble-then-invert, which still covers generation,
+   * rendering, parsing and the derived move tables.
+   */
+  it('generateScramble("minx") returns 77 moves that scramble and invert cleanly', async () => {
+    for (let i = 0; i < 15; i += 1) {
+      const result = await generateScramble('minx', { seed: `minx-seed-${i}` });
+      expect(result.moves.split(' ')).toHaveLength(77);
+      const moves = result.moves.split(' ').map(parseMegaminxMove);
+
+      const scrambledState = applyMegaminxMoves(SOLVED_MEGAMINX_STATE, moves);
+      expect(isSolvedMegaminx(scrambledState)).toBe(false);
+      expect(
+        isSolvedMegaminx(applyMegaminxMoves(scrambledState, inverseMegaminxMoves(moves))),
+      ).toBe(true);
     }
   });
 });

@@ -25,8 +25,21 @@ export type WcaEventId =
   | 'skewb'
   | 'sq1';
 
-/** How the scramble was produced. `random-state`: a uniformly random legal state, solved near-optimally and inverted — the same quality class WCA competitions use. */
-export type ScrambleQuality = 'random-state';
+/**
+ * How the scramble was produced, and therefore what can be claimed about it.
+ *
+ * - `random-state` — a uniformly random legal state, solved near-optimally
+ *   and inverted.
+ * - `random-moves` — a fixed-length sequence of randomly chosen moves, with
+ *   no solve involved.
+ *
+ * This is not a quality ranking of *this* package's work: WCA Regulation
+ * 4b3e specifies random-moves for 5x5x5, 6x6x6, 7x7x7 and Megaminx, so for
+ * those events random-moves *is* the official method and a random-state
+ * scramble would be the non-conforming one. Every other implemented event is
+ * random-state.
+ */
+export type ScrambleQuality = 'random-state' | 'random-moves';
 
 export interface ScrambleResult {
   readonly event: WcaEventId;
