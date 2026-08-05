@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { generateScramble, isImplementedEvent, UnimplementedEventError } from './index';
+import { implementedEvents } from './core/scrambler-registry';
+import type { WcaEventId } from './core/types';
 import { parseMove } from './notation/move';
+
+/**
+ * Every member of `WcaEventId`, spelled out. `WcaEventId` is a type, so there
+ * is no runtime list to check against — keeping one here at least makes the
+ * "N of seventeen" claim testable. Promoting this to a real export is on the
+ * API-review list.
+ */
+const EVERY_WCA_EVENT: readonly WcaEventId[] = [
+  '222',
+  '333',
+  '444',
+  '555',
+  '666',
+  '777',
+  '333bf',
+  '333fm',
+  '333oh',
+  '333mbf',
+  '444bf',
+  '555bf',
+  'minx',
+  'pyram',
+  'clock',
+  'skewb',
+  'sq1',
+];
 import { applyMoves, isSolved, solve333, SOLVED_STATE } from './puzzles/333';
 import {
   applyMoves222,
@@ -54,8 +82,8 @@ describe('@cubesmith/scrambler public entry point', () => {
    * 3x3x3 solves (`333`, `333bf`, `333fm`, `333oh`) for no extra coverage, and
    * a 3x3x3 solve is by far the slowest thing in this suite.
    */
-  it('fifteen of the seventeen events are registered', () => {
-    for (const event of [
+  it('registers exactly the thirteen events that are implemented', () => {
+    const implemented = [
       '222',
       '333',
       '333bf',
@@ -69,9 +97,18 @@ describe('@cubesmith/scrambler public entry point', () => {
       'minx',
       'pyram',
       'skewb',
-    ] as const) {
-      expect(isImplementedEvent(event)).toBe(true);
-    }
+    ] as const;
+    const unimplemented = ['444', '444bf', 'sq1', '333mbf'] as const;
+
+    for (const event of implemented) expect(isImplementedEvent(event)).toBe(true);
+    for (const event of unimplemented) expect(isImplementedEvent(event)).toBe(false);
+
+    // The count is asserted rather than described in prose, because "fifteen of
+    // seventeen" sat in the README and in this test's own name while the real
+    // number was thirteen — a hand-maintained claim with nothing checking it.
+    expect([...implementedEvents()].sort()).toEqual([...implemented].sort());
+    expect(implemented.length).toBe(13);
+    expect(implemented.length + unimplemented.length).toBe(EVERY_WCA_EVENT.length);
   });
 
   it('the cheap events all produce a non-empty scramble through the public entry point', async () => {

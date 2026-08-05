@@ -25,8 +25,8 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**Fifteen of the seventeen WCA events work end to end.** The remaining two —
-`444`/`444bf` and `sq1` — throw `UnimplementedEventError`, and `333mbf` is out
+**Thirteen of the seventeen WCA events work end to end.** Three —
+`444`, `444bf` and `sq1` — throw `UnimplementedEventError`, and `333mbf` is out
 of scope by design (see below).
 
 | Event | Method | Status |
