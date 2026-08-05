@@ -6,14 +6,14 @@
   "sideEffects": false,
   "description": "Dependency-free WCA scramble generation. Pure computation only — no Web Workers, no DOM, no browser-only APIs — so it runs identically in Node, Bun, Vite, and both Next.js server and client contexts.",
   "license": "MIT",
-  "author": "",
-  "homepage": "https://github.com/<your-github-username>/cubesmith-scrambler#readme",
+  "author": "DrSiroukane",
+  "homepage": "https://github.com/cubesmithjs/cubesmith-scrambler#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-github-username>/cubesmith-scrambler.git"
+    "url": "git+https://github.com/cubesmithjs/cubesmith-scrambler.git"
   },
   "bugs": {
-    "url": "https://github.com/<your-github-username>/cubesmith-scrambler/issues"
+    "url": "https://github.com/cubesmithjs/cubesmith-scrambler/issues"
   },
   "keywords": [
     "rubiks-cube",
