@@ -6,6 +6,7 @@
  */
 import { register222Scrambler } from './puzzles/222';
 import { register333Scrambler } from './puzzles/333';
+import { registerPyraminxScrambler } from './puzzles/pyraminx';
 
 // Real function calls, not bare `import '...'` for their side effect —
 // registering a puzzle mutates the scrambler registry, and an import kept
@@ -16,6 +17,7 @@ import { register333Scrambler } from './puzzles/333';
 // that kind of removal.
 register222Scrambler();
 register333Scrambler();
+registerPyraminxScrambler();
 
 export { generateScramble } from './core/generate-scramble';
 export { UnimplementedEventError } from './core/errors';

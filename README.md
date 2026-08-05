@@ -25,7 +25,7 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')` and `generateScramble('222')` both work end to
+**`generateScramble('333')`, `('222')` and `('pyram')` all work end to
 end.** Each generates a uniformly random, physically-reachable state and
 solves it via IDA* with pruning-table heuristics; the solution's inverse is
 returned as the scramble. Every other event still throws
@@ -39,17 +39,19 @@ returned as the scramble. Every other event still throws
 | Shared face-turn notation (`U`, `R'`, `F2`, …) | ✅ Done |
 | **`generateScramble('333')`** — cube state model + all 18 move tables (invariant-tested), parity-correct random-state generation, two-phase (Kociemba-style) solver + pruning tables | ✅ **Done** |
 | **`generateScramble('222')`** — single-phase solver (the whole 3,674,160-state group fits in one pruning table, confirmed by BFS reaching every entry — no two-phase decomposition needed) | ✅ **Done** |
+| **`generateScramble('pyram')`** — tetrahedral geometry derived on an exact integer lattice, single exact pruning table, optimal solve + WCA-shaped tip moves | ✅ **Done** |
 | Every other event (444, 555, …, clock) | Not started — folders exist, no implementation |
 
 Known limitation: pruning tables are built lazily in memory on first use,
 not precomputed and shipped as a serialized asset. Measured on this
 machine: **333** — ~11s one-time cold-build, then ~7-400ms per scramble
 (mean ~100ms; search depth varies per state). **222** — ~5.75s cold-build,
-then **~0.01ms per scramble** (mean, ~100,000/sec) — its pruning table
-holds the *exact* distance for the whole group, so search is essentially
-free once built. Precomputing and shipping serialized tables to eliminate
-the cold-start cost is the natural next optimization, not yet done. See
-`npm run bench`.
+then **~0.01ms per scramble** (mean, ~100,000/sec). **pyram** — ~1s
+cold-build, then **~0.014ms per scramble** (mean, ~74,000/sec). For 222 and
+pyram the pruning table holds the *exact* distance for the whole group, so
+search is essentially free once built. Precomputing and shipping serialized
+tables to eliminate the cold-start cost is the natural next optimization,
+not yet done. See `npm run bench`.
 
 ## Usage
 
@@ -58,6 +60,7 @@ import { generateScramble } from '@cubesmith/scrambler';
 
 const { moves } = await generateScramble('333');
 const { moves: pocketCube } = await generateScramble('222');
+const { moves: pyraminx } = await generateScramble('pyram');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
@@ -105,8 +108,24 @@ const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' 
   no two-phase decomposition and no parity fix-up needed in random-state
   generation (every permutation/orientation combination is independently
   reachable).
-- **`src/puzzles/{444,555,666,777,skewb,pyraminx,megaminx,square1,clock}/`**
-  — empty. Deliberately: an empty directory isn't a placeholder
+- **`src/puzzles/pyraminx/`** — the first non-cube puzzle, so it brings its
+  own `notation.ts` rather than reusing `src/notation/`: a Pyraminx turn has
+  order 3, so there are only two amounts and `2` means *counterclockwise*,
+  where a cube face turn has order 4 and `2` means a half turn. `geometry.ts`
+  derives the turn tables from 3D rotations the same way 333 does, but on an
+  exact **integer** lattice — a regular tetrahedron's four vertices are four
+  alternate corners of a cube, which puts the six edge midpoints precisely on
+  the six cube face centers, so no floating-point tolerance appears anywhere.
+  All 720 edge permutations and all 64 flip vectors are encodable rather than
+  just the legal ones, so the pruning BFS *proves* the two constraints
+  (even permutation, even total flip) instead of assuming them: it reaches
+  exactly 933,120 of the 3,732,480 encodable states — the published Pyraminx
+  group order — at a maximum distance of 11, the published God's number.
+  Tips are modelled but not searched: nothing on the puzzle can observe a
+  tip, and an uppercase turn carries its own tip along, so they're
+  reconciled after the layer solve and emitted last, as WCA scrambles do.
+- **`src/puzzles/{444,555,666,777,skewb,megaminx,square1,clock}/`** —
+  empty. Deliberately: an empty directory isn't a placeholder
   implementation, but a stub file pretending to be a working API would be.
 
 ## Independence note

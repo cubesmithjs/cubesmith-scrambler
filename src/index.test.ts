@@ -8,12 +8,20 @@ import {
   solve222,
   SOLVED_222_STATE,
 } from './puzzles/222';
+import {
+  applyPyraminxMoves,
+  isSolvedPyraminx,
+  parsePyraminxMove,
+  solvePyraminx,
+  SOLVED_PYRAMINX_STATE,
+} from './puzzles/pyraminx';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('333 and 222 are implemented; other events still throw UnimplementedEventError', async () => {
+  it('333, 222 and pyram are implemented; other events still throw UnimplementedEventError', async () => {
     expect(isImplementedEvent('333')).toBe(true);
     expect(isImplementedEvent('222')).toBe(true);
+    expect(isImplementedEvent('pyram')).toBe(true);
     expect(isImplementedEvent('444')).toBe(false);
     await expect(generateScramble('444')).rejects.toBeInstanceOf(UnimplementedEventError);
     await expect(generateScramble('555')).rejects.toBeInstanceOf(UnimplementedEventError);
@@ -89,6 +97,31 @@ describe('@cubesmith/scrambler public entry point', () => {
       expect(isSolved222(scrambledState)).toBe(false);
       const solution = solve222(scrambledState);
       expect(isSolved222(applyMoves222(scrambledState, solution))).toBe(true);
+    }
+  });
+
+  it('generateScramble("pyram") returns a well-formed result that genuinely scrambles and re-solves', async () => {
+    const result = await generateScramble('pyram', { seed: 'pyram-end-to-end' });
+    expect(result.event).toBe('pyram');
+    expect(result.quality).toBe('random-state');
+    expect(result.moves.length).toBeGreaterThan(0);
+
+    const moves = result.moves.split(' ').map(parsePyraminxMove);
+    const scrambledState = applyPyraminxMoves(SOLVED_PYRAMINX_STATE, moves);
+    expect(isSolvedPyraminx(scrambledState)).toBe(false);
+
+    const solution = solvePyraminx(scrambledState);
+    expect(isSolvedPyraminx(applyPyraminxMoves(scrambledState, solution))).toBe(true);
+  });
+
+  it('holds across many different seeds for pyram, not just one', async () => {
+    for (let i = 0; i < 15; i += 1) {
+      const result = await generateScramble('pyram', { seed: `pyram-seed-${i}` });
+      const moves = result.moves.split(' ').map(parsePyraminxMove);
+      const scrambledState = applyPyraminxMoves(SOLVED_PYRAMINX_STATE, moves);
+      expect(isSolvedPyraminx(scrambledState)).toBe(false);
+      const solution = solvePyraminx(scrambledState);
+      expect(isSolvedPyraminx(applyPyraminxMoves(scrambledState, solution))).toBe(true);
     }
   });
 });

@@ -1,6 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import { createRandomSource } from '../random/random-source';
-import { permutationParity, randomPermutation, swapToFlipParity } from './permutation';
+import {
+  allPermutations,
+  permutationParity,
+  randomPermutation,
+  swapToFlipParity,
+} from './permutation';
+
+describe('allPermutations', () => {
+  it('produces exactly n! distinct permutations of [0, n)', () => {
+    let factorial = 1;
+    for (let n = 0; n <= 7; n += 1) {
+      if (n > 0) factorial *= n;
+      const perms = allPermutations(n);
+      expect(perms).toHaveLength(factorial);
+      expect(new Set(perms.map((p) => p.join(','))).size).toBe(factorial);
+      for (const perm of perms) {
+        expect(perm).toHaveLength(n);
+        expect(new Set(perm).size).toBe(n);
+      }
+    }
+  });
+
+  it('is in lexicographic order, so an index is a stable coordinate', () => {
+    const perms = allPermutations(5);
+    expect(perms[0]).toEqual([0, 1, 2, 3, 4]);
+    expect(perms[perms.length - 1]).toEqual([4, 3, 2, 1, 0]);
+    for (let i = 1; i < perms.length; i += 1) {
+      expect(perms[i]!.join(',') > perms[i - 1]!.join(',')).toBe(true);
+    }
+  });
+
+  it('splits evenly into even and odd permutations for n >= 2', () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const perms = allPermutations(n);
+      const even = perms.filter((p) => permutationParity(p) === 0).length;
+      expect(even * 2).toBe(perms.length);
+    }
+  });
+});
 
 describe('randomPermutation', () => {
   it('returns a permutation of [0, n) — every value appears exactly once', () => {

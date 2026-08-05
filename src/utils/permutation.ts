@@ -14,6 +14,37 @@ export function randomPermutation(random: RandomSource, n: number): number[] {
 }
 
 /**
+ * Every permutation of `[0, n)` in lexicographic order, so a permutation's
+ * index in this list is a stable, reversible coordinate. Only ever called
+ * for small `n` — `n!` grows fast, and the puzzles that rank permutations
+ * this way (2x2x2's 7 corners, Pyraminx's 6 edges) are exactly the ones
+ * whose whole permutation space is small enough to enumerate outright.
+ */
+export function allPermutations(n: number): number[][] {
+  const results: number[][] = [];
+  const current: number[] = [];
+  const used = new Array<boolean>(n).fill(false);
+
+  function recurse(): void {
+    if (current.length === n) {
+      results.push([...current]);
+      return;
+    }
+    for (let i = 0; i < n; i += 1) {
+      if (used[i]) continue;
+      used[i] = true;
+      current.push(i);
+      recurse();
+      current.pop();
+      used[i] = false;
+    }
+  }
+
+  recurse();
+  return results;
+}
+
+/**
  * `0` (even) or `1` (odd): the number of transpositions `perm` decomposes
  * into, mod 2 — via cycle decomposition (each cycle of length `k`
  * contributes `k - 1` transpositions), rather than counting inversions,
