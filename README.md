@@ -25,11 +25,12 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')`, `('222')`, `('pyram')` and `('skewb')` all work
-end to end.** Each generates a uniformly random, physically-reachable state
-and solves it via IDA* with pruning-table heuristics; the solution's inverse
-is returned as the scramble. Every other event still throws
-`UnimplementedEventError`.
+**`generateScramble('333')`, `('222')`, `('pyram')`, `('skewb')` and
+`('clock')` all work end to end.** Each generates a uniformly random,
+physically-reachable state; the four twisty puzzles solve it via IDA* with
+pruning-table heuristics and return the solution's inverse, while Clock —
+whose group is abelian — reads the scramble straight off a linear system.
+Every other event still throws `UnimplementedEventError`.
 
 | Piece | Status |
 |---|---|
@@ -42,7 +43,8 @@ is returned as the scramble. Every other event still throws
 | **`generateScramble('222')`** — single-phase solver (the whole 3,674,160-state group fits in one pruning table, confirmed by BFS reaching every entry — no two-phase decomposition needed) | ✅ **Done** |
 | **`generateScramble('pyram')`** — tetrahedral geometry derived on an exact integer lattice, single exact pruning table, optimal solve + WCA-shaped tip moves | ✅ **Done** |
 | **`generateScramble('skewb')`** — corner-turning, deep-cut geometry; BFS-discovered coordinates reproducing the puzzle's 3,149,280 states exactly | ✅ **Done** |
-| Every other event (444, 555, …, clock) | Not started — folders exist, no implementation |
+| **`generateScramble('clock')`** — dials and pins, no cube geometry; the official 14-token template proved to be a unimodular basis for all 12^14 states | ✅ **Done** |
+| Every other event (444, 555, …, sq1) | Not started — folders exist, no implementation |
 
 Known limitation: pruning tables are built lazily in memory on first use,
 not precomputed and shipped as a serialized asset. Measured on this
@@ -53,7 +55,8 @@ then ~0.017ms per scramble (~59,000/sec). **pyram** — ~1s cold-build, then
 (~72,000/sec). For 222, pyram and skewb the pruning table holds the *exact*
 distance for the whole group, so search is essentially free once built.
 Precomputing and shipping serialized tables to eliminate the cold-start cost
-is the natural next optimization, not yet done. See `npm run bench`.
+is the natural next optimization, not yet done. **clock** has no table and no
+cold start at all — ~0.011ms (~93,000/sec). See `npm run bench`.
 
 ## Usage
 
@@ -64,6 +67,7 @@ const { moves } = await generateScramble('333');
 const { moves: pocketCube } = await generateScramble('222');
 const { moves: pyraminx } = await generateScramble('pyram');
 const { moves: skewb } = await generateScramble('skewb');
+const { moves: clock } = await generateScramble('clock');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
@@ -162,7 +166,29 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   landing on 8,748 corner states × 360 center states = **3,149,280** — the
   published Skewb position count — with the pruning BFS then reaching every
   one of them at a maximum distance of 11, the published God's number.
-- **`src/puzzles/{444,555,666,777,megaminx,square1,clock}/`** — empty.
+- **`src/puzzles/clock/`** — the outlier. No cube geometry is reusable here
+  and none is used: a Clock is eighteen twelve-position dials (nine per side)
+  and four pins, where a pin's state decides whether its corner clock is
+  geared to its three neighbours on the front or the back. Its own
+  `notation.ts` too — a token names a *pin configuration* and an hour count,
+  and a scramble also contains a physical flip of the puzzle and a closing
+  declaration of where the pins are left.
+
+  Every move is an *addition* in `Z12` on a fixed set of dials, so the group
+  is abelian and the puzzle is linear algebra rather than search — no pruning
+  table, no IDA*, no state-space BFS. Corner clocks pass through the puzzle
+  and show on both sides, leaving `9 + 9 - 4 = 14` independent dials and the
+  published `12^14 = 1,283,918,464,548,864` states.
+
+  The payoff is that the official fourteen-token scramble template turns out
+  to be a **unimodular basis**: its effect matrix — *measured* by applying
+  each token to a solved puzzle, not written down — has determinant ±1. So
+  every state is reachable by exactly one choice of the fourteen amounts,
+  generating a uniformly random state is fourteen uniform draws with no
+  constraint to satisfy, and solving one is a single matrix multiply
+  (`utils/mod-matrix.ts`, which inverts mod 4 and mod 3 and recombines by
+  CRT, because `Z12` is not a field and a column can lack a pivot entirely).
+- **`src/puzzles/{444,555,666,777,megaminx,square1}/`** — empty.
   Deliberately: an empty directory isn't a placeholder implementation, but a
   stub file pretending to be a working API would be.
 

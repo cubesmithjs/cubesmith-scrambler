@@ -6,6 +6,7 @@
  */
 import { register222Scrambler } from './puzzles/222';
 import { register333Scrambler } from './puzzles/333';
+import { registerClockScrambler } from './puzzles/clock';
 import { registerPyraminxScrambler } from './puzzles/pyraminx';
 import { registerSkewbScrambler } from './puzzles/skewb';
 
@@ -20,6 +21,7 @@ register222Scrambler();
 register333Scrambler();
 registerPyraminxScrambler();
 registerSkewbScrambler();
+registerClockScrambler();
 
 export { generateScramble } from './core/generate-scramble';
 export { UnimplementedEventError } from './core/errors';

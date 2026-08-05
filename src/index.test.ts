@@ -22,14 +22,22 @@ import {
   solveSkewb,
   SOLVED_SKEWB_STATE,
 } from './puzzles/skewb';
+import {
+  applyClockTokens,
+  isSolvedClock,
+  parseClockScramble,
+  solveClock,
+  SOLVED_CLOCK_STATE,
+} from './puzzles/clock';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('333, 222, pyram and skewb are implemented; other events still throw UnimplementedEventError', async () => {
+  it('333, 222, pyram, skewb and clock are implemented; other events still throw UnimplementedEventError', async () => {
     expect(isImplementedEvent('333')).toBe(true);
     expect(isImplementedEvent('222')).toBe(true);
     expect(isImplementedEvent('pyram')).toBe(true);
     expect(isImplementedEvent('skewb')).toBe(true);
+    expect(isImplementedEvent('clock')).toBe(true);
     expect(isImplementedEvent('444')).toBe(false);
     await expect(generateScramble('444')).rejects.toBeInstanceOf(UnimplementedEventError);
     await expect(generateScramble('555')).rejects.toBeInstanceOf(UnimplementedEventError);
@@ -153,6 +161,28 @@ describe('@cubesmith/scrambler public entry point', () => {
       const scrambledState = applySkewbMoves(SOLVED_SKEWB_STATE, moves);
       expect(isSolvedSkewb(scrambledState)).toBe(false);
       expect(isSolvedSkewb(applySkewbMoves(scrambledState, solveSkewb(scrambledState)))).toBe(true);
+    }
+  });
+
+  it('generateScramble("clock") returns the official token template, and it round-trips', async () => {
+    const result = await generateScramble('clock', { seed: 'clock-end-to-end' });
+    expect(result.event).toBe('clock');
+    expect(result.quality).toBe('random-state');
+    expect(result.moves).toContain('y2');
+
+    const tokens = parseClockScramble(result.moves);
+    const scrambledState = applyClockTokens(SOLVED_CLOCK_STATE, tokens);
+    expect(isSolvedClock(scrambledState)).toBe(false);
+
+    expect(isSolvedClock(applyClockTokens(scrambledState, solveClock(scrambledState)))).toBe(true);
+  });
+
+  it('holds across many different seeds for clock, not just one', async () => {
+    for (let i = 0; i < 15; i += 1) {
+      const result = await generateScramble('clock', { seed: `clock-seed-${i}` });
+      const scrambledState = applyClockTokens(SOLVED_CLOCK_STATE, parseClockScramble(result.moves));
+      expect(isSolvedClock(scrambledState)).toBe(false);
+      expect(isSolvedClock(applyClockTokens(scrambledState, solveClock(scrambledState)))).toBe(true);
     }
   });
 });
