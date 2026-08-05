@@ -8,8 +8,10 @@ import { register222Scrambler } from './puzzles/222';
 import { register333Scrambler } from './puzzles/333';
 import { registerClockScrambler } from './puzzles/clock';
 import { registerMegaminxScrambler } from './puzzles/megaminx';
+import { registerRandomMoveCubeScramblers } from './puzzles/nxn';
 import { registerPyraminxScrambler } from './puzzles/pyraminx';
 import { registerSkewbScrambler } from './puzzles/skewb';
+import { registerVariantScramblers } from './puzzles/variants';
 
 // Real function calls, not bare `import '...'` for their side effect —
 // registering a puzzle mutates the scrambler registry, and an import kept
@@ -24,6 +26,9 @@ registerPyraminxScrambler();
 registerSkewbScrambler();
 registerClockScrambler();
 registerMegaminxScrambler();
+registerRandomMoveCubeScramblers();
+// Last, because the variant events build on the scramblers registered above.
+registerVariantScramblers();
 
 export { generateScramble } from './core/generate-scramble';
 export { UnimplementedEventError } from './core/errors';

@@ -19,8 +19,9 @@
  */
 
 import type { Face } from '../../notation/move';
+import { rotateQuarter, vecEquals, type Vec3 } from '../../utils/vec3';
 
-export type Vec3 = readonly [number, number, number];
+export type { Vec3 };
 
 export const CORNER_POSITIONS: readonly Vec3[] = [
   [1, 1, 1], // 0 URF
@@ -50,26 +51,20 @@ export const EDGE_POSITIONS: readonly Vec3[] = [
 
 /**
  * The face turn as a 90° rotation of position vectors, in the WCA sense
- * (clockwise viewed with that face turned toward the viewer). Derived once
- * per axis from the standard right-hand-rule rotation matrices, using the
- * fact that "clockwise viewed from the positive end of an axis looking
- * toward the origin" is always the negative-angle rotation in the
- * right-hand convention, and its mirror (negative end of the axis) is
- * always the positive-angle rotation — applied uniformly to all six faces
- * rather than re-derived ad hoc per face.
+ * (clockwise viewed with that face turned toward the viewer). The rotations
+ * themselves live in `utils/vec3.ts` — this module was their original home,
+ * and they moved there once `puzzles/nxn/` needed the same six rotations for
+ * its facelet model, so that a second consumer could not drift from a second
+ * copy.
  */
 const ROTATIONS: Record<Face, (v: Vec3) => Vec3> = {
-  U: ([x, y, z]) => [-z, y, x],
-  D: ([x, y, z]) => [z, y, -x],
-  F: ([x, y, z]) => [y, -x, z],
-  B: ([x, y, z]) => [-y, x, z],
-  R: ([x, y, z]) => [x, z, -y],
-  L: ([x, y, z]) => [x, -z, y],
+  U: (v) => rotateQuarter('U', v),
+  D: (v) => rotateQuarter('D', v),
+  F: (v) => rotateQuarter('F', v),
+  B: (v) => rotateQuarter('B', v),
+  R: (v) => rotateQuarter('R', v),
+  L: (v) => rotateQuarter('L', v),
 };
-
-function vecEquals(a: Vec3, b: Vec3): boolean {
-  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-}
 
 /**
  * A face turn only physically moves pieces actually on that face's layer —

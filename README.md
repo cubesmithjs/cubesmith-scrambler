@@ -25,28 +25,29 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')`, `('222')`, `('pyram')`, `('skewb')`, `('clock')`
-and `('minx')` all work end to end.** The four twisty random-state puzzles
-draw a uniformly random reachable state and solve it via IDA* with
-pruning-table heuristics, returning the solution's inverse; Clock — whose
-group is abelian — reads its scramble straight off a linear system; and
-Megaminx is random-*moves*, which is what WCA Regulation 4b3e requires for it.
-Every other event still throws `UnimplementedEventError`.
+**Fifteen of the seventeen WCA events work end to end.** The remaining two —
+`444`/`444bf` and `sq1` — throw `UnimplementedEventError`, and `333mbf` is out
+of scope by design (see below).
 
-| Piece | Status |
-|---|---|
-| Package scaffold, strict TypeScript, ESM, Vitest | ✅ Done |
-| `generateScramble()` / registry / typed "not implemented" errors | ✅ Done |
-| Seeded (`RandomSource`) / cryptographically-random number generation | ✅ Done |
-| Shared face-turn notation (`U`, `R'`, `F2`, …) | ✅ Done |
-| WCA Regulation 4b3 scramble shaping (per-event minimum distance to solved, presentable sequence length) | ✅ Done |
-| **`generateScramble('333')`** — cube state model + all 18 move tables (invariant-tested), parity-correct random-state generation, two-phase (Kociemba-style) solver + pruning tables | ✅ **Done** |
-| **`generateScramble('222')`** — single-phase solver (the whole 3,674,160-state group fits in one pruning table, confirmed by BFS reaching every entry — no two-phase decomposition needed) | ✅ **Done** |
-| **`generateScramble('pyram')`** — tetrahedral geometry derived on an exact integer lattice, single exact pruning table, optimal solve + WCA-shaped tip moves | ✅ **Done** |
-| **`generateScramble('skewb')`** — corner-turning, deep-cut geometry; BFS-discovered coordinates reproducing the puzzle's 3,149,280 states exactly | ✅ **Done** |
-| **`generateScramble('clock')`** — dials and pins, no cube geometry; the official 14-token template proved to be a unimodular basis for all 12^14 states | ✅ **Done** |
-| **`generateScramble('minx')`** — dodecahedral geometry, Pochmann notation, 77 random moves per Regulation 4b3e (**not** random-state — see below) | ✅ **Done** |
-| Every other event (444, 555, …, sq1) | Not started — folders exist, no implementation |
+| Event | Method | Status |
+|---|---|---|
+| `333` | random-state | ✅ Two-phase (Kociemba-style) solver, parity-correct random state |
+| `222` | random-state | ✅ Single-phase; the whole 3,674,160-state group fits one exact pruning table |
+| `pyram` | random-state | ✅ Tetrahedral geometry on an exact integer lattice; 933,120 states, God's number 11, both reproduced by BFS |
+| `skewb` | random-state | ✅ Corner-turning deep cut; BFS-discovered coordinates reproducing 3,149,280 states and God's number 11 |
+| `clock` | random-state | ✅ Dials and pins; the official 14-token template proved to be a unimodular basis for all 12^14 states |
+| `minx` | random-moves | ✅ Dodecahedral geometry, Pochmann notation, 77 moves (random-moves is what 4b3e *requires* here) |
+| `555` `666` `777` | random-moves | ✅ Shared NxN facelet model; 60 / 80 / 100 moves, no redundant move anywhere |
+| `333fm` `333oh` | random-state | ✅ Plain aliases for `333` — same puzzle, only the human constraint differs |
+| `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a) |
+| `444` `444bf` | random-state | ❌ Not started — needs a full random-state solver, comparable to `333` |
+| `sq1` | random-state | ❌ Not started — needs a shape-changing model and a two-phase solver |
+| `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API |
+
+Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
+`generateScramble()` / registry / typed "not implemented" errors, seeded and
+cryptographically-random number generation, shared face-turn and wide-move
+notation, and the WCA Regulation 4b3 scramble shaping described below.
 
 Known limitation: pruning tables are built lazily in memory on first use,
 not precomputed and shipped as a serialized asset. Measured on this
@@ -58,7 +59,9 @@ then ~0.017ms per scramble (~59,000/sec). **pyram** — ~1s cold-build, then
 distance for the whole group, so search is essentially free once built.
 Precomputing and shipping serialized tables to eliminate the cold-start cost
 is the natural next optimization, not yet done. **clock** has no table and no
-cold start at all — ~0.011ms (~93,000/sec). See `npm run bench`.
+cold start at all — ~0.011ms (~93,000/sec). The random-moves events have no
+table and no search either: **minx** ~0.01ms, **555/666/777** ~0.011 / 0.014 /
+0.018ms. See `npm run bench`.
 
 ## Usage
 
@@ -71,14 +74,23 @@ const { moves: pyraminx } = await generateScramble('pyram');
 const { moves: skewb } = await generateScramble('skewb');
 const { moves: clock } = await generateScramble('clock');
 const { moves: megaminx } = await generateScramble('minx');
+const { moves: big } = await generateScramble('777');
+// blindfolded events additionally orient the puzzle randomly:
+const { moves: blind } = await generateScramble('333bf');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
 
+`ScrambleResult` also carries `quality`, which is `'random-state'` or
+`'random-moves'` depending on what the event's regulation calls for — see
+below. `isImplementedEvent(event)` answers whether an event is callable
+without having to catch `UnimplementedEventError`.
+
 ## Scramble shape — what the WCA Regulations require beyond "random state"
 
-A scramble is not just the inverse of a random state's solution. Two extra
-rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
+A scramble is not just the inverse of a random state's solution. Four extra
+rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
+`src/puzzles/nxn/orientation.ts`):
 
 - **A minimum number of moves to solve.** Regulation 4b3 sets a floor of 2
   moves, with per-puzzle exceptions: **2x2x2 ≥ 4** (4b3b), **Skewb ≥ 7**
@@ -100,6 +112,15 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   Padding here asks the solver for a solution of a given *exact* length
   rather than the shortest one, so the state reached is unchanged and still
   uniformly random.
+- **Blindfolded events must orient the puzzle randomly.** Regulation 4b3a, and
+  the reason `333bf` is *not* an alias for `333`: a 3x3x3 scramble is all
+  single-layer turns, so it never moves a centre and always leaves the cube
+  white-up green-front. For a blindfolded solve the starting orientation is
+  part of what gets memorised. The orientation is carried by wide moves —
+  which is why official 3BLD scrambles end with tokens like `Rw2 Fw'` — and
+  the suffixes are *searched for* rather than written down, because the
+  obvious `Rw^a Fw^b` construction reaches only 16 of the 24 orientations and
+  so cannot give the equal probability the regulation asks for.
 
 ## Design
 
@@ -118,8 +139,12 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   `globalThis.crypto`, present in Node ≥19, Bun, and every browser)
   otherwise.
 - **`src/notation/`** — move/notation primitives (`Face`, `FaceMove`,
-  `moveToString`, `parseMove`, inversion) shared by every face-turn-family
-  puzzle (222–777).
+  `moveToString`, `parseMove`, inversion) shared by the face-turn-family
+  puzzles. `puzzles/nxn/notation.ts` extends them with layer depth (`Rw`,
+  `3Rw`). The non-cube puzzles each bring their own notation instead of bending
+  these types: a Pyraminx or Skewb turn has order 3 so `2` would mean
+  *counterclockwise* rather than a half turn, a Megaminx token names a face to
+  *hold*, and a Clock token names a pin configuration and an hour count.
 - **`src/puzzles/333/`** — the 3x3x3 cube state model (`CubeState`), its 18
   move tables (derived geometrically from 3D rotation matrices rather than
   hand-transcribed, and cross-checked against known mathematical invariants
@@ -221,17 +246,49 @@ rules apply, and both are implemented here (`src/core/scramble-shape.ts`):
   there's no solver, the end-to-end gate is scramble-then-invert rather than
   scramble-then-solve, plus a check that 77 random moves really does displace
   essentially every piece.
-- **`src/puzzles/{444,555,666,777,square1}/`** — empty. Deliberately: an
-  empty directory isn't a placeholder implementation, but a stub file
-  pretending to be a working API would be.
+- **`src/puzzles/nxn/`** — one module for the whole NxNxN family, currently
+  serving 555, 666 and 777 (and, once it exists, 444). It models the cube at
+  the **facelet** level rather than as pieces with orientation counters: these
+  are random-moves events with no solver, so there is nothing to coordinatise,
+  and tracking every sticker individually is a *stronger* check on the derived
+  moves than tracking a piece plus a twist. Positions live on an exact integer
+  lattice doubled so cubie centres are integers, and each facelet carries its
+  outward normal — which is what makes the layer test correct, since which
+  layer a facelet belongs to is a property of its cubie, not of its own
+  position (every R-face sticker sits at `x = n` on every cube). The 90°
+  rotations come from `utils/vec3.ts`, shared with `puzzles/333/geometry.ts`.
+
+  `random-moves.ts` holds the one rule that makes "random moves" mean
+  something: within any run of consecutive moves on the same axis, no two may
+  turn the same layer set. Same-axis moves commute, so a repeat anywhere inside
+  such a run could be reordered together and merged — `R Rw R'` is as redundant
+  as `R R'`, and a scrambler that only checked the previous move would emit it.
+  `orientation.ts` provides the random puzzle orientation the blindfolded
+  events need.
+- **`src/puzzles/variants.ts`** — the events that are the same puzzle as one
+  already implemented: `333fm`/`333oh` as plain aliases, `333bf`/`555bf` with
+  the orientation suffix added.
+- **`src/puzzles/{444,square1}/`** — empty. Deliberately: an empty directory
+  isn't a placeholder implementation, but a stub file pretending to be a
+  working API would be.
 
 ## Independence note
 
-The two-phase algorithm this package's solver will implement is Herbert
-Kociemba's published *method* — the group-theoretic decomposition and
-IDA*-with-pruning-tables technique, not any project's source code. It's
-implemented from that conceptual description; no code was read from or
-adapted from `cubing.js`, csTimer, or TNoodle.
+Every puzzle here is implemented from published *descriptions* of its
+mechanics and from this package's own geometric derivations — no code was read
+from or adapted from `cubing.js`, csTimer, or TNoodle. The 3x3x3 solver uses
+Herbert Kociemba's published two-phase *method*: the group-theoretic
+decomposition and the IDA*-with-pruning-tables technique, not any project's
+source expression of it.
+
+Where a fact about a puzzle could have been misremembered, it was looked up
+and then checked against something computable. The move tables are derived
+from coordinate models rather than transcribed, and each puzzle's derivation
+is cross-checked against numbers published independently of this code — the
+Pyraminx's 933,120 states and God's number of 11, the Skewb's 3,149,280 and
+11, the Clock's 12^14, the Megaminx's dodecahedral structure and its 60
+rotations. Those checks are what the test suites spend most of their effort
+on, because a plausible-looking wrong model is the failure mode that matters.
 
 ## Contributing
 

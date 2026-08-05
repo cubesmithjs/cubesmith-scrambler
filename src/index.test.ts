@@ -36,16 +36,48 @@ import {
   parseMegaminxMove,
   SOLVED_MEGAMINX_STATE,
 } from './puzzles/megaminx';
+import {
+  applyWideMoves,
+  inverseWideMoves,
+  isIdentityNxN,
+  isSolvedNxN,
+  parseWideMove,
+  solvedCubeNxN,
+} from './puzzles/nxn';
+import { orientationKey } from './puzzles/nxn/orientation';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('333, 222, pyram, skewb, clock and minx are implemented; other events still throw UnimplementedEventError', async () => {
-    for (const event of ['333', '222', 'pyram', 'skewb', 'clock', 'minx'] as const) {
+  it('fifteen of the seventeen events are implemented', async () => {
+    for (const event of [
+      '222',
+      '333',
+      '333bf',
+      '333fm',
+      '333oh',
+      '555',
+      '555bf',
+      '666',
+      '777',
+      'clock',
+      'minx',
+      'pyram',
+      'skewb',
+    ] as const) {
       expect(isImplementedEvent(event)).toBe(true);
+      expect((await generateScramble(event, { seed: 'smoke' })).moves.length).toBeGreaterThan(0);
     }
-    expect(isImplementedEvent('444')).toBe(false);
-    await expect(generateScramble('444')).rejects.toBeInstanceOf(UnimplementedEventError);
-    await expect(generateScramble('555')).rejects.toBeInstanceOf(UnimplementedEventError);
+  });
+
+  /**
+   * The three that aren't, and why — each is a deliberate state, not an
+   * oversight, and each throws rather than returning something plausible.
+   */
+  it('444, 444bf and sq1 throw UnimplementedEventError; 333mbf is out of scope by design', async () => {
+    for (const event of ['444', '444bf', 'sq1', '333mbf'] as const) {
+      expect(isImplementedEvent(event)).toBe(false);
+      await expect(generateScramble(event)).rejects.toBeInstanceOf(UnimplementedEventError);
+    }
   });
 
   /**
@@ -206,6 +238,91 @@ describe('@cubesmith/scrambler public entry point', () => {
    * the check is scramble-then-invert, which still covers generation,
    * rendering, parsing and the derived move tables.
    */
+  /**
+   * The variant events. `333fm`/`333oh` are the same scramble as `333` — same
+   * puzzle, only the human constraint differs — while the blindfolded ones
+   * must additionally orient the puzzle randomly (Regulation 4b3a), so they
+   * are *not* plain aliases.
+   */
+  describe('variant events', () => {
+    it('333fm and 333oh reproduce 333 exactly for the same seed', async () => {
+      const base = await generateScramble('333', { seed: 'variant' });
+      expect((await generateScramble('333fm', { seed: 'variant' })).moves).toBe(base.moves);
+      expect((await generateScramble('333oh', { seed: 'variant' })).moves).toBe(base.moves);
+    });
+
+    it('333bf is a 333 scramble plus a wide-move orientation suffix', async () => {
+      const base = await generateScramble('333', { seed: 'bf' });
+      const bf = await generateScramble('333bf', { seed: 'bf' });
+      expect(bf.moves.startsWith(base.moves)).toBe(true);
+
+      // Every extra token is a wide move — the only thing that can move a
+      // centre, and therefore the only thing that can reorient the cube.
+      const extra = bf.moves.slice(base.moves.length).trim();
+      for (const token of extra.split(' ').filter(Boolean)) {
+        expect(parseWideMove(token).depth).toBeGreaterThanOrEqual(2);
+      }
+    });
+
+    /**
+     * That the *draw* covers all 24 orientations uniformly is established in
+     * `puzzles/nxn/orientation.test.ts`, where it costs nothing. Here the point
+     * is only that `333bf` is wired to it at all — contrasted against `333`,
+     * whose single-layer turns can never move a centre. A 3x3x3 scramble is
+     * ~100ms, so this deliberately uses a handful of seeds rather than
+     * hundreds.
+     */
+    it('333bf varies the orientation; 333 always leaves it alone', async () => {
+      const solved = solvedCubeNxN(3);
+      const blindfolded = new Set<string>();
+      const sighted = new Set<string>();
+      for (let seed = 0; seed < 12; seed += 1) {
+        const bf = await generateScramble('333bf', { seed: `bf-${seed}` });
+        blindfolded.add(
+          orientationKey(applyWideMoves(solved, bf.moves.split(' ').map(parseWideMove))),
+        );
+        const plain = await generateScramble('333', { seed: `bf-${seed}` });
+        sighted.add(
+          orientationKey(applyWideMoves(solved, plain.moves.split(' ').map(parseWideMove))),
+        );
+      }
+      expect(blindfolded.size).toBeGreaterThan(1);
+      // Exactly the gap Regulation 4b3a closes for the blindfolded events.
+      expect(sighted.size).toBe(1);
+    });
+
+    it('555bf is a 555 scramble plus an orientation suffix, and still round-trips', async () => {
+      const base = await generateScramble('555', { seed: 'bf5' });
+      const bf = await generateScramble('555bf', { seed: 'bf5' });
+      expect(bf.moves.startsWith(base.moves)).toBe(true);
+      expect(bf.quality).toBe('random-moves');
+
+      const moves = bf.moves.split(' ').map(parseWideMove);
+      const scrambled = applyWideMoves(solvedCubeNxN(5), moves);
+      expect(isSolvedNxN(scrambled)).toBe(false);
+      expect(isIdentityNxN(applyWideMoves(scrambled, inverseWideMoves(moves)))).toBe(true);
+    });
+  });
+
+  describe('the big cubes', () => {
+    for (const [event, size, length] of [
+      ['555', 5, 60],
+      ['666', 6, 80],
+      ['777', 7, 100],
+    ] as const) {
+      it(`${event} is ${length} random moves that scramble and invert cleanly`, async () => {
+        const result = await generateScramble(event, { seed: `${event}-e2e` });
+        expect(result.quality).toBe('random-moves');
+        const moves = result.moves.split(' ').map(parseWideMove);
+        expect(moves).toHaveLength(length);
+
+        const scrambled = applyWideMoves(solvedCubeNxN(size), moves);
+        expect(isSolvedNxN(scrambled)).toBe(false);
+        expect(isIdentityNxN(applyWideMoves(scrambled, inverseWideMoves(moves)))).toBe(true);
+      });
+    }
+  });
+
   it('generateScramble("minx") returns 77 moves that scramble and invert cleanly', async () => {
     for (let i = 0; i < 15; i += 1) {
       const result = await generateScramble('minx', { seed: `minx-seed-${i}` });
