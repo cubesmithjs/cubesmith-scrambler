@@ -25,10 +25,10 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**`generateScramble('333')` works end to end** — a uniformly random,
-physically-reachable state is generated, solved via a two-phase
-(Kociemba-style) IDA* search with pruning tables, and the solution's
-inverse is returned as the scramble. Every other event still throws
+**`generateScramble('333')` and `generateScramble('222')` both work end to
+end.** Each generates a uniformly random, physically-reachable state and
+solves it via IDA* with pruning-table heuristics; the solution's inverse is
+returned as the scramble. Every other event still throws
 `UnimplementedEventError`.
 
 | Piece | Status |
@@ -37,20 +37,19 @@ inverse is returned as the scramble. Every other event still throws
 | `generateScramble()` / registry / typed "not implemented" errors | ✅ Done |
 | Seeded (`RandomSource`) / cryptographically-random number generation | ✅ Done |
 | Shared face-turn notation (`U`, `R'`, `F2`, …) | ✅ Done |
-| 3x3x3 cube state model + all 18 move tables, invariant-tested | ✅ Done |
-| 3x3x3 uniformly-random, physically-reachable state generation | ✅ Done |
-| 3x3x3 two-phase (Kociemba-style) solver + pruning tables | ✅ Done |
-| **`generateScramble('333')`** | ✅ **Done** |
-| Every other event (222, 444, …, clock) | Not started — folders exist, no implementation |
+| **`generateScramble('333')`** — cube state model + all 18 move tables (invariant-tested), parity-correct random-state generation, two-phase (Kociemba-style) solver + pruning tables | ✅ **Done** |
+| **`generateScramble('222')`** — single-phase solver (the whole 3,674,160-state group fits in one pruning table, confirmed by BFS reaching every entry — no two-phase decomposition needed) | ✅ **Done** |
+| Every other event (444, 555, …, clock) | Not started — folders exist, no implementation |
 
-Known limitation: pruning tables (~2M states across phase 1, ~1M across
-phase 2) are built lazily in memory on first use of each phase, not
-precomputed and shipped as a serialized asset. Measured on this machine:
-the first scramble in a process pays a **~11s** one-time table-build cost;
-every scramble after that (tables now cached) takes **~7-400ms** (mean
-~100ms — IDA* search depth varies per random state). Precomputing and
-shipping serialized tables to eliminate that cold-start cost is the
-natural next optimization, not yet done. See `npm run bench`.
+Known limitation: pruning tables are built lazily in memory on first use,
+not precomputed and shipped as a serialized asset. Measured on this
+machine: **333** — ~11s one-time cold-build, then ~7-400ms per scramble
+(mean ~100ms; search depth varies per state). **222** — ~5.75s cold-build,
+then **~0.01ms per scramble** (mean, ~100,000/sec) — its pruning table
+holds the *exact* distance for the whole group, so search is essentially
+free once built. Precomputing and shipping serialized tables to eliminate
+the cold-start cost is the natural next optimization, not yet done. See
+`npm run bench`.
 
 ## Usage
 
@@ -58,6 +57,7 @@ natural next optimization, not yet done. See `npm run bench`.
 import { generateScramble } from '@cubesmith/scrambler';
 
 const { moves } = await generateScramble('333');
+const { moves: pocketCube } = await generateScramble('222');
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
@@ -93,7 +93,19 @@ const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' 
   the solution). Only `register333Scrambler` (called once, explicitly, from
   `src/index.ts`) is part of the public contract; everything else here is
   an internal implementation detail.
-- **`src/puzzles/{222,444,555,666,777,skewb,pyraminx,megaminx,square1,clock}/`**
+- **`src/puzzles/222/`** — mirrors the 333 module's structure at much
+  smaller scale. Reuses `puzzles/333/geometry.ts`'s corner rotation
+  mechanics directly (a 2x2x2 is literally "the corners of a 3x3x3"; U/R/F
+  — the only faces WCA/TNoodle 2x2x2 scrambles use — never touch the 8th
+  corner, which is the standard "fixed reference corner" convention,
+  falling out automatically rather than needing special-casing). Its
+  entire state space (7! × 3^6 = 3,674,160 — the well-known Pocket Cube
+  group order, confirmed by the pruning table's BFS reaching every single
+  entry) fits in one pruning table holding *exact* distances, so there's
+  no two-phase decomposition and no parity fix-up needed in random-state
+  generation (every permutation/orientation combination is independently
+  reachable).
+- **`src/puzzles/{444,555,666,777,skewb,pyraminx,megaminx,square1,clock}/`**
   — empty. Deliberately: an empty directory isn't a placeholder
   implementation, but a stub file pretending to be a working API would be.
 

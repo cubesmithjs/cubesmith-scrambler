@@ -4,15 +4,17 @@
  * `generateScramble`) works identically in Node, Bun, Vite, and both
  * Next.js server and client contexts.
  */
+import { register222Scrambler } from './puzzles/222';
 import { register333Scrambler } from './puzzles/333';
 
-// A real function call, not a bare `import './puzzles/333'` for its side
-// effect — registering a puzzle mutates the scrambler registry, and an
-// import kept around only for that effect is exactly the pattern a
-// bundler's tree-shaking is allowed to drop once it sees this package
-// declare `sideEffects` (see package.json, which deliberately does NOT
-// claim `false` for this reason). A visible top-level call is not
-// eligible for that kind of removal.
+// Real function calls, not bare `import '...'` for their side effect —
+// registering a puzzle mutates the scrambler registry, and an import kept
+// around only for that effect is exactly the pattern a bundler's
+// tree-shaking is allowed to drop once it sees this package declare
+// `sideEffects` (see package.json, which deliberately does NOT claim
+// `false` for this reason). A visible top-level call is not eligible for
+// that kind of removal.
+register222Scrambler();
 register333Scrambler();
 
 export { generateScramble } from './core/generate-scramble';
