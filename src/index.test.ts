@@ -48,7 +48,13 @@ import { orientationKey } from './puzzles/nxn/orientation';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
-  it('fifteen of the seventeen events are implemented', async () => {
+  /**
+   * Registration only. Each event's generation is exercised by its own tests
+   * below and in its puzzle module; re-generating here would mean four more
+   * 3x3x3 solves (`333`, `333bf`, `333fm`, `333oh`) for no extra coverage, and
+   * a 3x3x3 solve is by far the slowest thing in this suite.
+   */
+  it('fifteen of the seventeen events are registered', () => {
     for (const event of [
       '222',
       '333',
@@ -65,7 +71,14 @@ describe('@cubesmith/scrambler public entry point', () => {
       'skewb',
     ] as const) {
       expect(isImplementedEvent(event)).toBe(true);
-      expect((await generateScramble(event, { seed: 'smoke' })).moves.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('the cheap events all produce a non-empty scramble through the public entry point', async () => {
+    for (const event of ['222', '555', '666', '777', 'clock', 'minx', 'pyram', 'skewb'] as const) {
+      const result = await generateScramble(event, { seed: 'smoke' });
+      expect(result.event).toBe(event);
+      expect(result.moves.length).toBeGreaterThan(0);
     }
   });
 
@@ -267,28 +280,35 @@ describe('@cubesmith/scrambler public entry point', () => {
     /**
      * That the *draw* covers all 24 orientations uniformly is established in
      * `puzzles/nxn/orientation.test.ts`, where it costs nothing. Here the point
-     * is only that `333bf` is wired to it at all — contrasted against `333`,
-     * whose single-layer turns can never move a centre. A 3x3x3 scramble is
-     * ~100ms, so this deliberately uses a handful of seeds rather than
-     * hundreds.
+     * is only that `333bf` is wired to it at all. Kept to a few seeds because a
+     * 3x3x3 solve is the slowest operation in this package.
      */
-    it('333bf varies the orientation; 333 always leaves it alone', async () => {
+    it('333bf actually varies the orientation', async () => {
       const solved = solvedCubeNxN(3);
-      const blindfolded = new Set<string>();
-      const sighted = new Set<string>();
-      for (let seed = 0; seed < 12; seed += 1) {
+      const orientations = new Set<string>();
+      for (let seed = 0; seed < 8; seed += 1) {
         const bf = await generateScramble('333bf', { seed: `bf-${seed}` });
-        blindfolded.add(
+        orientations.add(
           orientationKey(applyWideMoves(solved, bf.moves.split(' ').map(parseWideMove))),
         );
-        const plain = await generateScramble('333', { seed: `bf-${seed}` });
-        sighted.add(
-          orientationKey(applyWideMoves(solved, plain.moves.split(' ').map(parseWideMove))),
-        );
       }
-      expect(blindfolded.size).toBeGreaterThan(1);
-      // Exactly the gap Regulation 4b3a closes for the blindfolded events.
-      expect(sighted.size).toBe(1);
+      expect(orientations.size).toBeGreaterThan(1);
+    });
+
+    /**
+     * And the gap Regulation 4b3a closes, argued structurally rather than by
+     * sampling: a `333` scramble is *only* single-layer turns, and a
+     * single-layer turn cannot move a centre — so the orientation it leaves the
+     * cube in is always the same one, whatever the seed.
+     */
+    it('a sighted 333 scramble contains no wide move, so it can never reorient the cube', async () => {
+      const result = await generateScramble('333', { seed: 'depth-check' });
+      for (const token of result.moves.split(' ')) {
+        expect(parseWideMove(token).depth).toBe(1);
+      }
+      const solved = solvedCubeNxN(3);
+      const after = applyWideMoves(solved, result.moves.split(' ').map(parseWideMove));
+      expect(orientationKey(after)).toBe(orientationKey(solved));
     });
 
     it('555bf is a 555 scramble plus an orientation suffix, and still round-trips', async () => {
