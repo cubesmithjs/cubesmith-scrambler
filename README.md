@@ -26,8 +26,12 @@ npm install @cubesmith/scrambler
 ## Status
 
 **Fourteen of the seventeen WCA events work end to end.** Two — `444` and
-`444bf` — throw `UnimplementedEventError`, and `333mbf` is out of scope by
-design (see below).
+`444bf` — throw `UnimplementedEventError` while their solver is built, and
+`333mbf` is out of scope by design (see below).
+
+Every implemented puzzle has a design document under [`docs/`](./docs/), plus a
+[conformance review of the blindfolded events](./docs/blindfolded-review.md) and
+the [4x4x4 design](./docs/444-design.md) that is being built to.
 
 | Event | Method | Status |
 |---|---|---|
@@ -41,7 +45,7 @@ design (see below).
 | `333fm` `333oh` | random-state | ✅ Plain aliases for `333` — same puzzle, only the human constraint differs |
 | `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a) |
 | `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
-| `444` `444bf` | random-state | ❌ Not started — needs a full random-state solver, comparable to `333` |
+| `444` `444bf` | random-state | 🚧 In progress — piece model, coordinates and phase 1 done and verified; `generateScramble` still throws until the solver is finished |
 | `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
@@ -94,7 +98,12 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
 
 - **A minimum number of moves to solve.** Regulation 4b3 sets a floor of 2
   moves, with per-puzzle exceptions: **2x2x2 ≥ 4** (4b3b), **Skewb ≥ 7**
-  (4b3c), **Square-1 ≥ 11** (4b3d), **Pyraminx ≥ 6** (4b3f). Enforced by
+  (4b3c), **Square-1 ≥ 11** (4b3d), **Pyraminx ≥ 6** (4b3f). The base floor of
+  2 is enforced for every event too, including the random-*moves* cubes, where
+  4b3e restates it — and for the blindfolded events it is checked **after** the
+  orientation suffix, because a wide move moves the state by a move as well as
+  reorienting it (see [`docs/blindfolded-review.md`](./docs/blindfolded-review.md)
+  §4.2). Enforced by
   redrawing, which is what keeps the "equal probability for each state" the
   regulation also demands — the conditional distribution of a uniform draw is
   uniform on the condition.
@@ -268,9 +277,16 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
 - **`src/puzzles/variants.ts`** — the events that are the same puzzle as one
   already implemented: `333fm`/`333oh` as plain aliases, `333bf`/`555bf` with
   the orientation suffix added.
-- **`src/puzzles/{444,square1}/`** — empty. Deliberately: an empty directory
-  isn't a placeholder implementation, but a stub file pretending to be a
-  working API would be.
+- **`src/puzzles/square1/`** — the shape-changing puzzle: a 24-slot model where
+  a corner is one piece id in two consecutive slots, an exact enumeration
+  reproducing the published 3,678 twistable shapes, a two-phase solver, and an
+  exact Regulation 4b3d distance check.
+- **`src/puzzles/444/`** — under construction, in the milestones of
+  [`docs/444-design.md`](./docs/444-design.md). The piece model (derived from the
+  facelet model, which stays as its oracle), the coordinates and the published
+  `7.4 x 10^45` state count, and phase 1 of the solver are done; the remaining
+  phases are not, so `generateScramble('444')` still throws rather than
+  returning something plausible.
 
 ## Independence note
 
