@@ -28,9 +28,14 @@ const BINOMIAL: readonly (readonly number[])[] = (() => {
   return table;
 })();
 
-/** `C(24, size)` — how many subsets of that size there are. */
+/** `C(n, k)` for any `n` up to 24 — the centre coordinate asks for `C(8,4)`. */
+export function binomial(n: number, k: number): number {
+  return BINOMIAL[n]![k]!;
+}
+
+/** `C(24, size)` — how many subsets of the 24 slots there are of that size. */
 export function subsetCount(size: number): number {
-  return BINOMIAL[SLOT_COUNT]![size]!;
+  return binomial(SLOT_COUNT, size);
 }
 
 export function rankSubset(mask: number, size: number): number {
