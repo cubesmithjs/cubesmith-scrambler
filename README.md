@@ -25,9 +25,9 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**Thirteen of the seventeen WCA events work end to end.** Three —
-`444`, `444bf` and `sq1` — throw `UnimplementedEventError`, and `333mbf` is out
-of scope by design (see below).
+**Fourteen of the seventeen WCA events work end to end.** Two — `444` and
+`444bf` — throw `UnimplementedEventError`, and `333mbf` is out of scope by
+design (see below).
 
 | Event | Method | Status |
 |---|---|---|
@@ -40,8 +40,8 @@ of scope by design (see below).
 | `555` `666` `777` | random-moves | ✅ Shared NxN facelet model; 60 / 80 / 100 moves, no redundant move anywhere |
 | `333fm` `333oh` | random-state | ✅ Plain aliases for `333` — same puzzle, only the human constraint differs |
 | `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a) |
+| `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
 | `444` `444bf` | random-state | ❌ Not started — needs a full random-state solver, comparable to `333` |
-| `sq1` | random-state | ❌ Not started — needs a shape-changing model and a two-phase solver |
 | `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),

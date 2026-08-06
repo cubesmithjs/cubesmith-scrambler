@@ -11,6 +11,7 @@ import { registerMegaminxScrambler } from './puzzles/megaminx';
 import { registerRandomMoveCubeScramblers } from './puzzles/nxn';
 import { registerPyraminxScrambler } from './puzzles/pyraminx';
 import { registerSkewbScrambler } from './puzzles/skewb';
+import { registerSquare1Scrambler } from './puzzles/square1';
 import { registerVariantScramblers } from './puzzles/variants';
 
 // Real function calls, not bare `import '...'` for their side effect —
@@ -27,6 +28,7 @@ registerSkewbScrambler();
 registerClockScrambler();
 registerMegaminxScrambler();
 registerRandomMoveCubeScramblers();
+registerSquare1Scrambler();
 // Last, because the variant events build on the scramblers registered above.
 registerVariantScramblers();
 

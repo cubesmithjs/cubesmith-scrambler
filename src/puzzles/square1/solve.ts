@@ -1,4 +1,14 @@
-import { compressSquare1Moves, type Square1Move } from './notation';
+import { registerScrambler } from '../../core/scrambler-registry';
+import { drawStateAtLeastMovesFromSolved } from '../../core/scramble-shape';
+import type { RandomSource } from '../../random/random-source';
+import {
+  compressSquare1Moves,
+  inverseSquare1Moves,
+  square1MovesToString,
+  type Square1Move,
+} from './notation';
+import { square1DistanceCappedAt } from './distance';
+import { randomSquare1State } from './random-state';
 import { phase1Solutions } from './phase1-search';
 import { Phase2BudgetExceededError, phase2LowerBound, phase2Search } from './phase2-search';
 import { applySquare1Moves, hasSquareLayers, isSquare1Solved, type Square1State } from './state';
@@ -132,6 +142,47 @@ function attemptPhase2(
     if (error instanceof Phase2BudgetExceededError) return undefined;
     throw error;
   }
+}
+
+/** WCA Regulation 4b3d: a Square-1 scramble's state must require at least 11 moves to solve. */
+export const MIN_SQUARE1_SOLVE_DISTANCE = 11;
+
+/**
+ * Draws a uniformly random Square-1 position far enough from solved to be a
+ * legal scramble, solves it, and returns the inverse.
+ *
+ * Both clauses of Regulation 4b3d are covered, and neither by a patch-up:
+ *
+ * - *"at least 11 moves to solve"* — by redrawing until an **exact** check says
+ *   so (`distance.ts`), which keeps the surviving draws uniform because the
+ *   conditional distribution of a uniform draw is uniform on the condition.
+ * - *"must allow a `/` move without a prior (X, Y) move"* — by construction:
+ *   only twistable shapes are ever drawn (`random-state.ts`).
+ *
+ * Unlike the smaller puzzles here, there is no padding to a presentable length.
+ * That rule exists so a visibly short sequence cannot advertise an easy scramble
+ * on a printed sheet; Square-1 solutions come out at 18-28 moves, far above any
+ * floor worth setting, and their length is dominated by the phase split rather
+ * than by how scrambled the puzzle is.
+ */
+export function generateSquare1Scramble(random: RandomSource): string {
+  const state = drawStateAtLeastMovesFromSolved(
+    random,
+    randomSquare1State,
+    // Exact below the threshold and honest above it: the value is either a
+    // distance actually achieved or a proof that none that short exists.
+    (candidate) => square1DistanceCappedAt(candidate, MIN_SQUARE1_SOLVE_DISTANCE - 1),
+    MIN_SQUARE1_SOLVE_DISTANCE,
+  );
+  return square1MovesToString(inverseSquare1Moves(solveSquare1(state)));
+}
+
+/**
+ * Registers `'sq1'` with the core scrambler registry. Called explicitly — see
+ * the note in `src/index.ts` for why that distinction matters.
+ */
+export function registerSquare1Scrambler(): void {
+  registerScrambler('sq1', (random) => generateSquare1Scramble(random));
 }
 
 /** Whether a sequence really solves a state — the check every test ends with. */

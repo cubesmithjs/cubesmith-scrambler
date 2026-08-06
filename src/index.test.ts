@@ -82,7 +82,7 @@ describe('@cubesmith/scrambler public entry point', () => {
    * 3x3x3 solves (`333`, `333bf`, `333fm`, `333oh`) for no extra coverage, and
    * a 3x3x3 solve is by far the slowest thing in this suite.
    */
-  it('registers exactly the thirteen events that are implemented', () => {
+  it('registers exactly the fourteen events that are implemented', () => {
     const implemented = [
       '222',
       '333',
@@ -97,8 +97,9 @@ describe('@cubesmith/scrambler public entry point', () => {
       'minx',
       'pyram',
       'skewb',
+      'sq1',
     ] as const;
-    const unimplemented = ['444', '444bf', 'sq1', '333mbf'] as const;
+    const unimplemented = ['444', '444bf', '333mbf'] as const;
 
     for (const event of implemented) expect(isImplementedEvent(event)).toBe(true);
     for (const event of unimplemented) expect(isImplementedEvent(event)).toBe(false);
@@ -107,7 +108,7 @@ describe('@cubesmith/scrambler public entry point', () => {
     // seventeen" sat in the README and in this test's own name while the real
     // number was thirteen — a hand-maintained claim with nothing checking it.
     expect([...implementedEvents()].sort()).toEqual([...implemented].sort());
-    expect(implemented.length).toBe(13);
+    expect(implemented.length).toBe(14);
     expect(implemented.length + unimplemented.length).toBe(EVERY_WCA_EVENT.length);
   });
 
@@ -120,11 +121,11 @@ describe('@cubesmith/scrambler public entry point', () => {
   });
 
   /**
-   * The three that aren't, and why — each is a deliberate state, not an
+   * The ones that aren't, and why — each is a deliberate state, not an
    * oversight, and each throws rather than returning something plausible.
    */
-  it('444, 444bf and sq1 throw UnimplementedEventError; 333mbf is out of scope by design', async () => {
-    for (const event of ['444', '444bf', 'sq1', '333mbf'] as const) {
+  it('444 and 444bf throw UnimplementedEventError; 333mbf is out of scope by design', async () => {
+    for (const event of ['444', '444bf', '333mbf'] as const) {
       expect(isImplementedEvent(event)).toBe(false);
       await expect(generateScramble(event)).rejects.toBeInstanceOf(UnimplementedEventError);
     }

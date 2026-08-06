@@ -496,6 +496,59 @@ process.
 
 ---
 
+## 13. 4b3d and generation, as built (steps 5 and 6)
+
+### The exact distance check
+
+Regulation 4b3d wants *"a random state from all states that require at least 11
+moves to solve (equal probability for each state)"*. Rejection sampling gives
+the parenthetical for free — the conditional distribution of a uniform draw is
+uniform on the condition — but **only if the test is exact**. Rejecting on an
+approximation would throw away qualifying states whose approximation read low,
+and the survivors would no longer be uniform.
+
+Proving "at least 11" by brute force is hopeless (`143^5` for ten moves), so:
+
+1. **A lower bound that usually settles it.** Any solution must also solve the
+   shape, the permutation parity and the middle piece, so the exact distance in
+   that 77,220-node graph can never exceed the truth. It settles **46-65%** of
+   draws outright, at the cost of a table lookup.
+2. **A bounded search when it does not**, pruned by the same bound and with a
+   visited set. The visited set is load-bearing, not an optimisation: without
+   it the bound-7 case took **4.4 seconds**; with it, 93ms.
+
+Measured cost of the check, by what the bound reads:
+
+| bound | 8 | 9 | 10 | ≥ 11 |
+|---|---|---|---|---|
+| mean | 93 ms | 625 ms | 54 ms | 0 ms |
+
+The middle piece earned its place in the bound by moving the mean per draw from
+~510ms to ~50ms.
+
+### Generation
+
+Draw uniformly over twistable positions → redraw until the exact check passes →
+solve → invert → render. Both clauses of 4b3d are covered without a patch-up:
+the minimum distance by exact rejection, and *"must allow a `/` without a prior
+(X, Y)"* by construction, since only twistable shapes are ever drawn.
+
+**No length padding**, unlike the smaller puzzles here. That rule exists so a
+visibly short sequence cannot advertise an easy scramble on a printed sheet;
+Square-1 solutions come out at 18-28 moves, far above any floor worth setting,
+and their length is dominated by the phase split rather than by how scrambled
+the puzzle is.
+
+### Validation
+
+`scramble.test.ts` carries an **independent validator** — the notation rules
+rewritten from the format description, sharing no code with the package's own
+parser — and applies generated scrambles to a solved puzzle to check that they
+never jam, always leave the puzzle unsolved, always leave it twistable, and
+always leave it at least eleven moves from solved.
+
+---
+
 ## Sources
 
 - [Jaap's Square-1 page](https://www.jaapsch.net/puzzles/square1.htm) — piece
