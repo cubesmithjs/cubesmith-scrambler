@@ -188,21 +188,30 @@ export function smallestSupport(library: readonly Generator444[]): number {
  * The **deep** library, built by construction rather than by search.
  *
  * The shallow search above cannot reach the sequences that actually pair wings:
- * they run eight to eleven moves, and a tree that deep cannot be walked. But they
- * do not need to be searched for, because of one fact about outer turns:
+ * they run eight to eleven moves, and a tree that deep cannot be walked.
+ * Conjugation reaches them cheaply — `A X A'`, slice out, work with outer turns,
+ * slice back, which is the shape of the pairing algorithms a human uses. Taking `A`
+ * from the wide moves is what makes the conjugate split slot pairs, the thing the
+ * shallow library could not do.
  *
- * > An outer turn does not change the centre arrangement **at all**. It permutes
- * > four identical centres within one face, which is invisible.
+ * ## The claim that looked structural and is not
  *
- * So for any setup `A` and any sequence `X` made only of outer turns, the
- * conjugate `A X A'` has centre effect `A . identity . A'` — the identity, on
- * *every* centre arrangement rather than merely on the solved one. Centre
- * neutrality is structural, not something a search has to discover.
+ * This construction was first justified like so: an outer turn permutes four
+ * *identical* centres within a face, which is invisible, so `X` has no centre effect
+ * and `A X A'` is centre-neutral by construction.
  *
- * That is exactly the shape of the pairing algorithms a human uses: slice out with
- * `A`, work with outer turns, slice back with `A'`. Taking `A` from the wide moves
- * is what makes the conjugate split slot pairs, which is the thing the shallow
- * library could not do.
+ * **That is wrong, and it produced a library a quarter of which breaks the
+ * centres.** The four centres of a face are only identical when the centres are
+ * *solved*; after the setup `A` they are not, so an outer turn in the core moves
+ * centres of differing colours and does change the arrangement. The error survived
+ * a test that sampled the first 250 members, all of small support, where it happens
+ * to come out right.
+ *
+ * So centre neutrality is **verified, not assumed**: every candidate is run through
+ * the exact centre coordinate and kept only if it returns to where it started. The
+ * check costs one table-free coordinate application per move, and it is the
+ * difference between a library that works and one that quietly corrupts the
+ * centres four generators into a pairing.
  */
 export interface Conjugate444 extends Generator444 {
   readonly setup: readonly number[];
@@ -245,6 +254,25 @@ export function preservesSlotPairsMap(destination: readonly number[]): boolean {
   return true;
 }
 
+
+/**
+ * Whether a sequence returns the **solved** centre arrangement to itself — checked
+ * against the exact centre coordinate rather than argued from the moves involved.
+ */
+export function isCentreNeutral(moves: readonly number[]): boolean {
+  const preserving = centrePreservingMoveIndices();
+  let coordinate = solvedCentreCoordinate();
+  for (const move of moves) {
+    const restricted = preserving.indexOf(move);
+    // A move outside the centre-preserving set can carry a centre off its axis
+    // pair, which the coordinate cannot represent — so such a sequence is not
+    // centre-neutral in the sense this library needs.
+    if (restricted < 0) return false;
+    coordinate = applyCentreCoordinate(coordinate, restricted);
+  }
+  return coordinate === solvedCentreCoordinate();
+}
+
 let conjugates: readonly Conjugate444[] | undefined;
 
 /**
@@ -274,7 +302,7 @@ export function conjugateLibrary(coreDepth = 4): readonly Conjugate444[] {
     if (core.length > 0) {
       const moves = [setup, ...core, setupInverse];
       const destination = wingEffectOf(moves);
-      if (!preservesSlotPairsMap(destination)) {
+      if (!preservesSlotPairsMap(destination) && isCentreNeutral(moves)) {
         let support = 0;
         for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
           if (destination[slot] !== slot) support += 1;

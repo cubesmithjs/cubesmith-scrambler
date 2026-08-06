@@ -162,9 +162,16 @@ describe('the centre-neutral generator library', () => {
 describe('the conjugate library', () => {
   const library = conjugateLibrary(4);
 
-  it('is large, and every member splits pairs while holding the centres', () => {
-    expect(library.length).toBeGreaterThan(100_000);
-    for (const generator of library.slice(0, 250)) {
+  /**
+   * 1,872 survivors, from 407,832 candidates — the filter throws away 99.5% of
+   * them, which is the measure of how wrong the "centre-neutral by construction"
+   * claim was. Every survivor is checked here, not a sample of the smallest, since
+   * sampling the smallest is exactly what let the error through.
+   */
+  it('holds the centres and splits pairs, in every single member', () => {
+    expect(library.length).toBeGreaterThan(1_000);
+    expect(library.length).toBeLessThan(10_000);
+    for (const generator of library) {
       const after = apply444Moves(SOLVED_444_STATE, generator.moves);
       // Centre-neutral by construction, verified against the model anyway.
       expect(areCentresSolved(after)).toBe(true);
@@ -175,7 +182,7 @@ describe('the conjugate library', () => {
     }
   });
 
-  it('has its centre-neutrality from the core being outer turns only', () => {
+  it('is built as a wide setup bracketing an outer-turn core', () => {
     const tables = move444Tables();
     for (const generator of library.slice(0, 200)) {
       for (const move of generator.core) expect(tables[move]!.move.depth).toBe(1);

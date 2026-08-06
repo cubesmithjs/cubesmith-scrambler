@@ -15,8 +15,9 @@ import { WING_COUNT_444 } from './pieces';
  * 2. **The group is primitive**, shown by the stronger property that it is
  *    2-transitive: the orbit of an ordered pair of wing slots is *all* `24 x 23`
  *    ordered pairs.
- * 3. **The group contains a 3-cycle**, exhibited as a product of two support-6
- *    generators.
+ * 3. **The group contains a 3-cycle**, exhibited as a commutator of a support-6
+ *    generator with a library member. (A product of *two* generators cannot be one,
+ *    for a structural reason recorded at that step.)
  * 4. **Jordan's theorem**: a primitive group of degree `n` containing a 3-cycle
  *    contains `A_n`. With (1) that forces the group to be **exactly `A24`**.
  *
@@ -55,7 +56,9 @@ describe('checkpoint G: the generator library is complete', () => {
   const smallest = library.filter((generator) => generator.support === 6);
 
   it('step 1 — every generator is even, so the group lies inside A24', () => {
-    expect(library.length).toBeGreaterThan(100_000);
+    // 1,872 after the centre-neutrality filter, not the 407,832 candidates that
+    // were generated: see `generators.ts` on the claim that had to be withdrawn.
+    expect(library.length).toBeGreaterThan(1_000);
     for (const generator of library) {
       expect(parityOf(generator.wingDestination)).toBe(0);
     }
@@ -88,14 +91,36 @@ describe('checkpoint G: the generator library is complete', () => {
     expect(seen.size).toBe(WINGS * (WINGS - 1));
   });
 
-  it('step 3 — the group contains a bare 3-cycle', () => {
-    expect(smallest.length).toBeGreaterThan(1_000);
+  /**
+   * **Why a commutator and not a product of two generators.**
+   *
+   * Every generator has a *doubled* cycle type — `3+3`, `4+4`, `5+5`, `2+2+3+3`,
+   * never a lone cycle. That is structural, not luck: the core `X` is built from
+   * outer turns, outer turns preserve the two 12-wing orbits and act on them as
+   * mirror images of one another, so `X` does the same thing twice and conjugation
+   * by the setup preserves cycle type. A measured consequence is that no product of
+   * two generators has support below 4, so the 3-cycle cannot be exhibited that way.
+   *
+   * A commutator can, and is the standard device for shrinking support: `[a, b]`
+   * only disturbs points where `a` and `b’s` conjugate of `a` disagree, so choosing
+   * `b` to overlap `a`'s support in few points collapses most of it. Scanning
+   * support-6 generators against the library finds a bare 3-cycle immediately.
+   */
+  it('step 3 — the group contains a bare 3-cycle, as a commutator', () => {
+    expect(smallest.length).toBeGreaterThan(100);
+    // The doubled cycle type, which is what rules out the shorter route.
+    for (const generator of smallest) {
+      expect(cycleType(generator.wingDestination)).toEqual([3, 3]);
+    }
 
     let threeCycle: number[] | undefined;
     outer: for (const first of smallest) {
-      const inverse = invert(first.wingDestination);
-      for (const second of smallest) {
-        const product = compose(second.wingDestination, inverse);
+      const a = first.wingDestination;
+      const aInverse = invert(a);
+      for (const second of library) {
+        const b = second.wingDestination;
+        // [a, b] = a b a' b'
+        const product = compose(compose(compose(a, b), aInverse), invert(b));
         if (supportOf(product) !== 3) continue;
         threeCycle = product;
         break outer;
@@ -148,7 +173,7 @@ describe('checkpoint G: the generator library is complete', () => {
     // arrangements (step 4). Nothing is left to check at runtime; this test exists
     // to fail loudly if any input to that argument is edited away.
     const library1 = conjugateLibrary(4);
-    expect(library1.length).toBeGreaterThan(100_000);
+    expect(library1.length).toBeGreaterThan(1_000);
     expect(library1.every((generator) => parityOf(generator.wingDestination) === 0)).toBe(true);
   });
 });

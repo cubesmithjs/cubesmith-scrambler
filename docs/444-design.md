@@ -340,49 +340,76 @@ a depth-10 one cannot be walked: `24^10` is out of reach and the centre-distance
 prune only bites near the end of a sequence.
 
 A meet in the middle on the centre coordinate would reach them. It turned out not
-to be needed, because of one fact that makes the search unnecessary:
+to be needed, because conjugation reaches them directly: take the setup `A` from
+the wide moves, the core `X` from the outer turns, and `A X A'` has the shape of
+the pairing algorithms a human uses — slice out, work with outer turns, slice back
+— while the wide setup is what makes it split slot pairs, precisely what the
+shallow library could not do.
+
+#### The claim that looked structural, and was wrong
+
+The construction was first justified like this:
 
 > An outer turn does not change the centre arrangement **at all**. It permutes four
-> identical centres within one face, which is invisible.
+> identical centres within one face, which is invisible. So `A X A'` has centre
+> effect `A . identity . A'` — the identity — and centre neutrality is *structural*,
+> not something a search has to discover.
 
-So for any setup `A` and any sequence `X` built only from outer turns, the
-conjugate `A X A'` has centre effect `A . identity . A'` — the identity, on *every*
-centre arrangement rather than merely on the solved one. **Centre neutrality is
-structural, not something a search has to discover.** And that is exactly the shape
-of the algorithms a human uses to pair edges: slice out, work with outer turns,
-slice back.
+**That is false, and it is worth recording why rather than quietly fixing it.** The
+four centres of a face are identical only when the centres are *solved*. After the
+setup `A` they are not: `A` is a wide move, it carries centres of one colour into a
+face holding another, and an outer turn in the core then permutes centres that
+differ. The core does change the arrangement, and the closing `A'` does not have to
+undo it.
 
-Taking `A` from the wide moves is what makes the conjugate split slot pairs, which
-is precisely what the shallow library could not do.
+The error was not caught by the test that should have caught it, because that test
+asserted centre-neutrality over the *first 250* members — which, sorted by support,
+are the smallest, and on those the claim happens to hold. What exposed it was the
+pairing loop, four generators in, reporting the centres unsolved.
+
+So centre-neutrality is now **verified, not argued**: every candidate is run
+through the exact centre coordinate (`isCentreNeutral` in `generators.ts`) and kept
+only if it returns the solved arrangement to itself.
 
 #### The conjugate library, measured
 
 | | |
 |---|---|
-| pair-splitting conjugates, core ≤ 4 outer turns | **407,832**, in 5.8s |
-| smallest | support **6**, cycle type `[3+3]`, at **six moves** |
-| centre-neutral | every one, by construction and verified against the model |
-| splits pairs | every one, by construction of the filter |
+| pair-splitting conjugates generated, core ≤ 4 outer turns | 407,832 |
+| of those, **actually centre-neutral** | **1,872**, in 5.1s |
+| discarded by the verification | 99.5% |
+| smallest | support **6**, cycle type `3+3`, at **six moves** |
+| supports present | `6:504  8:144  10:576  16:648` |
 | transitive on the 24 wings | yes |
 
-So both halves of the tool set now exist: the shallow library moves whole edges
-and is what the last phase wants, and the conjugate library splits pairs and is
-what the pairing phase wants.
+The 99.5% is the measure of how wrong the structural claim was. A library a
+quarter — in fact very nearly all — of whose members corrupt the centres would have
+produced scrambles that pass every wing-level assertion and are simply not
+reduced.
 
-#### Checkpoint G — **passed**
+#### Checkpoint G — **passed**, on the verified library
 
-The group the conjugate library generates in its action on the 24 wings is
+The group the 1,872 verified generators generate in their action on the 24 wings is
 **exactly `A24`**, proved in four steps, each either a classical theorem or a
 computation small enough to live in `completeness.test.ts`:
 
 1. **Inside `A24`.** Every generator is an even permutation of the wings — a
    conjugate `A X A'` has the parity of `X`, and each outer turn acts on the wings
-   as two 4-cycles, which is even. Checked over all 407,832.
+   as two 4-cycles, which is even. Checked over all 1,872.
 2. **Primitive**, via the stronger property that the group is **2-transitive**: the
    orbit of an ordered pair of wing slots is all `24 x 23 = 552` ordered pairs.
-3. **Contains a bare 3-cycle**, exhibited as a product of two support-6 generators.
-   (The same search over the *shallow* library's 216 double 3-cycles found none,
-   which is one more way the two halves differ.)
+3. **Contains a bare 3-cycle**, exhibited as a **commutator** `[a, b]` of a
+   support-6 generator with a library member.
+
+   The route changed here when the library shrank, and the reason is structural.
+   Every generator has a *doubled* cycle type — `3+3`, `4+4`, `5+5`, `2+2+3+3`,
+   never a lone cycle — because the core is outer-only, outer turns preserve the two
+   12-wing orbits and act on them as mirror images, so the core does the same thing
+   twice and conjugation preserves cycle type. Measured consequence: **no product of
+   two generators has support below 4**, so the old product-of-two exhibition is not
+   merely unlucky on the smaller library, it is impossible on any library of this
+   construction. A commutator has no such obstruction and yields a 3-cycle on the
+   first scan.
 4. **Jordan's theorem**: a primitive group of degree `n` containing a 3-cycle
    contains `A_n`. With step 1, the group is therefore exactly `A24`.
 
@@ -663,7 +690,7 @@ Each ends in a commit and a report, and each has a gate:
       sequences, transitive, all even, smallest support 6. **None split a slot
       pair**, so this half pairs nothing: it is the last phase's tool set (§6).
    2. ✅ the pair-splitting library, by **conjugation** rather than search —
-      407,832 sequences `A X A'` with `X` outer-only, centre-neutral by
+      1,872 sequences `A X A'` with `X` outer-only, centre-neutrality
       construction, smallest at support 6 in six moves.
    3. ✅ **checkpoint G** — passed. The group is exactly `A24`, so pairing is
       reachable from any arrangement, which makes the staged pairing total.
