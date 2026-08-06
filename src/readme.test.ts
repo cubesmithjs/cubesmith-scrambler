@@ -46,7 +46,7 @@ describe('the README status claims', () => {
     for (const event of [...implementedEvents()]) {
       expect(README, event).toContain(`\`${event}\``);
     }
-    for (const event of ['444', '444bf', '333mbf'] as const) {
+    for (const event of ['333mbf'] as const) {
       expect(README, event).toContain(`\`${event}\``);
       expect(isImplementedEvent(event)).toBe(false);
     }
@@ -65,12 +65,19 @@ describe('the README status claims', () => {
   });
 
   it('says an unimplemented event throws rather than that it works', () => {
-    // `444` is the one in flight, so the README must be explicit that calling it
-    // still throws — an "in progress" line that reads like a working feature is
-    // the kind of drift this test exists to catch.
+    // 333mbf is now the only unimplemented event, and the README must be explicit
+    // that calling it throws — a status line that reads like a working feature is
+    // the kind of drift this test exists to catch. (`444` used to be the one in
+    // flight here; its row now has to claim the opposite, which the check below
+    // pins.)
+    const multi = readmeLines().find((line) => line.startsWith('| `333mbf` |'));
+    expect(multi).toBeDefined();
+    expect(multi).toMatch(/throws/);
+
     const status = readmeLines().find((line) => line.startsWith('| `444` `444bf` |'));
     expect(status).toBeDefined();
-    expect(status).toMatch(/throws/);
+    expect(status).not.toMatch(/throws/);
+    expect(status).toMatch(/random-state/);
   });
 
   it('points at the design documents, which are the detail the README does not carry', () => {

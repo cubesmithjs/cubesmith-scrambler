@@ -25,13 +25,12 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**Fourteen of the seventeen WCA events work end to end.** Two — `444` and
-`444bf` — throw `UnimplementedEventError` while their solver is built, and
-`333mbf` is out of scope by design (see below).
+**Sixteen of the seventeen WCA events work end to end.** Only `333mbf` is
+missing, and it is out of scope by design rather than unbuilt (see below).
 
 Every implemented puzzle has a design document under [`docs/`](./docs/), plus a
 [conformance review of the blindfolded events](./docs/blindfolded-review.md) and
-the [4x4x4 design](./docs/444-design.md) that is being built to.
+the [4x4x4 design](./docs/444-design.md).
 
 | Event | Method | Status |
 |---|---|---|
@@ -45,8 +44,8 @@ the [4x4x4 design](./docs/444-design.md) that is being built to.
 | `333fm` `333oh` | random-state | ✅ Plain aliases for `333` — same puzzle, only the human constraint differs |
 | `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a) |
 | `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
-| `444` `444bf` | random-state | 🚧 In progress — piece model, coordinates and phase 1 done and verified; `generateScramble` still throws until the solver is finished |
-| `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API |
+| `444` `444bf` | random-state | ✅ Reduction (centres, then wings with verified centre-neutral generators) + 3x3x3 hand-off; parity fixed by derived gadgets, not memorised algorithms. Long (~140 moves) and slow (~2s) by design — correctness first |
+| `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API, so it throws `UnimplementedEventError` |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
 `generateScramble()` / registry / typed "not implemented" errors, seeded and

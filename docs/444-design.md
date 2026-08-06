@@ -682,22 +682,30 @@ Each ends in a commit and a report, and each has a gate:
 3. ✅ **Phase 1** — tables, search, tests. Radius 8, 2.2 MB, optimal, ~67ms.
 4. ✅ **The orbit derivations of §9** — which removed a planned phase rather
    than filling it in.
-5. 🚧 **Phase 2, the reduction — generator-based staged pairing** (§6, plan of
-   record). Components built and verified: the exact centre table (343,000, the
-   finisher), the six wing-pair group tables (255,024 each), the single-edge table
-   (552, radius 4). Remaining, in order:
-   1. ✅ the shallow generator library, by exhaustive search to depth 4 — 46,308
-      sequences, transitive, all even, smallest support 6. **None split a slot
-      pair**, so this half pairs nothing: it is the last phase's tool set (§6).
-   2. ✅ the pair-splitting library, by **conjugation** rather than search —
-      1,872 sequences `A X A'` with `X` outer-only, centre-neutrality
-      construction, smallest at support 6 in six moves.
-   3. ✅ **checkpoint G** — passed. The group is exactly `A24`, so pairing is
-      reachable from any arrangement, which makes the staged pairing total.
-   4. ⬜ the staged pairing loop, and landing the centres with the exact table.
-6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
-   inverted solution reproducing exactly that state.
-7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gates: checkpoint F, and
+5. ✅ **Phase 2, the reduction — generator-based staged pairing** (§6, plan of
+   record). Centres onto their axis pairs, centres solved exactly (343,000-entry
+   table), wings paired over the verified centre-neutral library plus the
+   support-4 gadgets that the last-two-edges case needs. Checkpoint G re-proved on
+   the verified library. Measured: 25 of 25 random states reduced, 64 moves mean.
+6. ✅ **Phase 3, the 3x3x3 hand-off and parity.** The conversion is a homomorphism
+   over all thirty-six outer turns, with the edge-flip reference bits derived from
+   the 3x3x3 module rather than tabulated. Parity is fixed by a **derived** gadget
+   — a centre-neutral sequence that is odd on the wings — applied with a fresh
+   pairing, and a different gadget each pass, because one gadget provably cycles.
+   The targeted gadget for the permutation mismatch was shown **not to exist** in
+   the pair-preserving family, where dedge and corner parity are locked together.
+7. ✅ **Generation, `444bf`, checkpoint E.** `444` and `444bf` are registered and
+   reachable through `generateScramble`. `444bf` is the only blindfolded event with
+   **no** orientation suffix, because an even cube has no observable orientation and
+   the frame draw already is 4b3a's randomisation (§11) — `nxn/orientation.ts`
+   enforces that by throwing. Checkpoint E holds: the solution's inverse applied to
+   solved reproduces the drawn state exactly, which is the injectivity §11 needs.
+   Measured: 137 moves mean, 205 worst, ~1.8s per scramble warm.
+
+   Still open, and not blocking correctness: **checkpoint H's empirical half** —
+   totality measured over a large sample rather than the dozens run so far — plus
+   length and speed, both of which are consequences of the staged route and were
+   accepted as such.
    **checkpoint H** — every link of §11 tested or proved, including solver totality
    measured over a large sample. Only then does the README say done.
 

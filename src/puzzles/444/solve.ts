@@ -1,4 +1,9 @@
+import { isAtLeastTwoMovesFromSolved } from '../../core/scramble-shape';
+import { registerScrambler } from '../../core/scrambler-registry';
+import type { RandomSource } from '../../random/random-source';
 import { solve333 } from '../333/solve';
+import { inverseWideMoves, wideMovesToString } from '../nxn/notation';
+import { randomCube444State } from './coordinates';
 import { is333Reachable, parityOf444Handoff, to333State } from './handoff';
 import { pairWings444 } from './pairing';
 import { oddWingGadget } from './parity';
@@ -30,7 +35,10 @@ import { apply444Moves, is444Solved, move444Tables, type Cube444State } from './
  * failure below is thrown rather than retried.
  */
 /** How many gadget-and-repair passes to try before calling it a bug. */
-const MAX_PARITY_PASSES = 24;
+const MAX_PARITY_PASSES = 8;
+
+/** How many gadgets to try within one pass before settling for the first. */
+const PARITY_CANDIDATES = 6;
 
 export class Solve444Error extends Error {
   constructor(message: string) {
@@ -64,6 +72,11 @@ export function solve444(state: Cube444State): number[] {
   // Each pass flips the flip-parity and lands the dedges on a fresh paired arrangement,
   // so reachability is reached by iterating rather than by a targeted fix -- see
   // `parity.ts` on why the targeted fix for the permutation mismatch does not exist.
+  //
+  // Within a pass, several gadgets are tried and the first that lands *reachable* is
+  // the one committed. Taking the pass-indexed gadget blindly worked but cost dearly:
+  // 341 moves on average against 130 for this, because a blind pass that does not
+  // finish the job still adds a gadget and a whole fresh pairing to the answer.
   for (let pass = 0; !is333Reachable(to333State(current)); pass += 1) {
     if (pass >= MAX_PARITY_PASSES) {
       throw new Solve444Error(
@@ -71,15 +84,24 @@ export function solve444(state: Cube444State): number[] {
           `(${parityOf444Handoff(to333State(current))})`,
       );
     }
-    // A different gadget each pass: with one gadget the loop provably cycles.
-    const gadget = oddWingGadget(pass);
-    moves.push(...gadget);
-    current = apply444Moves(current, gadget);
-    // The gadget unpairs; pairing puts it back without touching the centres, and cannot
-    // undo the parity change because every generator it uses is even.
-    const repaired = pairWings444(current);
-    moves.push(...repaired.moves);
-    current = apply444Moves(current, repaired.moves);
+
+    let chosen: { moves: number[]; state: Cube444State } | undefined;
+    for (let candidate = 0; candidate < PARITY_CANDIDATES; candidate += 1) {
+      const gadget = oddWingGadget(pass * PARITY_CANDIDATES + candidate);
+      const disturbed = apply444Moves(current, gadget);
+      const repaired = pairWings444(disturbed);
+      const landed = apply444Moves(disturbed, repaired.moves);
+      const attempt = { moves: [...gadget, ...repaired.moves], state: landed };
+      // Keep the first candidate as the fallback, so a pass always makes progress.
+      chosen ??= attempt;
+      if (is333Reachable(to333State(landed))) {
+        chosen = attempt;
+        break;
+      }
+    }
+
+    moves.push(...chosen!.moves);
+    current = chosen!.state;
   }
 
   const handoff = to333State(current);
@@ -100,4 +122,44 @@ export function solve444(state: Cube444State): number[] {
     throw new Solve444Error('4x4x4 solution does not solve the cube');
   }
   return moves;
+}
+
+/**
+ * A scramble string: a uniformly random state, printed as the **inverse** of its
+ * solution, which is the convention every event in this package follows.
+ *
+ * The 4b3 two-move floor is applied by rejection **on the drawn state**, before any
+ * solving. That is the exact test — a state fewer than two moves from solved is either
+ * solved or one move from it, both of which are one comparison each — and exactness is
+ * what keeps the rejection uniformity-preserving. Rejecting on an estimate would
+ * quietly drop qualifying states, which §11 of the design document treats as the trap
+ * to avoid.
+ */
+export function generate444Scramble(random: RandomSource): string {
+  const tables = move444Tables();
+  const allMoves = tables.map((table) => table.move);
+
+  for (let draw = 0; draw < 64; draw += 1) {
+    const state = randomCube444State(random);
+    if (
+      !isAtLeastTwoMovesFromSolved(
+        state,
+        tables.map((_, index) => index),
+        (from, move) => apply444Moves(from, [move]),
+        is444Solved,
+      )
+    ) {
+      continue;
+    }
+    const solution = solve444(state).map((index) => allMoves[index]!);
+    return wideMovesToString(inverseWideMoves(solution));
+  }
+  // 64 consecutive draws inside two moves of solved is not luck; something is wrong
+  // with the draw, and silently looping for ever would hide it.
+  throw new Solve444Error('4x4x4 draw never cleared the two-move floor');
+}
+
+/** Registers `'444'` with the core scrambler registry. */
+export function register444Scrambler(): void {
+  registerScrambler('444', (random) => generate444Scramble(random));
 }

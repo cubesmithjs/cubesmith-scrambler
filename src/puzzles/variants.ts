@@ -1,6 +1,7 @@
 import { registerScrambler } from '../core/scrambler-registry';
 import type { RandomSource } from '../random/random-source';
 import { generate333Scramble } from './333/solve';
+import { generate444Scramble } from './444/solve';
 import { generateCubeNxNScramble, RANDOM_MOVE_CUBES } from './nxn/solve';
 import { withMinimumDistance } from './nxn/minimum';
 import { withRandomOrientation } from './nxn/orientation';
@@ -27,11 +28,8 @@ import { withRandomOrientation } from './nxn/orientation';
  * for a complete set of 24 suffixes rather than assuming a vocabulary that
  * covers them.
  *
- * Two blindfolded events are deliberately absent:
+ * One blindfolded event is deliberately absent:
  *
- * - **`444bf`** waits on `444`, which is not implemented yet. Registering it
- *   against some other puzzle's scrambler would be worse than throwing
- *   `UnimplementedEventError`.
  * - **`333mbf`** (Multi-Blind) is out of scope by design, not oversight: it is
  *   one inspection over *many* cubes, which does not fit a one-scramble-per-call
  *   API. Adding it would mean changing what `generateScramble` returns for
@@ -39,6 +37,7 @@ import { withRandomOrientation } from './nxn/orientation';
  */
 
 const CUBE_333_SIZE = 3;
+const CUBE_444_SIZE = 4;
 
 /**
  * 5x5x5's size and scramble length, read from the same table `555` registers
@@ -66,6 +65,25 @@ function generate333BlindfoldedScramble(random: RandomSource): string {
   );
 }
 
+/**
+ * 4x4x4 blindfolded — the **only** blindfolded event here with no orientation suffix.
+ *
+ * Regulation 4b3a wants a random starting orientation, and for 3BLD and 5BLD that has
+ * to be appended, because those cubes have fixed centres and so a visible orientation
+ * that single-layer turns never change. A 4x4x4 has no fixed centre: its orientation is
+ * not observable, and the random-state draw already happens in a random frame, which
+ * *is* 4b3a's random orientation. Section 11 of the 4x4x4 design document works this
+ * through.
+ *
+ * `nxn/orientation.ts` agrees, and says so by throwing: asking it for a suffix for an
+ * even cube is an error, not a no-op. So 444bf is 444 plus the 4b3 floor, and the
+ * difference between the two events is that the floor is checked on the printed
+ * sequence.
+ */
+function generate444BlindfoldedScramble(random: RandomSource): string {
+  return withMinimumDistance(CUBE_444_SIZE, () => generate444Scramble(random));
+}
+
 function generate555BlindfoldedScramble(random: RandomSource): string {
   return withMinimumDistance(CUBE_555.size, () =>
     withRandomOrientation(
@@ -87,6 +105,7 @@ export function registerVariantScramblers(): void {
 
   // Same puzzle, plus a random orientation (Regulation 4b3a).
   registerScrambler('333bf', generate333BlindfoldedScramble);
+  registerScrambler('444bf', generate444BlindfoldedScramble);
   registerScrambler('555bf', generate555BlindfoldedScramble, 'random-moves');
 }
 
