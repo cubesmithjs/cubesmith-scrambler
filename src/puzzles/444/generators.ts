@@ -183,3 +183,130 @@ export function cycleType(destination: readonly number[]): number[] {
 export function smallestSupport(library: readonly Generator444[]): number {
   return library.reduce((least, generator) => Math.min(least, generator.support), Infinity);
 }
+
+/**
+ * The **deep** library, built by construction rather than by search.
+ *
+ * The shallow search above cannot reach the sequences that actually pair wings:
+ * they run eight to eleven moves, and a tree that deep cannot be walked. But they
+ * do not need to be searched for, because of one fact about outer turns:
+ *
+ * > An outer turn does not change the centre arrangement **at all**. It permutes
+ * > four identical centres within one face, which is invisible.
+ *
+ * So for any setup `A` and any sequence `X` made only of outer turns, the
+ * conjugate `A X A'` has centre effect `A . identity . A'` — the identity, on
+ * *every* centre arrangement rather than merely on the solved one. Centre
+ * neutrality is structural, not something a search has to discover.
+ *
+ * That is exactly the shape of the pairing algorithms a human uses: slice out with
+ * `A`, work with outer turns, slice back with `A'`. Taking `A` from the wide moves
+ * is what makes the conjugate split slot pairs, which is the thing the shallow
+ * library could not do.
+ */
+export interface Conjugate444 extends Generator444 {
+  readonly setup: readonly number[];
+  readonly core: readonly number[];
+}
+
+function wingEffectOf(moves: readonly number[]): number[] {
+  const tables = move444Tables();
+  const destination = Array.from({ length: WING_COUNT_444 }, (_, slot) => slot);
+  for (const move of moves) {
+    for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+      destination[slot] = tables[move]!.wingDestination[destination[slot]!]!;
+    }
+  }
+  return destination;
+}
+
+function inverseMoveIndex(move: number): number {
+  const tables = move444Tables();
+  const { face, depth, amount } = tables[move]!.move;
+  const wanted = amount === 2 ? 2 : amount === 1 ? 3 : 1;
+  const index = tables.findIndex(
+    (candidate) =>
+      candidate.move.face === face &&
+      candidate.move.depth === depth &&
+      candidate.move.amount === wanted,
+  );
+  if (index < 0) throw new Error('444-generators: a move without an inverse');
+  return index;
+}
+
+/** Whether a wing map keeps every slot pair intact. */
+export function preservesSlotPairsMap(destination: readonly number[]): boolean {
+  for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+    const sibling = slot % 2 === 0 ? slot + 1 : slot - 1;
+    if (Math.floor(destination[slot]! / 2) !== Math.floor(destination[sibling]! / 2)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+let conjugates: readonly Conjugate444[] | undefined;
+
+/**
+ * Conjugates `A X A'` with `A` a single wide move and `X` an outer-turn sequence
+ * of at most `coreDepth` moves — every one centre-neutral by construction, and
+ * kept only if it **splits a slot pair**, since that is what pairing needs.
+ *
+ * Deduplicated by wing effect, shortest and smallest-support first.
+ */
+export function conjugateLibrary(coreDepth = 4): readonly Conjugate444[] {
+  if (conjugates) return conjugates;
+
+  const tables = move444Tables();
+  const wide = tables
+    .map((table, index) => ({ table, index }))
+    .filter(({ table }) => table.move.depth === 2)
+    .map(({ index }) => index);
+  const outer = tables
+    .map((table, index) => ({ table, index }))
+    .filter(({ table }) => table.move.depth === 1)
+    .map(({ index }) => index);
+
+  const byEffect = new Map<string, Conjugate444>();
+  const core: number[] = [];
+
+  const walkCore = (setup: number, setupInverse: number, previous: number): void => {
+    if (core.length > 0) {
+      const moves = [setup, ...core, setupInverse];
+      const destination = wingEffectOf(moves);
+      if (!preservesSlotPairsMap(destination)) {
+        let support = 0;
+        for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+          if (destination[slot] !== slot) support += 1;
+        }
+        const key = destination.join(',');
+        const existing = byEffect.get(key);
+        if (!existing || existing.moves.length > moves.length) {
+          byEffect.set(key, {
+            moves,
+            setup: [setup],
+            core: [...core],
+            wingDestination: destination,
+            support,
+          });
+        }
+      }
+    }
+    if (core.length >= coreDepth) return;
+    for (const move of outer) {
+      if (previous >= 0 && tables[move]!.move.face === tables[previous]!.move.face) continue;
+      core.push(move);
+      walkCore(setup, setupInverse, move);
+      core.pop();
+    }
+  };
+
+  for (const setup of wide) {
+    walkCore(setup, inverseMoveIndex(setup), -1);
+  }
+
+  conjugates = [...byEffect.values()].sort(
+    (a, b) => a.support - b.support || a.moves.length - b.moves.length,
+  );
+  return conjugates;
+}

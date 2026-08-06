@@ -339,13 +339,36 @@ while restoring the centres are the conjugated ones — slice out, work, slice b
 a depth-10 one cannot be walked: `24^10` is out of reach and the centre-distance
 prune only bites near the end of a sequence.
 
-The technique that does reach them is a **meet in the middle on the centre
-coordinate**: enumerate prefixes to depth five and hash them by the centre
-coordinate they produce, then enumerate suffixes to depth five and match. Two
-halves leaving the centres in the same place compose into a centre-neutral whole,
-and `24^5` per side is tractable. Building that is the next step, and the shallow
-library already built is not wasted — it is exactly the tool set the **last** phase
-needs, where a reduced cube is solved as a 3x3x3 by moving whole edges.
+A meet in the middle on the centre coordinate would reach them. It turned out not
+to be needed, because of one fact that makes the search unnecessary:
+
+> An outer turn does not change the centre arrangement **at all**. It permutes four
+> identical centres within one face, which is invisible.
+
+So for any setup `A` and any sequence `X` built only from outer turns, the
+conjugate `A X A'` has centre effect `A . identity . A'` — the identity, on *every*
+centre arrangement rather than merely on the solved one. **Centre neutrality is
+structural, not something a search has to discover.** And that is exactly the shape
+of the algorithms a human uses to pair edges: slice out, work with outer turns,
+slice back.
+
+Taking `A` from the wide moves is what makes the conjugate split slot pairs, which
+is precisely what the shallow library could not do.
+
+#### The conjugate library, measured
+
+| | |
+|---|---|
+| pair-splitting conjugates, core ≤ 4 outer turns | **407,832**, in 5.8s |
+| smallest | support **6**, cycle type `[3+3]`, at **six moves** |
+| centre-neutral | every one, by construction and verified against the model |
+| splits pairs | every one, by construction of the filter |
+| transitive on the 24 wings | yes |
+
+So both halves of the tool set now exist: the shallow library moves whole edges
+and is what the last phase wants, and the conjugate library splits pairs and is
+what the pairing phase wants. Checkpoint G is now a question about a library that
+exists rather than one that has to be found first.
 
 ---
 
@@ -612,10 +635,10 @@ Each ends in a commit and a report, and each has a gate:
    1. ✅ the shallow generator library, by exhaustive search to depth 4 — 46,308
       sequences, transitive, all even, smallest support 6. **None split a slot
       pair**, so this half pairs nothing: it is the last phase's tool set (§6).
-   2. ⬜ the deep library, by **meet in the middle on the centre coordinate** —
-      prefixes and suffixes to depth five, matched where they leave the centres
-      alike. This is where the pairing sequences live, at eight to eleven moves.
-   3. ⬜ **checkpoint G** — prove the deep library complete before using it.
+   2. ✅ the pair-splitting library, by **conjugation** rather than search —
+      407,832 sequences `A X A'` with `X` outer-only, centre-neutral by
+      construction, smallest at support 6 in six moves.
+   3. ⬜ **checkpoint G** — prove the conjugate library complete before using it.
    4. ⬜ the staged pairing loop, and landing the centres with the exact table.
 6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
    inverted solution reproducing exactly that state.

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { areCentresSolved, areWingsPaired } from './orbits';
-import { cycleType, generatorLibrary, isTransitive, smallestSupport } from './generators';
+import {
+  conjugateLibrary,
+  cycleType,
+  generatorLibrary,
+  isTransitive,
+  preservesSlotPairsMap,
+  smallestSupport,
+} from './generators';
 import { WING_COUNT_444 } from './pieces';
 import { apply444Moves, move444Tables, SOLVED_444_STATE } from './state';
 
@@ -137,6 +144,65 @@ describe('the centre-neutral generator library', () => {
       const after = apply444Moves(SOLVED_444_STATE, generator.moves);
       expect(areCentresSolved(after)).toBe(true);
       expect(areWingsPaired(after)).toBe(true);
+    }
+  });
+});
+
+/**
+ * The construction that gets past the shallow search's ceiling, and the reason it
+ * needs no search at all: an outer turn does not change the centre arrangement,
+ * only permuting four identical centres within a face. So `A X A'` with `X`
+ * outer-only is centre-neutral on **every** centre arrangement, not merely on the
+ * solved one — structurally, by construction.
+ *
+ * Taking `A` from the wide moves is what makes the conjugate split slot pairs,
+ * which is exactly what the shallow library could not do and what pairing needs.
+ * It is also the shape of the algorithms a human uses: slice out, work, slice back.
+ */
+describe('the conjugate library', () => {
+  const library = conjugateLibrary(4);
+
+  it('is large, and every member splits pairs while holding the centres', () => {
+    expect(library.length).toBeGreaterThan(100_000);
+    for (const generator of library.slice(0, 250)) {
+      const after = apply444Moves(SOLVED_444_STATE, generator.moves);
+      // Centre-neutral by construction, verified against the model anyway.
+      expect(areCentresSolved(after)).toBe(true);
+      // And unlike every member of the shallow library, it breaks pairing — which
+      // is the same thing as being able to create it.
+      expect(areWingsPaired(after)).toBe(false);
+      expect(preservesSlotPairsMap(generator.wingDestination)).toBe(false);
+    }
+  });
+
+  it('has its centre-neutrality from the core being outer turns only', () => {
+    const tables = move444Tables();
+    for (const generator of library.slice(0, 200)) {
+      for (const move of generator.core) expect(tables[move]!.move.depth).toBe(1);
+      // Setup and its inverse bracket the core.
+      expect(generator.setup).toHaveLength(1);
+      expect(tables[generator.setup[0]!]!.move.depth).toBe(2);
+      expect(generator.moves).toHaveLength(generator.core.length + 2);
+    }
+  });
+
+  it('reaches support 6 at six moves, and is transitive', () => {
+    expect(library[0]!.support).toBe(6);
+    expect(library[0]!.moves).toHaveLength(6);
+    expect(cycleType(library[0]!.wingDestination)).toEqual([3, 3]);
+    expect(isTransitive(library)).toBe(true);
+  });
+
+  it('permutes the wings exactly as recorded', () => {
+    const tables = move444Tables();
+    for (const generator of library.slice(0, 150)) {
+      const destination = Array.from({ length: WING_COUNT_444 }, (_, slot) => slot);
+      for (const move of generator.moves) {
+        for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+          destination[slot] = tables[move]!.wingDestination[destination[slot]!]!;
+        }
+      }
+      expect([...generator.wingDestination]).toEqual(destination);
     }
   });
 });
