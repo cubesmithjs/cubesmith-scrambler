@@ -367,8 +367,34 @@ is precisely what the shallow library could not do.
 
 So both halves of the tool set now exist: the shallow library moves whole edges
 and is what the last phase wants, and the conjugate library splits pairs and is
-what the pairing phase wants. Checkpoint G is now a question about a library that
-exists rather than one that has to be found first.
+what the pairing phase wants.
+
+#### Checkpoint G — **passed**
+
+The group the conjugate library generates in its action on the 24 wings is
+**exactly `A24`**, proved in four steps, each either a classical theorem or a
+computation small enough to live in `completeness.test.ts`:
+
+1. **Inside `A24`.** Every generator is an even permutation of the wings — a
+   conjugate `A X A'` has the parity of `X`, and each outer turn acts on the wings
+   as two 4-cycles, which is even. Checked over all 407,832.
+2. **Primitive**, via the stronger property that the group is **2-transitive**: the
+   orbit of an ordered pair of wing slots is all `24 x 23 = 552` ordered pairs.
+3. **Contains a bare 3-cycle**, exhibited as a product of two support-6 generators.
+   (The same search over the *shallow* library's 216 double 3-cycles found none,
+   which is one more way the two halves differ.)
+4. **Jordan's theorem**: a primitive group of degree `n` containing a 3-cycle
+   contains `A_n`. With step 1, the group is therefore exactly `A24`.
+
+Completeness follows in two lines. `A24` reaches every arrangement of the same
+parity as the one it starts from, and paired arrangements exist in **both**
+parities — swapping the two wings inside one slot pair keeps an arrangement paired
+while flipping its parity. So whatever parity a drawn state has, a paired
+arrangement of that parity is reachable.
+
+That is what makes the staged pairing **total**, and per §11 totality is a
+*uniformity* requirement rather than a reliability nicety: a solver that failed on
+some states would silently condition the distribution.
 
 ---
 
@@ -474,10 +500,11 @@ state drawn**, not merely a scrambled one.
 rules rewritten from the format description, sharing no code with the package's
 parser; plus uniformity statistics over many draws and a benchmark.
 
-**Checkpoint G — generator completeness.** *The generator library must be shown
-sufficient to reach every valid edge-pairing configuration.* This is a gate, not
-an assumption, and it is the one thing that makes the staged route admissible at
-all.
+**Checkpoint G — generator completeness.** ✅ **Passed** — see §6. The group is
+exactly `A24`, by evidence of the first kind below. *The generator library must be
+shown sufficient to reach every valid edge-pairing configuration.* This is a gate,
+not an assumption, and it is the one thing that makes the staged route admissible
+at all.
 
 Acceptable evidence, in order of preference:
 
@@ -638,7 +665,8 @@ Each ends in a commit and a report, and each has a gate:
    2. ✅ the pair-splitting library, by **conjugation** rather than search —
       407,832 sequences `A X A'` with `X` outer-only, centre-neutral by
       construction, smallest at support 6 in six moves.
-   3. ⬜ **checkpoint G** — prove the conjugate library complete before using it.
+   3. ✅ **checkpoint G** — passed. The group is exactly `A24`, so pairing is
+      reachable from any arrangement, which makes the staged pairing total.
    4. ⬜ the staged pairing loop, and landing the centres with the exact table.
 6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
    inverted solution reproducing exactly that state.
