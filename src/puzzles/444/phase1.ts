@@ -1,6 +1,13 @@
 import { FACES } from '../../notation/move';
 import { CENTRE_COUNT_444, pieces444 } from './pieces';
 import { move444Tables, type Cube444State } from './state';
+import {
+  buildMaskPermuter,
+  permuteMask,
+  rankSubset,
+  subsetCount,
+  subsetFromRank,
+} from './subsets';
 
 /**
  * Phase 1 of the 4x4x4 solver: **every centre onto its own axis pair**.
@@ -51,53 +58,19 @@ import { move444Tables, type Cube444State } from './state';
  */
 
 export const CENTRE_SUBSET_SIZE = 8;
-export const CENTRE_SUBSET_COUNT = 735_471; // C(24,8)
-
-const BINOMIAL: readonly (readonly number[])[] = (() => {
-  const table: number[][] = [];
-  for (let n = 0; n <= CENTRE_COUNT_444; n += 1) {
-    const row = new Array<number>(CENTRE_SUBSET_SIZE + 2).fill(0);
-    row[0] = 1;
-    for (let k = 1; k <= CENTRE_SUBSET_SIZE + 1; k += 1) {
-      row[k] = (table[n - 1]?.[k] ?? 0) + (table[n - 1]?.[k - 1] ?? 0);
-    }
-    table.push(row);
-  }
-  return table;
-})();
+export const CENTRE_SUBSET_COUNT = subsetCount(CENTRE_SUBSET_SIZE); // C(24,8) = 735,471
 
 /**
- * Colexicographic rank of a subset given as a bit mask: the sum of `C(p, i)`
- * over the set bits `p`, counted from one. The smallest subset ranks 0 and the
- * largest `C(24,8) - 1`, with nothing skipped — which is what makes it usable as
- * a table index rather than merely a hash.
+ * A centre subset's rank and its inverse, and the mask permuter — all shared with
+ * phase 2 through `subsets.ts`, since "a fixed-size subset of the 24 slots,
+ * permuted by the moves" is the shape both phases' coordinates take.
  */
 export function rankCentreSubset(mask: number): number {
-  let rank = 0;
-  let index = 1;
-  // Only the eight set bits, lowest first — colex needs ascending order, and
-  // walking all 24 slots instead cost the table build three times over.
-  for (let bits = mask; bits !== 0; bits &= bits - 1) {
-    const slot = 31 - Math.clz32(bits & -bits);
-    rank += BINOMIAL[slot]![index]!;
-    index += 1;
-  }
-  if (index !== CENTRE_SUBSET_SIZE + 1) {
-    throw new Error(`444-phase1: a centre subset must have ${CENTRE_SUBSET_SIZE} slots`);
-  }
-  return rank;
+  return rankSubset(mask, CENTRE_SUBSET_SIZE);
 }
 
 export function centreSubsetFromRank(rank: number): number {
-  let remaining = rank;
-  let mask = 0;
-  for (let index = CENTRE_SUBSET_SIZE; index >= 1; index -= 1) {
-    let slot = CENTRE_COUNT_444 - 1;
-    while (BINOMIAL[slot]![index]! > remaining) slot -= 1;
-    remaining -= BINOMIAL[slot]![index]!;
-    mask |= 1 << slot;
-  }
-  return mask;
+  return subsetFromRank(rank, CENTRE_SUBSET_SIZE);
 }
 
 /** The colour pairs phase 1 sorts the centres into, as indices into `FACES`. */
@@ -139,32 +112,12 @@ export function solvedCentreMaskFor(pair: readonly [number, number]): number {
 let maskTables: readonly Int32Array[] | undefined;
 
 function centreMaskTables(): readonly Int32Array[] {
-  if (maskTables) return maskTables;
-
-  maskTables = move444Tables().map((table) => {
-    const lookup = new Int32Array(3 * 256);
-    for (let chunk = 0; chunk < 3; chunk += 1) {
-      for (let byte = 0; byte < 256; byte += 1) {
-        let permuted = 0;
-        for (let bit = 0; bit < 8; bit += 1) {
-          if ((byte & (1 << bit)) === 0) continue;
-          permuted |= 1 << table.centreDestination[chunk * 8 + bit]!;
-        }
-        lookup[chunk * 256 + byte] = permuted;
-      }
-    }
-    return lookup;
-  });
+  maskTables ??= move444Tables().map((table) => buildMaskPermuter(table.centreDestination));
   return maskTables;
 }
 
 export function permuteCentreMask(mask: number, moveIndex: number): number {
-  const lookup = centreMaskTables()[moveIndex]!;
-  return (
-    lookup[(mask & 0xff)]! |
-    lookup[256 + ((mask >>> 8) & 0xff)]! |
-    lookup[512 + ((mask >>> 16) & 0xff)]!
-  );
+  return permuteMask(mask, centreMaskTables()[moveIndex]!);
 }
 
 /**

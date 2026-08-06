@@ -192,34 +192,34 @@ to 67ms.
 **Measured:** radius 8, tables built in 1.3s, solutions averaging 9.1 moves
 against a bound averaging 6.5, ~67ms per solve, optimal.
 
-### Phase 2 — wings into their orbits, centres into half-turn range
+### ~~Phase 2 — wings into their orbits~~ — **does not exist**
 
-**Invariant established:** the puzzle can be finished without any inner-slice
-quarter turn — i.e. it lies in `G1 = <U, D, L, R, F, B, Uw2, Dw2, Lw2, Rw2,
-Fw2, Bw2>`.
+This phase was planned on the understanding that the 24 wings split into two
+orbits of twelve once inner-slice quarter turns are withdrawn, so that a phase
+was needed to put each wing into its own orbit while they were still available.
 
-Two things have to be true for that, and **both orbit structures will be
-derived from the model rather than asserted here**, in the same spirit as
-Square-1's slice map:
+**Measured on the model, they do not split at all.** The wings are a single orbit
+of 24 under every move set tried — all 36 moves, the 24 that preserve phase 1,
+and even the 18 outer turns alone (`orbits.ts`, `orbits.test.ts`). The intuition
+that misled: `U2` sends the wing nearer F on the UR edge to the wing nearer B on
+UL, so even outer turns mix what looks like two handednesses. A 4x4x4 wing is
+unflippable *in place*, which is a different statement from being confined to
+half the slots.
 
-- the 24 wings split into orbits under `G1`, and each wing must be in its own;
-- the centres must be arranged so half-turn slices can finish them.
+So there is no orbit invariant to establish and the chain is **three phases, not
+four**. What *is* preserved, and what the last phase relies on, is **pairing**:
+both wings of an edge lie in the same two layers, so an outer turn moves them
+together — asserted in `orbits.test.ts`.
 
-**Coordinates:**
-
-| coordinate | size |
-|---|---|
-| which 12 of the 24 wing slots hold the first orbit | `C(24,12) = 2,704,156` |
-| centre arrangement within the axis pairs | `(C(8,4))^3 = 70^3 = 343,000` |
-
-Both fit comfortably as exact tables.
-
-### Phase 3 — reduction
+### Phase 2 — reduction
 
 **Invariant established:** wings are paired and centres are solved, so the
 puzzle is a 3x3x3 in disguise and only `<U, D, L, R, F, B>` is needed.
 
-**Move set:** `G1`.
+**Move set:** the 24 moves that keep every centre on its own axis pair — the
+eighteen outer turns and the six wide **half** turns. A wide *quarter* turn is
+exactly what would undo phase 1, and `orbits.test.ts` checks both halves of that
+claim: those 24 preserve the invariant, and a wide quarter turn breaks it.
 
 This is the phase with real risk, and the document says so plainly: the
 coordinate that matters is the wing *pairing*, and a full wing permutation
@@ -237,7 +237,7 @@ allows it; whether **two** such tables are needed, or whether a smaller subset
 (5 wings, 5.1 M entries) already prunes well enough, is a question to answer by
 measuring, not by choosing now.
 
-### Phase 4 — solve the 3x3x3
+### Phase 3 — solve the 3x3x3
 
 The existing `puzzles/333` two-phase solver, unchanged. The reduced 4x4x4 maps
 onto a 3x3x3 state by construction, and its solution lifts back to outer-layer
@@ -301,9 +301,13 @@ measurement happens early rather than at the end.
 Listed explicitly so they cannot be quietly assumed, exactly as Square-1's §8
 listed the slice question that turned out to have a counter-intuitive answer:
 
-1. **The wing orbit structure under `G1`.** Two orbits of 12 is the expected
-   answer; it will be *derived* by orbit enumeration on the model.
-2. **The centre orbit structure under `G1`**, likewise.
+1. ~~**The wing orbit structure under `G1`.**~~ **Answered, against
+   expectation:** a single orbit of 24, under every move set tried. There is no
+   orbit invariant, and the chain lost a phase because of it.
+2. **The centre orbit structure**, still open — what phase 2 needs is the
+   coordinate for "centres solved within their axis pairs", `(C(8,4))^3 =
+   343,000`, which is small and certain; whether it needs anything else is a
+   question for that milestone.
 3. **Whether phase 2 needs the wing parity in its coordinate** (§6, phase 4) or
    whether parity can be left to a fix-up. The design prefers the former; the
    decision will be made on measured phase-3 failure rates.
@@ -364,15 +368,18 @@ not for this document.
 
 Each ends in a commit and a report, and each has a gate:
 
-1. **Piece model + bijection to the facelet oracle.** Gate: checkpoint A.
-2. **Coordinates and the state count.** Gate: checkpoint B — *stop if it fails*.
-3. **Phase 1** — tables, search, tests. Gate: checkpoint D, and phase 1
-   solutions verified on the oracle.
-4. **Phase 2** — including the orbit derivations of §9. Gate: checkpoints C, D.
-5. **Phase 3** — the expensive one. Gate: measured depth and node counts before
-   any tuning.
-6. **Phase 4 + parity.** Gate: checkpoint E.
-7. **Generation, `444bf`, benchmarks, documentation.** Gate: checkpoint F.
+1. ✅ **Piece model + bijection to the facelet oracle.** Gate: checkpoint A.
+2. ✅ **Coordinates and the state count.** Gate: checkpoint B.
+3. ✅ **Phase 1** — tables, search, tests. Radius 8, 2.2 MB, optimal, ~67ms.
+4. ✅ **The orbit derivations of §9** — which removed a planned phase rather
+   than filling it in.
+5. ⬜ **Phase 2, the reduction** — centres solved and wings paired, within the
+   24-move set. The expensive one: the wing-pairing coordinate is the `12!`-sized
+   problem the partial pattern databases above are for. Gate: measured depth and
+   node counts before any tuning.
+6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
+   inverted solution reproducing exactly that state.
+7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gate: checkpoint F.
 
 ---
 
