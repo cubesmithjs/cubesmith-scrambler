@@ -168,17 +168,29 @@ L and R).
 
 **Move set:** all 36.
 
-**Coordinates** (pure combinatorics, so these sizes are certain):
+**Coordinates.** The first sketch here was wrong and the implementation
+corrected it, so both are recorded. "Which 8 of the 24 slots hold U/D colours"
+(`C(24,8) = 735,471`) is fine; "which 8 of the *remaining* 16 hold F/B"
+(`C(16,8) = 12,870`) is **not a usable abstraction** — it is defined relative to
+the first, so it has no transition function of its own, and the pair would be a
+single 9.5-billion-entry coordinate rather than two small ones.
+
+What works is three coordinates of the same form, one per axis pair:
 
 | coordinate | size |
 |---|---|
-| which 8 of the 24 centre slots hold U/D colours | `C(24,8) = 735,471` |
-| which 8 of the remaining 16 hold F/B colours | `C(16,8) = 12,870` |
+| which 8 slots hold U/D colours | `C(24,8) = 735,471` |
+| which 8 slots hold F/B colours | `C(24,8) = 735,471` |
+| which 8 slots hold L/R colours | `C(24,8) = 735,471` |
 
-Two exact breadth-first tables of those sizes — under a megabyte together —
-used as `max(...)`, which is admissible for the usual reason: each is a
-homomorphic projection, so any real solution solves it in the same number of
-moves and its shortest distance can never exceed the truth.
+Three exact breadth-first tables, 2.2 MB together, used as `max(...)` — each a
+homomorphic projection, so none can exceed the truth. The third is logically
+redundant (the L/R mask is what the other two leave over) but its *distance* is
+an independent bound, and including it is what took a solve from half a second
+to 67ms.
+
+**Measured:** radius 8, tables built in 1.3s, solutions averaging 9.1 moves
+against a bound averaging 6.5, ~67ms per solve, optimal.
 
 ### Phase 2 — wings into their orbits, centres into half-turn range
 
