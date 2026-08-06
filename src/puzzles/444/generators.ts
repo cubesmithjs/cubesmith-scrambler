@@ -2,7 +2,7 @@ import { moveAxis, moveLayerSet } from '../nxn/notation';
 import { applyCentreCoordinate, centreTable, solvedCentreCoordinate } from './centres';
 import { centrePreservingMoveIndices } from './orbits';
 import { WING_COUNT_444 } from './pieces';
-import { move444Tables } from './state';
+import { move444Tables, SOLVED_444_STATE } from './state';
 
 /**
  * The **centre-neutral generator library**: short sequences that leave every
@@ -256,21 +256,41 @@ export function preservesSlotPairsMap(destination: readonly number[]): boolean {
 
 
 /**
- * Whether a sequence returns the **solved** centre arrangement to itself — checked
- * against the exact centre coordinate rather than argued from the moves involved.
+ * Whether a sequence returns the **solved** centre arrangement to itself.
+ *
+ * Checked on the centre **colours**, not on the centre coordinate. The coordinate
+ * of `centres.ts` can only represent arrangements in which every centre is still on
+ * its own axis pair, so asking it about a sequence containing a quarter wide turn —
+ * `Rw`, `Uw'` — is meaningless: such a turn carries U centres into F, off their
+ * pair, and the coordinate has nowhere to put them.
+ *
+ * Rejecting those sequences, which is what an earlier version of this function did,
+ * threw away every gadget with a quarter wide setup: the entire family the human
+ * pairing algorithms live in, `Uw' (R U R' F R' F') Uw` and its relatives. What was
+ * left could only set up with a 180° wide turn, and pairing stalled on the last two
+ * edges for want of exactly the sequences that had been discarded.
+ *
+ * Colours are the right level anyway. Two centres of the same colour are
+ * interchangeable — that is the whole reason a 4x4x4 has fewer states than its
+ * piece count suggests — so what has to come back is the *arrangement of colours*,
+ * and nothing finer.
  */
 export function isCentreNeutral(moves: readonly number[]): boolean {
-  const preserving = centrePreservingMoveIndices();
-  let coordinate = solvedCentreCoordinate();
+  const tables = move444Tables();
+  const solved = SOLVED_444_STATE.centreColour;
+  let colours = solved;
   for (const move of moves) {
-    const restricted = preserving.indexOf(move);
-    // A move outside the centre-preserving set can carry a centre off its axis
-    // pair, which the coordinate cannot represent — so such a sequence is not
-    // centre-neutral in the sense this library needs.
-    if (restricted < 0) return false;
-    coordinate = applyCentreCoordinate(coordinate, restricted);
+    const { centreDestination } = tables[move]!;
+    const next = new Array<number>(colours.length);
+    for (let slot = 0; slot < colours.length; slot += 1) {
+      next[centreDestination[slot]!] = colours[slot]!;
+    }
+    colours = next;
   }
-  return coordinate === solvedCentreCoordinate();
+  for (let slot = 0; slot < colours.length; slot += 1) {
+    if (colours[slot] !== solved[slot]) return false;
+  }
+  return true;
 }
 
 let conjugates: readonly Conjugate444[] | undefined;
@@ -337,4 +357,66 @@ export function conjugateLibrary(coreDepth = 4): readonly Conjugate444[] {
     (a, b) => a.support - b.support || a.moves.length - b.moves.length,
   );
   return conjugates;
+}
+
+let extended: readonly Conjugate444[] | undefined;
+
+/**
+ * The library plus the **support-4 gadgets**, which is what pairing actually needs.
+ *
+ * Greedy pairing over `conjugateLibrary` alone stalls at ten of twelve edges, every
+ * time, and the reason is exact rather than statistical. In the last-two-edges shape
+ * each bad edge holds one wing of the other, so the fix is a single transposition —
+ * an **odd** permutation, and every generator here is even (checkpoint G, step 1).
+ * The even way to do it is a transposition of the two bad wings *together with* a
+ * transposition of the two wings inside some already-paired edge, which leaves that
+ * edge paired: cycle type `2+2`, support 4.
+ *
+ * No member of the library has support 4 — the smallest is `3+3` — but products of
+ * two members do, which is why the stall is a gap in the *move set* rather than in
+ * the group. So they are computed once, deduplicated by wing effect, and handed to
+ * the pairing loop as ordinary generators. Their words are the two concatenated, so
+ * they cost about twice as much as an ordinary generator and are used at most once
+ * per solve.
+ *
+ * This is why the depth-2 lookahead was the wrong shape for the problem: a `3+3`
+ * generator can unpair as many as six edges, so the intermediate position on the way
+ * to a support-4 gadget can be far *worse* than the stall it is escaping, and any
+ * lookahead that prunes on "no worse than" cannot see it.
+ */
+export function extendedLibrary(): readonly Conjugate444[] {
+  if (extended) return extended;
+
+  const library = conjugateLibrary(4);
+  const small = library.filter((generator) => generator.support === 6);
+  const byEffect = new Map<string, Conjugate444>();
+
+  for (const first of small) {
+    for (const second of library) {
+      const destination = new Array<number>(WING_COUNT_444);
+      let support = 0;
+      for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+        const landed = second.wingDestination[first.wingDestination[slot]!]!;
+        destination[slot] = landed;
+        if (landed !== slot) support += 1;
+      }
+      if (support === 0 || support > 4) continue;
+      const key = destination.join(',');
+      const moves = [...first.moves, ...second.moves];
+      const existing = byEffect.get(key);
+      if (existing && existing.moves.length <= moves.length) continue;
+      byEffect.set(key, {
+        moves,
+        setup: first.setup,
+        core: first.core,
+        wingDestination: destination,
+        support,
+      });
+    }
+  }
+
+  extended = [...library, ...byEffect.values()].sort(
+    (a, b) => a.support - b.support || a.moves.length - b.moves.length,
+  );
+  return extended;
 }

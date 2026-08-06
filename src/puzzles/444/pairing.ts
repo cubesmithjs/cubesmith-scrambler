@@ -1,4 +1,4 @@
-import { conjugateLibrary, type Conjugate444 } from './generators';
+import { extendedLibrary, type Conjugate444 } from './generators';
 import { WING_COUNT_444 } from './pieces';
 import type { Cube444State } from './state';
 
@@ -89,7 +89,7 @@ export interface PairingResult {
  * which is nothing.
  */
 export function pairWings444(state: Cube444State, maxSteps = 40): PairingResult {
-  const library = conjugateLibrary(4);
+  const library = extendedLibrary();
   let wings = [...state.wingPermutation];
   const moves: number[] = [];
   let steps = 0;
@@ -115,12 +115,61 @@ export function pairWings444(state: Cube444State, maxSteps = 40): PairingResult 
       if (paired === current + 3) break;
     }
 
-    if (!best) throw new PairingStalledError(current);
+    if (best) {
+      wings = applyGenerator(wings, best.generator);
+      moves.push(...best.generator.moves);
+      steps += 1;
+      continue;
+    }
 
-    wings = applyGenerator(wings, best.generator);
-    moves.push(...best.generator.moves);
-    steps += 1;
+    // No single generator improves. Look one further: some generator that makes
+    // things no worse, followed by one that improves.
+    const rescue = lookAhead(library, wings, current);
+    if (!rescue) throw new PairingStalledError(current);
+    for (const generator of rescue) {
+      wings = applyGenerator(wings, generator);
+      moves.push(...generator.moves);
+      steps += 1;
+    }
   }
 
   return { moves, wingPermutation: wings, steps };
+}
+
+/**
+ * The depth-2 rescue, for the position greedy cannot leave.
+ *
+ * Greedy stalls in the last-two-edges shape: ten edges paired, and every generator
+ * that touches the remaining two breaks one of the ten. The way out is a pair of
+ * generators — the first allowed to *lose* ground, the second required to end above
+ * where the first began.
+ *
+ * Two things keep this affordable. Only generators that leave the count no worse
+ * than `current - 3` are worth extending, which throws away almost all of the
+ * 1,872; and the second leg stops at the first genuine improvement, since any
+ * improvement breaks the stall and greedy takes over again.
+ *
+ * This is a heuristic escape, not a proof of totality. Checkpoint G proves a
+ * solution exists; if this ever fails to find one the loop still throws rather than
+ * redrawing, so the gap would surface as an error and not as a silent bias.
+ */
+function lookAhead(
+  library: readonly Conjugate444[],
+  wings: readonly number[],
+  current: number,
+): Conjugate444[] | undefined {
+  const candidates = library
+    .map((generator) => ({ generator, wings: applyGenerator(wings, generator) }))
+    .map((step) => ({ ...step, paired: pairedEdgeCount(step.wings) }))
+    .filter((step) => step.paired >= current - 3)
+    .sort((a, b) => b.paired - a.paired || a.generator.moves.length - b.generator.moves.length);
+
+  for (const first of candidates) {
+    for (const second of library) {
+      if (pairedEdgeCount(applyGenerator(first.wings, second)) > current) {
+        return [first.generator, second];
+      }
+    }
+  }
+  return undefined;
 }
