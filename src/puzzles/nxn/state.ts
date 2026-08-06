@@ -102,6 +102,30 @@ export function isSolvedNxN(state: CubeNxNState): boolean {
   return true;
 }
 
+/**
+ * Solved in the sense a **competitor** means it: every face shows one colour,
+ * whichever colour that is.
+ *
+ * `isSolvedNxN` is a different and deliberately stricter question — it asks
+ * whether every slot shows *its own* face's colour, which a solved cube that has
+ * merely been rotated fails. Both predicates are wanted, and confusing them is a
+ * real hazard: the blindfolded events append a wide move precisely in order to
+ * rotate the puzzle, so anything asking "is this scramble too close to solved"
+ * has to ask this question rather than that one.
+ */
+export function isUniformlyColouredNxN(state: CubeNxNState): boolean {
+  const { facelets } = modelForSize(state.size);
+  const faceColour = new Map<Face, Face>();
+  for (let slot = 0; slot < state.occupant.length; slot += 1) {
+    const slotFace = facelets[slot]!.face;
+    const showing = facelets[state.occupant[slot]!]!.face;
+    const already = faceColour.get(slotFace);
+    if (already === undefined) faceColour.set(slotFace, showing);
+    else if (already !== showing) return false;
+  }
+  return true;
+}
+
 /** Every facelet back in its own slot — the round-trip check. */
 export function isIdentityNxN(state: CubeNxNState): boolean {
   return state.occupant.every((v, i) => v === i);

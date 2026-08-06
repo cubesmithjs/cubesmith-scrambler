@@ -38,6 +38,30 @@ import type { RandomSource } from '../random/random-source';
  * each puzzle's `solve*InExactly`.
  */
 
+/**
+ * The base case of rule 1, for puzzles too large to have a distance function:
+ * **at least two moves to solve**, which is what 4b3 asks of every event with
+ * no exception of its own — and, via 4b3e, of the random-*moves* events too.
+ *
+ * Two moves is the one threshold that needs no solver: a state is closer than
+ * that exactly when it is already solved, or when a single move solves it. So
+ * this is one solvedness test plus one per move, and it applies equally to a
+ * 3x3x3 and to a 7x7x7.
+ *
+ * Rejecting on it keeps the draw uniform for the same reason every other filter
+ * here does — the conditional distribution of a uniform draw is uniform on the
+ * condition.
+ */
+export function isAtLeastTwoMovesFromSolved<TState, TMove>(
+  state: TState,
+  moves: readonly TMove[],
+  apply: (state: TState, move: TMove) => TState,
+  isSolved: (state: TState) => boolean,
+): boolean {
+  if (isSolved(state)) return false;
+  return !moves.some((move) => isSolved(apply(state, move)));
+}
+
 /** Draws until the state is at least `minimumMoves` from solved, keeping the draw uniform over the states that qualify. */
 export function drawStateAtLeastMovesFromSolved<TState>(
   random: RandomSource,

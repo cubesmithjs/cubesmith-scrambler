@@ -2,6 +2,7 @@ import { registerScrambler } from '../core/scrambler-registry';
 import type { RandomSource } from '../random/random-source';
 import { generate333Scramble } from './333/solve';
 import { generateCubeNxNScramble, RANDOM_MOVE_CUBES } from './nxn/solve';
+import { withMinimumDistance } from './nxn/minimum';
 import { withRandomOrientation } from './nxn/orientation';
 
 /**
@@ -50,15 +51,28 @@ const CUBE_555 = (() => {
   return entry;
 })();
 
+/**
+ * The 4b3 minimum is checked **after** the orientation suffix, not before.
+ *
+ * A wide move is a whole-puzzle rotation composed with a turn, so appending one
+ * moves the state by a move as well as reorienting it: a state exactly two
+ * moves from solved can come back one move from solved. Filtering the draw and
+ * then appending would leave the sequence actually handed to a competitor
+ * unchecked, which is the wrong end of the process to check.
+ */
 function generate333BlindfoldedScramble(random: RandomSource): string {
-  return withRandomOrientation(generate333Scramble(random), random, CUBE_333_SIZE);
+  return withMinimumDistance(CUBE_333_SIZE, () =>
+    withRandomOrientation(generate333Scramble(random), random, CUBE_333_SIZE),
+  );
 }
 
 function generate555BlindfoldedScramble(random: RandomSource): string {
-  return withRandomOrientation(
-    generateCubeNxNScramble(random, CUBE_555.size, CUBE_555.length),
-    random,
-    CUBE_555.size,
+  return withMinimumDistance(CUBE_555.size, () =>
+    withRandomOrientation(
+      generateCubeNxNScramble(random, CUBE_555.size, CUBE_555.length),
+      random,
+      CUBE_555.size,
+    ),
   );
 }
 

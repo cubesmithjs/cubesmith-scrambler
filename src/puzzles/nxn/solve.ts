@@ -2,6 +2,7 @@ import { registerScrambler } from '../../core/scrambler-registry';
 import type { WcaEventId } from '../../core/types';
 import type { RandomSource } from '../../random/random-source';
 import { wideMovesToString } from './notation';
+import { withMinimumDistance } from './minimum';
 import { randomMoveSequence } from './random-moves';
 
 /**
@@ -24,7 +25,12 @@ export function generateCubeNxNScramble(
   size: number,
   length: number,
 ): string {
-  return wideMovesToString(randomMoveSequence(random, size, length));
+  // Regulation 4b3e asks for "sufficiently many random moves (instead of random
+  // state), **at least 2 moves to solve**" — the second half is a requirement
+  // too, not a description of what random moves happen to give.
+  return withMinimumDistance(size, () =>
+    wideMovesToString(randomMoveSequence(random, size, length)),
+  );
 }
 
 /**
