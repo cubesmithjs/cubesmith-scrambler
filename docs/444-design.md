@@ -272,65 +272,49 @@ What the seven tables are still worth: the centre table is the exact finisher fo
 the last stage, and the wing-pair tables are exactly the per-stage guidance a
 staged pairing needs.
 
-### The staged reduction — the plan the measurements point to
+### The staged reduction — **plan of record**
 
 Measured inputs, all exact and all cheap:
 
 | | |
 |---|---|
-| pairing **one** edge, from anywhere | radius **≤ 4** (552-entry table) |
+| pairing **one** edge, from anywhere | radius **4** (552-entry table) |
 | pairing **two** edges of a group | radius 6 (255,024-entry table) |
 | finishing the centres | radius ~12 (343,000-entry table, exact) |
 
-Pairing one more edge is therefore *always* cheap in isolation. The whole
-difficulty of the reduction is **preservation**: a stage must pair a new edge
-without unpairing the ones already done, and the moves that can pair anything are
-exactly the moves that can unpair.
+Pairing one more edge is therefore always cheap *in isolation*. The whole
+difficulty is **preservation**: a stage must pair a new edge without unpairing the
+ones already done, and the moves that can pair anything are exactly the moves that
+can unpair.
 
-So the staged design turns on one question, and it is the next thing to measure:
+Two ways to handle that were considered. A **bounded search per stage** gives the
+shortest solutions but leaves an unknown at the end of it: the only admissible
+bound available is radius 4 against a branching factor of 24, so it may not
+terminate usefully and would need a stronger bound invented first.
 
-> Given `k` edges already paired, what does it cost to pair the `(k+1)`-th
-> **while keeping those `k` paired** — and does that cost stay bounded as `k`
-> grows?
+The plan of record is instead **generator-based pairing**, chosen because it can be
+shown to work before it is built:
 
-The experiment is small and follows the pattern that has worked three times in
-this puzzle: search over the 24-move set from a state with `k` edges paired, goal
-"`k+1` paired", with the already-paired edges as a constraint the search may not
-violate, and record the depth as a function of `k`. If the cost stays bounded —
-human reduction suggests it does until the last few edges, where a "last two
-edges" case needs its own treatment — the reduction is a loop of twelve bounded
-searches, and the last stage additionally lands the centres using the exact table.
+1. Precompute, once, by exhaustive search over the 24-move set, a library of short
+   sequences whose net effect is **centre-neutral** — every centre returned to
+   where it was — and which move only a few wings.
+2. Pair the wings by searching over *those sequences* as the moves, rather than
+   over raw turns. Preservation is then structural rather than something the
+   search has to be talked into.
+3. Land the centres with the exact table, at the point where the remaining centre
+   distance can be absorbed.
 
-Two things to settle at the same time:
+The cost is length: each generator is several moves and a dozen or more are
+needed, so scrambles will run long — plausibly 100 to 200 moves against the ~40 of
+official ones. That is an accepted, documented compromise for the first
+implementation, on the project's stated priority of correctness before
+optimisation, and it is attacked afterwards from a working baseline rather than
+instead of one.
 
-- **The last-pair case.** Human methods have a special algorithm for the final two
-  edges; if the bounded search finds one on its own, nothing special is needed.
-- **Where the centres go.** The centres must arrive solved at the same moment the
-  last edge is paired, so either the final stage searches for both, or the stages
-  keep the centre coordinate at a distance the final stage can absorb.
-
-### Open questions, in the order they should be answered
-
-1. The cost of "pair one more, preserve the rest", as a function of `k`.
-2. Whether the last pair needs its own case.
-3. How the centres are landed alongside the last pairing.
-4. Only then: solution length, and whether it is worth shortening.
-
-### Phase 3 — solve the 3x3x3
-
-The existing `puzzles/333` two-phase solver, unchanged. The reduced 4x4x4 maps
-onto a 3x3x3 state by construction, and its solution lifts back to outer-layer
-moves one-for-one.
-
-**The one thing that cannot be inherited: parity.** A reduced 4x4x4 can present
-a 3x3x3 state that no 3x3x3 can reach — an odd edge permutation ("OLL/PLL
-parity"). The 333 solver will reject it. The fix is standard and must be built
-in from the start rather than discovered later: detect the case at the end of
-phase 3 and apply a parity-fixing sequence, or — cleaner, and the approach this
-design prefers — **carry the wing permutation parity as part of phase 2's
-coordinate**, so the search is steered into the half that reduces to a solvable
-3x3x3. That makes parity a property the phases maintain rather than an
-exception patched afterwards.
+**This route is only admissible if the library is provably sufficient**, which is
+why generator completeness is a checkpoint of its own (§10, checkpoint G) rather
+than something the tests notice later — and, as §11 shows, it is a requirement of
+*uniformity* and not merely of reliability.
 
 ---
 
@@ -436,16 +420,148 @@ state drawn**, not merely a scrambled one.
 rules rewritten from the format description, sharing no code with the package's
 parser; plus uniformity statistics over many draws and a benchmark.
 
+**Checkpoint G — generator completeness.** *The generator library must be shown
+sufficient to reach every valid edge-pairing configuration.* This is a gate, not
+an assumption, and it is the one thing that makes the staged route admissible at
+all.
+
+Acceptable evidence, in order of preference:
+
+1. **A proof with a computational input.** Compute the order of the group the
+   library generates in its action on the 24 wings, by Schreier-Sims — a standard
+   algorithm, entirely tractable on 24 points with a handful of generators. If that
+   group contains the alternating group `A24`, completeness follows from a two-line
+   argument: `A24` acting on any arrangement reaches every arrangement of the same
+   parity, and the paired configurations include arrangements of **both** parities,
+   so the orbit must meet them. Both halves are checkable — the group order by
+   computation, the parity claim by exhibiting one paired arrangement of each
+   parity.
+2. **A published reference** establishing the same for an equivalent generator set,
+   cited precisely rather than gestured at.
+3. **Exhaustive verification** over a state space small enough to enumerate. Note
+   that this cannot be the full wing space (`24!`), so an exhaustive check has to be
+   over an abstraction, and the abstraction has to be a *homomorphic projection*
+   for the result to transfer — the same standard every pruning table in this
+   package is held to.
+
+If the group turns out **smaller** than `A24`, the finding is reported and the
+library extended with further generators until it is not — and the check re-run
+rather than argued around.
+
+**Checkpoint H — uniformity.** §11 states the argument; the checkpoint is that each
+of its links is either tested or proved, and that the one empirical link — solver
+totality — is measured over a large sample rather than inferred from a handful of
+solves.
+
 ---
 
-## 11. `444bf`
+## 11. Why the output is a uniform random state
 
-Once `444` exists, `444bf` is `444` plus Regulation 4b3a. But note the
-difference from `333bf` and `555bf`: an even cube has **no fixed centres**, so
-its orientation is not observable, and the random frame is already part of the
-uniform draw (§5). Whether an explicit orientation suffix is still wanted for
-consistency with official scrambles is a question for the blindfolded review,
-not for this document.
+Producing *legal* scrambles is not the claim Regulation 4b3 makes. The claim is "a
+random state from all states that require at least 2 moves to solve, **equal
+probability for each state**". This section is the argument that the pipeline
+delivers that, link by link, so checkpoint H has something specific to verify.
+
+### The pipeline
+
+```
+  draw S uniformly  ->  reject if S is fewer than 2 moves from solved  ->
+  solve: find sigma with sigma(S) = solved  ->  print sigma inverted
+```
+
+### Where the randomness enters, and where it does not
+
+**The state is sampled once, at the start, and nothing downstream touches it.**
+`randomCube444State` draws each factor independently — `8!` corner permutations,
+`3^7` orientations with the eighth forced, `24!` wing permutations, a shuffled
+multiset of centre colours — in a fixed frame. Checkpoint B is what licenses
+treating that as uniform over positions: the factor sizes multiply to exactly the
+published `7.4 x 10^45`, and the two claims that make the product a product (no
+parity constraint linking wings to corners; the twist sum invariant mod 3) are
+tested rather than assumed.
+
+Drawing in a fixed frame produces each *physical* position exactly 24 times, one
+per whole-cube rotation, so the marginal over positions is uniform. For `444bf`
+that is not a compromise but the mechanism: an even cube has no fixed centre, so
+its orientation is not observable, and the frame draw **is** Regulation 4b3a's
+random orientation. No orientation suffix is needed, unlike `333bf` and `555bf`
+where the puzzle does have observable centres. Whether to emit one anyway, for
+consistency with what competitors are used to seeing, is a presentation question
+and not a compliance one.
+
+### The reduction and the pairing do not change the distribution
+
+This is the link most likely to be doubted, so it is worth being exact about what
+the solver is.
+
+The reduction, the staged pairing, the generator library, the phase order — all of
+it runs **after** `S` is fixed, and its only output is a move sequence `sigma` with
+`sigma(S) = solved`. It is a *witness*, not a sampler. Two consequences:
+
+- **The solver's quality is irrelevant to uniformity.** Optimal or wasteful, 40
+  moves or 200, staged or single-search — none of it can shift the distribution of
+  `S`, because `S` was drawn before the solver was called and is not modified by
+  it.
+- **Even a randomised solver is safe.** If a stage picks among equally good
+  generators at random, that changes *which* valid sequence is printed, never
+  *which state* it encodes.
+
+What the staging *does* affect is the **length** distribution, and that is worth
+stating rather than hiding: length will be dominated by the number of stages, not
+by how scrambled the drawn state was. That is the opposite of the leak the length
+floor elsewhere in this package guards against (`core/scramble-shape.ts`) — a
+Square-1 or Skewb scramble printed at its optimal length advertises an easy state,
+whereas a staged 4x4x4 scramble is long almost regardless of `S`.
+
+### No two source states share a scramble
+
+The map from `S` to the printed scramble is **injective**, and the reason is
+immediate: applying the printed scramble to a solved cube yields exactly `S`, since
+`sigma(S) = solved` and therefore the inverse of `sigma` carries solved back to
+`S`. The state is recoverable from the scramble, so two distinct states cannot
+produce the same one. There is no collision through which probability mass could
+pile up.
+
+That is also exactly what checkpoint E tests, and why it is phrased as "reproduces
+the *exact* state drawn" rather than "produces a scrambled cube".
+
+### Why rejection, solving and inversion each preserve uniformity
+
+- **Rejection.** The conditional distribution of a uniform draw is uniform on the
+  condition, so redrawing until `S` is at least 2 moves from solved leaves the
+  survivors uniform over the qualifying states — *provided the test is exact*. Ours
+  is: fewer than 2 moves from solved means solved or one move from solved, so it is
+  one solvedness check plus one per move, with no estimation anywhere. Rejecting on
+  an *approximate* test would discard qualifying states whose estimate read low and
+  bias what remained, which is the trap Square-1's 4b3d check was built to avoid.
+- **Solving.** A deterministic function of `S` that does not modify `S`; see above.
+- **Inversion.** A bijection on move sequences, and the identity "inverse of sigma
+  applied to solved gives `S`" is what makes the printed sequence encode the drawn
+  state rather than merely resemble one.
+
+### The one link that is not free: solver totality
+
+Every argument above assumes the solver **succeeds on every drawn state**. If it
+fails on some subset — a staged pairing that gets stuck, a generator library too
+small to finish some arrangement — and generation responds by drawing again, then
+the output is uniform *conditional on solvability*, which is uniform over the whole
+space only if solvability is universal. **A partial solver silently conditions the
+distribution**, and does so in a way no amount of statistical testing on the output
+is likely to reveal, because the excluded set is defined by an obscure property
+rather than a visible one.
+
+That is why checkpoint G is not a reliability nicety. **Generator completeness is a
+uniformity requirement**, and it is the reason the staged route must prove its
+library sufficient before the generator ships rather than after.
+
+Two consequences for the implementation:
+
+1. Generation must **never** silently redraw on solver failure. A failure is a
+   thrown error — a bug signal — not a retry, so any gap in completeness surfaces
+   loudly instead of quietly biasing the distribution.
+2. Totality is also measured empirically over a large sample, as the second half of
+   checkpoint H, because a proof about the group and a working implementation of it
+   are different claims.
 
 ---
 
@@ -458,15 +574,18 @@ Each ends in a commit and a report, and each has a gate:
 3. ✅ **Phase 1** — tables, search, tests. Radius 8, 2.2 MB, optimal, ~67ms.
 4. ✅ **The orbit derivations of §9** — which removed a planned phase rather
    than filling it in.
-5. 🚧 **Phase 2, the reduction.** The joint search is ruled out on measurement
-   (§6). Components built and verified: the exact centre table (343,000, the
-   finisher), the six wing-pair group tables (255,024 each), and the single-edge
-   table (552, radius ≤ 4). What remains is the **staged** design, whose four open
-   questions are listed at the end of §6, beginning with the cost of "pair one
-   more, preserve the rest".
+5. 🚧 **Phase 2, the reduction — generator-based staged pairing** (§6, plan of
+   record). Components built and verified: the exact centre table (343,000, the
+   finisher), the six wing-pair group tables (255,024 each), the single-edge table
+   (552, radius 4). Remaining, in order:
+   1. build the centre-neutral generator library by exhaustive search;
+   2. **checkpoint G** — prove the library complete before using it;
+   3. the staged pairing loop, and landing the centres with the exact table.
 6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
    inverted solution reproducing exactly that state.
-7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gate: checkpoint F.
+7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gates: checkpoint F, and
+   **checkpoint H** — every link of §11 tested or proved, including solver totality
+   measured over a large sample. Only then does the README say done.
 
 ---
 
