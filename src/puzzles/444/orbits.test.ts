@@ -123,3 +123,58 @@ describe('what phase 1 leaves for phase 2', () => {
     expect(unpaired).toBe(8);
   });
 });
+
+/**
+ * The constraints that decide what the remaining phases can look like. Each is a
+ * fact about the model, measured here, and together they pin the order the last
+ * two phases must come in — which is worth establishing before writing either,
+ * given that the last architectural guess cost a whole phase.
+ */
+describe('what each move set can and cannot preserve', () => {
+  const tables = move444Tables();
+  const wideHalf = tables.findIndex(
+    (table) => table.move.depth === 2 && table.move.amount === 2,
+  );
+
+  it('has wide half turns break solved centres, so only outer turns may follow them', () => {
+    expect(areCentresSolved(SOLVED_444_STATE)).toBe(true);
+    expect(areCentresSolved(apply444Moves(SOLVED_444_STATE, [wideHalf]))).toBe(false);
+    // …while keeping every centre on its own axis pair, which is why the phase
+    // before may use them.
+    expect(centresOnOwnAxisPair(apply444Moves(SOLVED_444_STATE, [wideHalf]))).toBe(true);
+  });
+
+  it('has wide half turns break pairing too', () => {
+    // Both wings of an edge in the turned layer travel together; an edge lying
+    // across the cut has one wing in the inner slice and one outside it, so the
+    // pair splits.
+    expect(areWingsPaired(apply444Moves(SOLVED_444_STATE, [wideHalf]))).toBe(false);
+  });
+
+  /**
+   * The consequence, and the question the next milestone opens with: since a wide
+   * half turn breaks both solved centres *and* pairing, the only moves available
+   * after either is established are the 18 outer turns. So either the reduction
+   * establishes both at once, or the outer turns alone must suffice to finish
+   * whichever comes second — and which of those is true is a question for
+   * computation, not for assumption.
+   */
+  it('leaves the outer turns as the only moves that preserve both', () => {
+    const random = createRandomSource('preserve both');
+    const outer = outerMoveIndices();
+    for (let trial = 0; trial < 10; trial += 1) {
+      const state = apply444Moves(
+        SOLVED_444_STATE,
+        Array.from({ length: 20 }, () => outer[random.nextUint32() % outer.length]!),
+      );
+      expect(areCentresSolved(state)).toBe(true);
+      expect(areWingsPaired(state)).toBe(true);
+    }
+
+    for (const [index, table] of tables.entries()) {
+      if (table.move.depth === 1) continue;
+      const after = apply444Moves(SOLVED_444_STATE, [index]);
+      expect(areCentresSolved(after) && areWingsPaired(after)).toBe(false);
+    }
+  });
+});
