@@ -244,9 +244,33 @@ require being home), which is admissible: any real reduction pairs them too.
 | centres solved within their axis pairs | `(C(8,4))^3 = 343,000` |
 | positions of the 4 wings of 2 edges, x6 disjoint groups | `6 x 255,024` |
 
-Whether `max` over those seven tables prunes well enough is the question the
-milestone opens with, and the fallbacks are the ones Square-1 needed: a
-meet-in-the-middle tail, and sweeping several phase-1 endings.
+**Measured, and the answer is no.** All seven tables were built and their
+strength taken against real phase-1 states:
+
+| | |
+|---|---|
+| wing-pair group table | 255,024 entries, **radius 6**, builds in 1.5s |
+| centre table | 343,000 entries, radius ~12, builds in under a second |
+| `max` of all seven, after phase 1 | **7 to 9** |
+
+Each component is shallow because each is small, so their maximum cannot rise
+much above nine — while the reduction has to solve the centres *and* pair all
+twelve edges, none of which is paired when phase 1 finishes. The true distance is
+far beyond nine, the move set branches about twenty per move, and iterative
+deepening across a gap that wide does not terminate in useful time. No
+meet-in-the-middle tail closes a gap of that size either: it buys a fixed number
+of moves, not a factor.
+
+So the joint search is ruled out on measurement rather than on suspicion, and the
+reduction must be **staged**: pair edges in small groups using sequences that
+preserve what earlier groups achieved, in the shape of the human reduction but
+with each stage's sequences found by exact search rather than memorised. Solutions
+will be long — plausibly 60 to 150 moves — which the project's stated priorities
+accept, and length can be attacked afterwards.
+
+What the seven tables are still worth: the centre table is the exact finisher for
+the last stage, and the wing-pair tables are exactly the per-stage guidance a
+staged pairing needs.
 
 ### Phase 3 — solve the 3x3x3
 
