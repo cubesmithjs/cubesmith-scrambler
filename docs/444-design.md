@@ -272,6 +272,50 @@ What the seven tables are still worth: the centre table is the exact finisher fo
 the last stage, and the wing-pair tables are exactly the per-stage guidance a
 staged pairing needs.
 
+### The staged reduction — the plan the measurements point to
+
+Measured inputs, all exact and all cheap:
+
+| | |
+|---|---|
+| pairing **one** edge, from anywhere | radius **≤ 4** (552-entry table) |
+| pairing **two** edges of a group | radius 6 (255,024-entry table) |
+| finishing the centres | radius ~12 (343,000-entry table, exact) |
+
+Pairing one more edge is therefore *always* cheap in isolation. The whole
+difficulty of the reduction is **preservation**: a stage must pair a new edge
+without unpairing the ones already done, and the moves that can pair anything are
+exactly the moves that can unpair.
+
+So the staged design turns on one question, and it is the next thing to measure:
+
+> Given `k` edges already paired, what does it cost to pair the `(k+1)`-th
+> **while keeping those `k` paired** — and does that cost stay bounded as `k`
+> grows?
+
+The experiment is small and follows the pattern that has worked three times in
+this puzzle: search over the 24-move set from a state with `k` edges paired, goal
+"`k+1` paired", with the already-paired edges as a constraint the search may not
+violate, and record the depth as a function of `k`. If the cost stays bounded —
+human reduction suggests it does until the last few edges, where a "last two
+edges" case needs its own treatment — the reduction is a loop of twelve bounded
+searches, and the last stage additionally lands the centres using the exact table.
+
+Two things to settle at the same time:
+
+- **The last-pair case.** Human methods have a special algorithm for the final two
+  edges; if the bounded search finds one on its own, nothing special is needed.
+- **Where the centres go.** The centres must arrive solved at the same moment the
+  last edge is paired, so either the final stage searches for both, or the stages
+  keep the centre coordinate at a distance the final stage can absorb.
+
+### Open questions, in the order they should be answered
+
+1. The cost of "pair one more, preserve the rest", as a function of `k`.
+2. Whether the last pair needs its own case.
+3. How the centres are landed alongside the last pairing.
+4. Only then: solution length, and whether it is worth shortening.
+
 ### Phase 3 — solve the 3x3x3
 
 The existing `puzzles/333` two-phase solver, unchanged. The reduced 4x4x4 maps
@@ -414,10 +458,12 @@ Each ends in a commit and a report, and each has a gate:
 3. ✅ **Phase 1** — tables, search, tests. Radius 8, 2.2 MB, optimal, ~67ms.
 4. ✅ **The orbit derivations of §9** — which removed a planned phase rather
    than filling it in.
-5. ⬜ **Phase 2, the reduction** — centres solved and wings paired, within the
-   24-move set. The expensive one: the wing-pairing coordinate is the `12!`-sized
-   problem the partial pattern databases above are for. Gate: measured depth and
-   node counts before any tuning.
+5. 🚧 **Phase 2, the reduction.** The joint search is ruled out on measurement
+   (§6). Components built and verified: the exact centre table (343,000, the
+   finisher), the six wing-pair group tables (255,024 each), and the single-edge
+   table (552, radius ≤ 4). What remains is the **staged** design, whose four open
+   questions are listed at the end of §6, beginning with the cost of "pair one
+   more, preserve the rest".
 6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
    inverted solution reproducing exactly that state.
 7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gate: checkpoint F.

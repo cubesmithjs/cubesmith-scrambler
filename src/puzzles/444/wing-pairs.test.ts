@@ -12,6 +12,11 @@ import {
   wingPairDistance,
   wingPairLowerBound,
   wingPairTable,
+  rankSingleEdge,
+  SINGLE_EDGE_COORDINATE_COUNT,
+  singleEdgeDistance,
+  singleEdgeFromRank,
+  singleEdgeTable,
   wingPositionsFromRank,
   wingPositionsOf,
 } from './wing-pairs';
@@ -112,5 +117,51 @@ describe('why the joint search is not viable', () => {
     }
 
     expect(Math.max(...bounds)).toBeLessThanOrEqual(12);
+  });
+});
+
+/**
+ * The first input to the staged reduction: what pairing **one** edge costs, on its
+ * own. A stage that pairs one more edge cannot be cheaper than this, and the
+ * number sets the scale for how long a staged solution will be.
+ */
+describe('pairing a single edge', () => {
+  it('has a 552-entry coordinate that ranks bijectively', () => {
+    expect(SINGLE_EDGE_COORDINATE_COUNT).toBe(552);
+    for (let rank = 0; rank < SINGLE_EDGE_COORDINATE_COUNT; rank += 1) {
+      const [first, second] = singleEdgeFromRank(rank);
+      expect(first).not.toBe(second);
+      expect(rankSingleEdge(first, second)).toBe(rank);
+    }
+  });
+
+  it('is complete and shallow', () => {
+    const table = singleEdgeTable();
+    expect(table).toHaveLength(SINGLE_EDGE_COORDINATE_COUNT);
+    expect(table.indexOf(255)).toBe(-1);
+    let deepest = 0;
+    for (const value of table) deepest = Math.max(deepest, value);
+    // 24 paired arrangements: twelve slot pairs, two orders each.
+    expect([...table].filter((value) => value === 0)).toHaveLength(24);
+    expect(deepest).toBeLessThanOrEqual(4);
+    expect(deepest).toBeGreaterThan(1);
+  });
+
+  it('reads zero for every edge of a solved cube, and never exceeds the group bound', () => {
+    for (let edge = 0; edge < 12; edge += 1) {
+      expect(singleEdgeDistance(SOLVED_444_STATE, edge)).toBe(0);
+    }
+
+    const random = createRandomSource('single vs group');
+    for (let trial = 0; trial < 6; trial += 1) {
+      const drawn = randomCube444State(random);
+      const opened = apply444Moves(drawn, phase1Search(drawn));
+      for (let group = 0; group < WING_PAIR_GROUPS.length; group += 1) {
+        const edges = [2 * group, 2 * group + 1];
+        const single = Math.max(...edges.map((edge) => singleEdgeDistance(opened, edge)));
+        // Pairing two edges is at least as hard as pairing the harder one alone.
+        expect(wingPairDistance(opened, group)).toBeGreaterThanOrEqual(single);
+      }
+    }
   });
 });

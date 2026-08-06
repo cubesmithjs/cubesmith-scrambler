@@ -150,3 +150,71 @@ export function wingPairLowerBound(state: Cube444State): number {
   }
   return bound;
 }
+
+/** `24 x 23` — where the two wings of a single edge are. */
+export const SINGLE_EDGE_COORDINATE_COUNT = 24 * 23;
+
+export function rankSingleEdge(first: number, second: number): number {
+  return first * 23 + (second > first ? second - 1 : second);
+}
+
+export function singleEdgeFromRank(rank: number): [number, number] {
+  const first = Math.floor(rank / 23);
+  const offset = rank % 23;
+  return [first, offset >= first ? offset + 1 : offset];
+}
+
+let singleEdge: Uint8Array | undefined;
+
+/**
+ * How far the two wings of **one** edge are from sharing a slot pair, over all
+ * 552 arrangements and the 24 centre-preserving moves.
+ *
+ * This is the first input the staged reduction needs: the cost of pairing one
+ * more edge, ignoring everything else. It is a lower bound on any stage that has
+ * to pair that edge, and it is the same table for every edge, since the moves act
+ * on slots and the edges differ only in labelling — asserted rather than assumed
+ * in `wing-pairs.test.ts`.
+ */
+export function singleEdgeTable(): Uint8Array {
+  if (singleEdge) return singleEdge;
+
+  const moves = centrePreservingMoveIndices();
+  const tables = move444Tables();
+  const distance = new Uint8Array(SINGLE_EDGE_COORDINATE_COUNT).fill(255);
+  const queue = new Int32Array(SINGLE_EDGE_COORDINATE_COUNT);
+  let tail = 0;
+
+  for (let rank = 0; rank < SINGLE_EDGE_COORDINATE_COUNT; rank += 1) {
+    const [first, second] = singleEdgeFromRank(rank);
+    if (edgeOfWingSlot(first) !== edgeOfWingSlot(second)) continue;
+    distance[rank] = 0;
+    queue[tail] = rank;
+    tail += 1;
+  }
+
+  for (let head = 0; head < tail; head += 1) {
+    const rank = queue[head]!;
+    const [first, second] = singleEdgeFromRank(rank);
+    const depth = distance[rank]! + 1;
+    for (const move of moves) {
+      const next = rankSingleEdge(
+        tables[move]!.wingDestination[first]!,
+        tables[move]!.wingDestination[second]!,
+      );
+      if (distance[next] !== 255) continue;
+      distance[next] = depth;
+      queue[tail] = next;
+      tail += 1;
+    }
+  }
+
+  singleEdge = distance;
+  return distance;
+}
+
+/** How far one edge is from being paired, wherever its wings are. */
+export function singleEdgeDistance(state: Cube444State, edge: number): number {
+  const positions = wingPositionsOf(state, [2 * edge, 2 * edge + 1]);
+  return singleEdgeTable()[rankSingleEdge(positions[0]!, positions[1]!)]!;
+}
