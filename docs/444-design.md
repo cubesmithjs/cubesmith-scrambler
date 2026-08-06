@@ -316,6 +316,37 @@ why generator completeness is a checkpoint of its own (§10, checkpoint G) rathe
 than something the tests notice later — and, as §11 shows, it is a requirement of
 *uniformity* and not merely of reliability.
 
+#### First results, and the length the library actually needs
+
+The exhaustive search is built (`generators.ts`) and its shallow half measured:
+
+| | |
+|---|---|
+| centre-neutral sequences of ≤ 4 moves | **46,308**, one per distinct wing effect |
+| transitive on the 24 wing slots | yes |
+| smallest support | **6**, cycle type `[3+3]`, at four moves |
+| all generators even permutations | yes, so the group lies inside `A24` |
+| generators that **split a slot pair** | **none** |
+
+The last line is the one that matters. Every short centre-neutral sequence maps
+slot pairs to slot pairs, so the support-6 members are 3-cycles of *whole edges*:
+they rearrange edges that are already paired and cannot pair anything. Applied to
+a solved cube they leave it reduced, however much they move.
+
+That is a fact about **length**, not about the approach. The sequences that pair
+while restoring the centres are the conjugated ones — slice out, work, slice back
+— and those run eight to eleven moves. A depth-4 tree search cannot see them, and
+a depth-10 one cannot be walked: `24^10` is out of reach and the centre-distance
+prune only bites near the end of a sequence.
+
+The technique that does reach them is a **meet in the middle on the centre
+coordinate**: enumerate prefixes to depth five and hash them by the centre
+coordinate they produce, then enumerate suffixes to depth five and match. Two
+halves leaving the centres in the same place compose into a centre-neutral whole,
+and `24^5` per side is tractable. Building that is the next step, and the shallow
+library already built is not wasted — it is exactly the tool set the **last** phase
+needs, where a reduced cube is solved as a 3x3x3 by moving whole edges.
+
 ---
 
 ## 7. Pruning tables and heuristics — summary
@@ -578,9 +609,14 @@ Each ends in a commit and a report, and each has a gate:
    record). Components built and verified: the exact centre table (343,000, the
    finisher), the six wing-pair group tables (255,024 each), the single-edge table
    (552, radius 4). Remaining, in order:
-   1. build the centre-neutral generator library by exhaustive search;
-   2. **checkpoint G** — prove the library complete before using it;
-   3. the staged pairing loop, and landing the centres with the exact table.
+   1. ✅ the shallow generator library, by exhaustive search to depth 4 — 46,308
+      sequences, transitive, all even, smallest support 6. **None split a slot
+      pair**, so this half pairs nothing: it is the last phase's tool set (§6).
+   2. ⬜ the deep library, by **meet in the middle on the centre coordinate** —
+      prefixes and suffixes to depth five, matched where they leave the centres
+      alike. This is where the pairing sequences live, at eight to eleven moves.
+   3. ⬜ **checkpoint G** — prove the deep library complete before using it.
+   4. ⬜ the staged pairing loop, and landing the centres with the exact table.
 6. ⬜ **Phase 3 + parity.** Gate: checkpoint E — a drawn state solved, and the
    inverted solution reproducing exactly that state.
 7. ⬜ **Generation, `444bf`, benchmarks, documentation.** Gates: checkpoint F, and
