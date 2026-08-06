@@ -227,15 +227,26 @@ coordinate is `24!`, far past tabulation. The plan is a **partial-permutation
 pattern database** — the exact positions of a chosen subset of wings — with
 several disjoint subsets combined by `max(...)`:
 
+The sizing here was revised once the language it would be built in was taken
+into account. Six wings is `24 x 23 x 22 x 21 x 20 x 19 = 96,909,120`, and while
+97 MB of table is affordable, the breadth-first search that fills it is not: the
+queue alone is ~390 MB, and a frontier scan over 97M entries x 24 moves is ~2.3
+billion transitions per level. That is minutes to hours in JavaScript.
+
+Four wings — the two wings of two edges — is
+`24 x 23 x 22 x 21 = 255,024`, which builds in a moment, and six such tables
+cover all twelve edges for 1.5 MB in total. Each takes as its goal *those two
+edges paired* (a multi-source breadth-first search, since pairing does not
+require being home), which is admissible: any real reduction pairs them too.
+
 | coordinate | size |
 |---|---|
-| exact positions of 6 chosen wings | `24 x 23 x 22 x 21 x 20 x 19 = 96,909,120` |
-| the same for a disjoint 6 | `96,909,120` |
+| centres solved within their axis pairs | `(C(8,4))^3 = 343,000` |
+| positions of the 4 wings of 2 edges, x6 disjoint groups | `6 x 255,024` |
 
-At one byte each that is ~97 MB per table. The memory budget for this project
-allows it; whether **two** such tables are needed, or whether a smaller subset
-(5 wings, 5.1 M entries) already prunes well enough, is a question to answer by
-measuring, not by choosing now.
+Whether `max` over those seven tables prunes well enough is the question the
+milestone opens with, and the fallbacks are the ones Square-1 needed: a
+meet-in-the-middle tail, and sweeping several phase-1 endings.
 
 ### Phase 3 — solve the 3x3x3
 
@@ -304,10 +315,16 @@ listed the slice question that turned out to have a counter-intuitive answer:
 1. ~~**The wing orbit structure under `G1`.**~~ **Answered, against
    expectation:** a single orbit of 24, under every move set tried. There is no
    orbit invariant, and the chain lost a phase because of it.
-2. **The centre orbit structure**, still open — what phase 2 needs is the
-   coordinate for "centres solved within their axis pairs", `(C(8,4))^3 =
-   343,000`, which is small and certain; whether it needs anything else is a
-   question for that milestone.
+2. ~~**The centre orbit structure.**~~ **Answered, and it settles the phase
+   order.** Ask instead whether a move keeps the two wing slots of an edge slot
+   *together*, and the answer falls out: all 18 outer turns do, all 18 wide turns
+   split them. Since the contents of a slot pair travel together under an outer
+   turn, **pairing is invariant under outer turns** — they cannot pair anything.
+   A wide quarter turn would undo phase 1, so the reduction may use only the
+   24-move set, and within it a wide half turn breaks solved centres as readily as
+   it breaks pairing. There is therefore no order in which one goal is finished
+   and then held: **centres-solved and wings-paired must be reached together, in
+   one search.** The cheaper two-step reduction is ruled out.
 3. **Whether phase 2 needs the wing parity in its coordinate** (§6, phase 4) or
    whether parity can be left to a fix-up. The design prefers the former; the
    decision will be made on measured phase-3 failure rates.

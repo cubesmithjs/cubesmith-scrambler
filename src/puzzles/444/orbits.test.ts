@@ -9,6 +9,7 @@ import {
   centresOnOwnAxisPair,
   isReduced,
   outerMoveIndices,
+  preservesSlotPairs,
   wingOrbitSizes,
 } from './orbits';
 import { phase1Search } from './phase1-search';
@@ -175,6 +176,70 @@ describe('what each move set can and cannot preserve', () => {
       if (table.move.depth === 1) continue;
       const after = apply444Moves(SOLVED_444_STATE, [index]);
       expect(areCentresSolved(after) && areWingsPaired(after)).toBe(false);
+    }
+  });
+});
+
+/**
+ * The experiment that decides the phase order, asked in the form that answers it
+ * outright rather than by search: does a move keep the two wing slots of an edge
+ * slot together?
+ */
+describe('slot pairs, and the phase order they force', () => {
+  const tables = move444Tables();
+
+  it('is preserved by every outer turn and split by every wide turn', () => {
+    const preserved: string[] = [];
+    const split: string[] = [];
+    for (const [index, table] of tables.entries()) {
+      (preservesSlotPairs(index) ? preserved : split).push(wideMoveToString(table.move));
+    }
+    expect(preserved).toHaveLength(18);
+    expect(split).toHaveLength(18);
+    expect(preserved.every((name) => !name.includes('w'))).toBe(true);
+    expect(split.every((name) => name.includes('w'))).toBe(true);
+  });
+
+  /**
+   * The corollary, and the answer to the open question: since an outer turn sends
+   * every slot pair into a slot pair, the contents of a pair travel together, so
+   * whether a pair holds two halves of one edge cannot change. Pairing is
+   * *invariant* under outer turns — they cannot pair anything.
+   */
+  it('makes pairing invariant under outer turns, whatever the arrangement', () => {
+    const random = createRandomSource('pairing invariant');
+    const outer = outerMoveIndices();
+    const all = tables.map((_, index) => index);
+
+    for (let trial = 0; trial < 25; trial += 1) {
+      // Scramble with everything, so the arrangement is genuinely unpaired…
+      const scrambled = apply444Moves(
+        SOLVED_444_STATE,
+        Array.from({ length: 12 }, () => all[random.nextUint32() % all.length]!),
+      );
+      const before = areWingsPaired(scrambled);
+      // …then turn only outer faces, as much as you like.
+      const after = apply444Moves(
+        scrambled,
+        Array.from({ length: 20 }, () => outer[random.nextUint32() % outer.length]!),
+      );
+      expect(areWingsPaired(after)).toBe(before);
+    }
+  });
+
+  /**
+   * Which settles the phase order. A wide quarter turn would undo phase 1, so the
+   * reduction may only use the 24-move set; within it a wide half turn breaks
+   * solved centres and pairing alike; and outer turns cannot pair. So there is no
+   * order in which one goal is finished and then held while the other is worked
+   * on — they have to be reached together.
+   */
+  it('leaves no move that can pair while holding solved centres', () => {
+    for (const [index, table] of tables.entries()) {
+      const canPair = !preservesSlotPairs(index);
+      if (!canPair) continue;
+      const after = apply444Moves(SOLVED_444_STATE, [index]);
+      expect(areCentresSolved(after), wideMoveToString(table.move)).toBe(false);
     }
   });
 });

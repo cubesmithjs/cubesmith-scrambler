@@ -123,3 +123,41 @@ export function areCentresSolved(state: Cube444State): boolean {
 export function isReduced(state: Cube444State): boolean {
   return areCentresSolved(state) && areWingsPaired(state);
 }
+
+/**
+ * Whether a move keeps the two wing slots of each 3x3x3 edge slot **together** —
+ * mapping them into one edge slot rather than splitting them across two.
+ *
+ * This is the decisive question for the phase order, and it has a one-line
+ * answer once asked the right way. A wing slot's sibling is the other slot of its
+ * edge (`2e` and `2e+1`), and pairing is a statement about what sits in a slot
+ * *pair*. So if a move sends every slot pair into some slot pair, it cannot
+ * change whether a pair holds two halves of one edge: the contents travel
+ * together.
+ *
+ * Measured: **the 18 outer turns all preserve slot pairs; all 18 wide turns split
+ * them**, quarter and half alike (`orbits.test.ts`).
+ *
+ * The consequence decides the architecture. Pairing is *invariant* under outer
+ * turns, so the outer turns cannot pair anything — the reduction has to be done
+ * with wide turns available. Wide **quarter** turns would undo phase 1, so what
+ * remains is the 24-move set, and within it a wide half turn breaks solved
+ * centres as readily as it breaks pairing. Neither goal can therefore be
+ * established and then held while the other is worked on:
+ *
+ * > **Centres-solved and wings-paired must be reached together, in one search
+ * > over the 24-move set.**
+ *
+ * That rules out the cheaper two-step reduction and settles what the next
+ * milestone builds.
+ */
+export function preservesSlotPairs(moveIndex: number): boolean {
+  const { wingDestination } = move444Tables()[moveIndex]!;
+  for (let slot = 0; slot < WING_COUNT_444; slot += 1) {
+    const sibling = slot % 2 === 0 ? slot + 1 : slot - 1;
+    if (edgeOfWingSlot(wingDestination[slot]!) !== edgeOfWingSlot(wingDestination[sibling]!)) {
+      return false;
+    }
+  }
+  return true;
+}
