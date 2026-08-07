@@ -233,11 +233,11 @@ export function requiredCombinedParity(alignment: number): number {
     const forUnflipped = classes[phase2ClassIndex(alignment, false, 0, parity)] === 1;
     const forFlipped = classes[phase2ClassIndex(alignment, true, 0, parity)] === 1;
     if (forUnflipped !== forFlipped) {
-      throw new Error('@cube/scrambler: Square-1 phase-2 parity depends on the middle piece');
+      throw new Error('@cubesmith/scrambler: Square-1 phase-2 parity depends on the middle piece');
     }
     if (forUnflipped) return parity;
   }
-  throw new Error('@cube/scrambler: no Square-1 phase-2 parity is reachable at this alignment');
+  throw new Error('@cubesmith/scrambler: no Square-1 phase-2 parity is reachable at this alignment');
 }
 
 export interface Phase1Table {
@@ -305,7 +305,7 @@ function cornerStartAlignment(mask: number): number {
   for (let slot = 0; slot < RING_SLOTS; slot += 1) {
     if ((mask & (1 << slot)) !== 0) return slot % 3;
   }
-  throw new Error('@cube/scrambler: a Square-1 ring with no corners');
+  throw new Error('@cubesmith/scrambler: a Square-1 ring with no corners');
 }
 
 /**
@@ -315,7 +315,7 @@ export function movesToPhase1Goal(key: number, parity: number): number {
   const { indexOf, distance } = phase1Table();
   const index = indexOf.get(key);
   if (index === undefined) {
-    throw new Error('@cube/scrambler: Square-1 shape key is not a shape the puzzle has');
+    throw new Error('@cubesmith/scrambler: Square-1 shape key is not a shape the puzzle has');
   }
   return distance[index * 2 + parity]!;
 }

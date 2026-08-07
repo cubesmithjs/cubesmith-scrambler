@@ -127,7 +127,7 @@ export function stateForShape(
 ): Square1State {
   const { corners: cornerSlots, edges: edgeSlots } = shapePositionSlots(key);
   if (cornerSlots.length !== corners.length || edgeSlots.length !== edges.length) {
-    throw new Error('@cube/scrambler: Square-1 shape does not have that many positions');
+    throw new Error('@cubesmith/scrambler: Square-1 shape does not have that many positions');
   }
 
   const slots = new Array<number>(2 * RING_SLOTS).fill(-1);
@@ -211,7 +211,7 @@ export function solveSquare1Shape(state: Square1State): Square1Move[] {
   let current = state;
   let remaining = distance.get(square1ShapeKey(current));
   if (remaining === undefined) {
-    throw new Error('@cube/scrambler: Square-1 state has a shape no move can produce');
+    throw new Error('@cubesmith/scrambler: Square-1 state has a shape no move can produce');
   }
 
   const moves: Square1Move[] = [];
@@ -228,7 +228,7 @@ export function solveSquare1Shape(state: Square1State): Square1Move[] {
     });
     if (!step) {
       // Unreachable: BFS distances always admit a descending neighbour.
-      throw new Error('@cube/scrambler: Square-1 shape descent stalled');
+      throw new Error('@cubesmith/scrambler: Square-1 shape descent stalled');
     }
 
     moves.push(step[0]);

@@ -129,7 +129,7 @@ export function square1LowerBound(state: Square1State): number {
   const { table: distance, indexOf } = solvedShapeTable();
   const index = indexOf.get(square1ShapeKey(state));
   if (index === undefined) {
-    throw new Error('@cube/scrambler: Square-1 state has a shape the puzzle cannot make');
+    throw new Error('@cubesmith/scrambler: Square-1 state has a shape the puzzle cannot make');
   }
   return distance[(index * 2 + combinedParity(state)) * 2 + (state.middleFlipped ? 1 : 0)]!;
 }
@@ -250,7 +250,7 @@ export function square1WitnessWithin(
   };
 
   if (!search(state, 0, distance, Previous.Nothing)) {
-    throw new Error('@cube/scrambler: Square-1 distance and witness disagree');
+    throw new Error('@cubesmith/scrambler: Square-1 distance and witness disagree');
   }
   return [...path];
 }

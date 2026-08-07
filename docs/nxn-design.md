@@ -25,7 +25,7 @@ also provides:
 |---|---|---|
 | `555bf` | `puzzles/variants.ts` | `555` plus a random orientation (4b3a); declared `random-moves` |
 | `333bf` | `puzzles/variants.ts` | a **`333`** scramble plus this module's orientation suffix |
-| `444` | not registered | random-**state**, deliberately excluded from `RANDOM_MOVE_CUBES`; see `docs/444-design.md` |
+| `444` | `puzzles/444/` | random-**state**, deliberately excluded from `RANDOM_MOVE_CUBES`; see `docs/444-design.md` |
 
 ### Goal of the implementation
 
@@ -531,12 +531,12 @@ None known in this module. (The related gap is in `puzzles/megaminx/`, the fourt
    the tests verify the *property* (near-total displacement) rather than the
    number, but the number itself is inherited rather than justified from first
    principles.
-4. **`444` is unimplemented**, so `444bf` is absent too — registering it against
-   another puzzle's scrambler would be worse than throwing
-   `UnimplementedEventError`. Note for when `444` lands: an even cube has no
-   fixed centres, so its orientation is not observable and 4b3a is satisfied
-   without any suffix; whether to emit one anyway is a presentation decision
-   rather than a compliance one (`docs/444-design.md` §11).
+4. **`444` and `444bf` are implemented, but not by this module** — they are
+   random-*state* events served by `puzzles/444/`, and are deliberately excluded
+   from `RANDOM_MOVE_CUBES`. `444bf` takes **no** orientation suffix from this
+   module: an even cube has no fixed centres, so its orientation is not
+   observable and 4b3a is satisfied without one (`docs/444-design.md` §11).
+   `orientation.ts` enforces that by throwing if asked for a `444bf` suffix.
 5. **`333mbf` is out of scope by design**, not oversight: it is one inspection
    over *many* cubes, which does not fit a one-scramble-per-call API.
 

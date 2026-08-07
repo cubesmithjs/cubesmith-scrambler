@@ -280,12 +280,19 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
   a corner is one piece id in two consecutive slots, an exact enumeration
   reproducing the published 3,678 twistable shapes, a two-phase solver, and an
   exact Regulation 4b3d distance check.
-- **`src/puzzles/444/`** — under construction, in the milestones of
-  [`docs/444-design.md`](./docs/444-design.md). The piece model (derived from the
-  facelet model, which stays as its oracle), the coordinates and the published
-  `7.4 x 10^45` state count, and phase 1 of the solver are done; the remaining
-  phases are not, so `generateScramble('444')` still throws rather than
-  returning something plausible.
+- **`src/puzzles/444/`** — all seven milestones of
+  [`docs/444-design.md`](./docs/444-design.md) are done, and `444`/`444bf` are
+  registered. The piece model is derived from the facelet model, which stays as
+  its oracle; the coordinates reproduce the published `7.4 x 10^45` state count.
+  The route is reduction — centres, then wings over a *verified* centre-neutral
+  generator library — handed off to the 3x3x3 solver, with parity fixed by
+  **derived** gadgets rather than memorised algorithms. Long (~140 moves) and
+  slow (~2s warm) by design: correctness first. `444bf` is the one blindfolded
+  event with **no** orientation suffix, because an even cube has no observable
+  orientation and the frame draw already is 4b3a's randomisation
+  (`docs/444-design.md` §11). Still open, and not blocking correctness:
+  checkpoint H's empirical half — solver totality measured over a large sample
+  rather than the dozens run so far.
 
 ## Independence note
 

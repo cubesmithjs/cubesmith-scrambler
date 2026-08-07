@@ -86,7 +86,7 @@ function phase2Plan(): Phase2Plan {
 
 export class Phase2BudgetExceededError extends Error {
   constructor(nodes: number) {
-    super(`@cube/scrambler: Square-1 phase 2 gave up after ${nodes} nodes`);
+    super(`@cubesmith/scrambler: Square-1 phase 2 gave up after ${nodes} nodes`);
     this.name = 'Phase2BudgetExceededError';
   }
 }
@@ -177,7 +177,7 @@ export function phase2Search(
         break;
       }
       if (!stepped) {
-        throw new Error('@cube/scrambler: Square-1 backward table has no descending move');
+        throw new Error('@cubesmith/scrambler: Square-1 backward table has no descending move');
       }
     }
   };

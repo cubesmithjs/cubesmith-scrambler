@@ -99,7 +99,7 @@ export function permutationFromIndex(index: number, size: number): number[] {
     remaining = Math.floor(remaining / radix);
   }
   if (remaining !== 0) {
-    throw new Error(`@cube/scrambler: permutation index ${index} is out of range for ${size}`);
+    throw new Error(`@cubesmith/scrambler: permutation index ${index} is out of range for ${size}`);
   }
 
   const available = Array.from({ length: size }, (_, i) => i);
@@ -122,7 +122,7 @@ export const SOLVED_PHASE2_COORDINATE: Phase2Coordinate = {
 
 export class NotSquareLayersError extends Error {
   constructor() {
-    super('@cube/scrambler: phase 2 needs both Square-1 layers square; phase 1 comes first');
+    super('@cubesmith/scrambler: phase 2 needs both Square-1 layers square; phase 1 comes first');
     this.name = 'NotSquareLayersError';
   }
 }

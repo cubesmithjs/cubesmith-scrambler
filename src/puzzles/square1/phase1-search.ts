@@ -166,7 +166,7 @@ export function phase1Solutions(
 export function phase1Search(state: Square1State): Square1Move[] {
   const [solution] = phase1Solutions(state, { maxSolutions: 1 });
   if (!solution) {
-    throw new Error('@cube/scrambler: no Square-1 phase-1 solution — the shape table is wrong');
+    throw new Error('@cubesmith/scrambler: no Square-1 phase-1 solution — the shape table is wrong');
   }
   return solution;
 }

@@ -49,7 +49,7 @@ export function reduce444(state: Cube444State): Reduction444 {
     // Not a defensive nicety: a reduction that silently came up short would be
     // handed to a 3x3x3 phase that cannot represent the position, and the failure
     // would surface as a wrong scramble rather than as an error.
-    throw new Error('@cube/scrambler: 4x4x4 reduction did not reduce');
+    throw new Error('@cubesmith/scrambler: 4x4x4 reduction did not reduce');
   }
 
   return {

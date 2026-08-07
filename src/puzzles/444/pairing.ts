@@ -64,7 +64,7 @@ export class PairingStalledError extends Error {
 
   constructor(paired: number) {
     super(
-      `@cube/scrambler: 4x4x4 pairing stalled with ${paired} of 12 edges paired — ` +
+      `@cubesmith/scrambler: 4x4x4 pairing stalled with ${paired} of 12 edges paired — ` +
         'the greedy step is insufficient even though the library is complete',
     );
     this.name = 'PairingStalledError';

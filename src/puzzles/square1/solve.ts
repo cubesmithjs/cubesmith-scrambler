@@ -65,7 +65,7 @@ export interface Square1SolveOptions {
 
 export class Square1UnsolvableError extends Error {
   constructor() {
-    super('@cube/scrambler: no Square-1 solution found — the state is not one the puzzle reaches');
+    super('@cubesmith/scrambler: no Square-1 solution found — the state is not one the puzzle reaches');
     this.name = 'Square1UnsolvableError';
   }
 }
@@ -97,7 +97,7 @@ export function solveSquare1(
       visit: (moves) => {
         const opened = applySquare1Moves(state, moves);
         if (!hasSquareLayers(opened)) {
-          throw new Error('@cube/scrambler: Square-1 phase 1 did not reach square layers');
+          throw new Error('@cubesmith/scrambler: Square-1 phase 1 did not reach square layers');
         }
         const cap = Math.min(
           phase2LowerBound(opened) + relaxation,

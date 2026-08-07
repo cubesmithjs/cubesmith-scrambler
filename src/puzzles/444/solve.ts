@@ -42,7 +42,7 @@ const PARITY_CANDIDATES = 6;
 
 export class Solve444Error extends Error {
   constructor(message: string) {
-    super(`@cube/scrambler: ${message}`);
+    super(`@cubesmith/scrambler: ${message}`);
     this.name = 'Solve444Error';
   }
 }

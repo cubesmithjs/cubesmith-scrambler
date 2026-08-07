@@ -9,7 +9,7 @@ export class UnimplementedEventError extends Error {
   readonly event: WcaEventId;
 
   constructor(event: WcaEventId) {
-    super(`@cube/scrambler: no scrambler is registered for event "${event}" yet`);
+    super(`@cubesmith/scrambler: no scrambler is registered for event "${event}" yet`);
     this.name = 'UnimplementedEventError';
     this.event = event;
   }

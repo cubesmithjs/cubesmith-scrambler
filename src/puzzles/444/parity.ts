@@ -110,7 +110,7 @@ export function oddWingGadget(index = 0): readonly number[] {
 
   while (oddWings.length <= index) {
     if (searchState.attempt >= 20_000) {
-      throw new Error(`@cube/scrambler: only ${oddWings.length} odd-wing gadgets found`);
+      throw new Error(`@cubesmith/scrambler: only ${oddWings.length} odd-wing gadgets found`);
     }
     const attempt = searchState.attempt;
     searchState.attempt += 1;

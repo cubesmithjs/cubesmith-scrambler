@@ -78,14 +78,14 @@ export function edgeFlipReference(): readonly number[] {
     if (bits.every((bit) => bit !== -1)) break;
   }
   if (bits.some((bit) => bit === -1)) {
-    throw new Error('@cube/scrambler: 4x4x4 flip reference is underdetermined');
+    throw new Error('@cubesmith/scrambler: 4x4x4 flip reference is underdetermined');
   }
   // Every constraint must hold, not merely enough of them to fix the bits: an
   // inconsistency would mean the two conventions do not differ by a per-edge bit at
   // all, and the whole conversion would need rethinking rather than patching.
   for (const [a, b, bit] of constraints) {
     if ((bits[a]! ^ bits[b]!) !== bit) {
-      throw new Error('@cube/scrambler: 4x4x4 flip reference is inconsistent');
+      throw new Error('@cubesmith/scrambler: 4x4x4 flip reference is inconsistent');
     }
   }
 
@@ -95,7 +95,7 @@ export function edgeFlipReference(): readonly number[] {
 
 export function to333State(state: Cube444State): CubeState {
   if (!areWingsPaired(state) || !areCentresSolved(state)) {
-    throw new Error('@cube/scrambler: 4x4x4 hand-off needs a reduced cube');
+    throw new Error('@cubesmith/scrambler: 4x4x4 hand-off needs a reduced cube');
   }
 
   const reference = edgeFlipReference();

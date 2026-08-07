@@ -118,7 +118,7 @@ function deriveMove(alignment: number, next: Square1State): DerivedMove | undefi
   });
 
   if (cornerMap.includes(-1) || edgeMap.includes(-1)) {
-    throw new Error(`@cube/scrambler: incoherent Square-1 phase-2 move from alignment ${alignment}`);
+    throw new Error(`@cubesmith/scrambler: incoherent Square-1 phase-2 move from alignment ${alignment}`);
   }
   return { alignment: landed, cornerMap, edgeMap };
 }
@@ -166,7 +166,7 @@ export function phase2MoveTables(): Phase2MoveTables {
       const derived = deriveMove(alignment, applySquare1LayerTurn(canonical, turn));
       if (!derived) {
         // A turn cannot break square layers; if one did, the model changed.
-        throw new Error('@cube/scrambler: a Square-1 layer turn left the square-layers set');
+        throw new Error('@cubesmith/scrambler: a Square-1 layer turn left the square-layers set');
       }
       const at = alignment * turnCount + index;
       turnAlignment[at] = derived.alignment;

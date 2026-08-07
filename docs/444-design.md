@@ -2,10 +2,14 @@
 
 Written before any implementation, to the same standard as `square1-design.md`:
 every claim is sourced, computed, or explicitly flagged as an open question to
-be settled by computation rather than assumption.
+be settled by computation rather than assumption. It has since been kept as the
+**build record** — §12 carries each milestone's outcome, so the document now
+reads as plan-then-result rather than plan alone.
 
-Target: `generateScramble('444')` and `generateScramble('444bf')`,
-WCA-conforming, original implementation.
+**Status: implemented.** `generateScramble('444')` and `generateScramble('444bf')`
+are registered and reachable; all seven milestones in §12 are done. One item
+remains open and is *not* blocking correctness — checkpoint H's empirical half,
+solver totality measured over a large sample rather than the dozens run so far.
 
 ---
 

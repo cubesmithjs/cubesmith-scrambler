@@ -155,7 +155,7 @@ export function isSliceLegal(state: Square1State): boolean {
 
 export class Square1IllegalSliceError extends Error {
   constructor() {
-    super('@cube/scrambler: this Square-1 state cannot be sliced — a corner straddles the cut');
+    super('@cubesmith/scrambler: this Square-1 state cannot be sliced — a corner straddles the cut');
     this.name = 'Square1IllegalSliceError';
   }
 }
@@ -294,7 +294,7 @@ export function square1Alignments(
       const previous = state.slots[ring + ((i + RING_SLOTS - 1) % RING_SLOTS)]!;
       if (isCornerPiece(piece) && piece !== previous) return i % 3;
     }
-    throw new Error('@cube/scrambler: a square Square-1 ring with no corners');
+    throw new Error('@cubesmith/scrambler: a square Square-1 ring with no corners');
   });
   return [alignments[0]!, alignments[1]!];
 }

@@ -444,7 +444,7 @@ computed.
 ### Related documents in this repository
 
 - `docs/square1-design.md` — the design-document standard this one follows.
-- `docs/444-design.md` — the 4x4x4 plan, which needs the two-phase machinery
-  this puzzle deliberately does not.
+- `docs/444-design.md` — the 4x4x4, which needs a full reduction pipeline and a
+  hand-off to another solver, where this puzzle needs neither.
 - `docs/333-design.md` — the same puzzle family at a scale where one exact table
   is no longer possible.
