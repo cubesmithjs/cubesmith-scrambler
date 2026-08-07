@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { generateScramble, isImplementedEvent, UnimplementedEventError } from './index';
+import {
+  generateScramble,
+  InvalidScrambleCountError,
+  isImplementedEvent,
+  MAX_SCRAMBLE_COUNT,
+} from './index';
 import { implementedEvents } from './core/scrambler-registry';
 import type { WcaEventId } from './core/types';
 import { parseMove } from './notation/move';
@@ -29,7 +34,15 @@ const EVERY_WCA_EVENT: readonly WcaEventId[] = [
   'skewb',
   'sq1',
 ];
-import { applyMoves, isSolved, solve333, SOLVED_STATE } from './puzzles/333';
+import {
+  applyMoves,
+  generate333Scramble,
+  generate333ScrambleWithFloor,
+  isSolved,
+  solve333,
+  SOLVED_STATE,
+} from './puzzles/333';
+import { createRandomSource } from './random/random-source';
 import {
   applyMoves222,
   isSolved222,
@@ -73,6 +86,7 @@ import {
   solvedCubeNxN,
 } from './puzzles/nxn';
 import { orientationKey } from './puzzles/nxn/orientation';
+import { cubeScrambleIsFarEnough } from './puzzles/nxn/minimum';
 
 /** A smoke test of the package's actual public entry point (`src/index.ts`), not an internal module. */
 describe('@cubesmith/scrambler public entry point', () => {
@@ -82,12 +96,52 @@ describe('@cubesmith/scrambler public entry point', () => {
    * 3x3x3 solves (`333`, `333bf`, `333fm`, `333oh`) for no extra coverage, and
    * a 3x3x3 solve is by far the slowest thing in this suite.
    */
-  it('registers exactly the sixteen events that are implemented', () => {
+  /**
+   * The structural guard for Regulation 4b3's floor.
+   *
+   * The floor was missing on four events for months while `README.md` claimed
+   * it was enforced everywhere, and `src/readme.test.ts` did not catch it
+   * because the claim was prose rather than a runnable example. Asserting the
+   * property for all sixteen events would mean generating sixteen scrambles
+   * and building every pruning table in this file — minutes, not seconds — so
+   * instead each event has to name *where* its floor lives, and the list is
+   * checked against the registry.
+   *
+   * This is a manifest, not a proof: it cannot tell that a named check is
+   * correct, only that no event was added without one being named. The
+   * property itself is asserted per event in that event's own tests.
+   */
+  it('every registered event names where its 4b3 floor is enforced', () => {
+    const floorEnforcedBy: Record<WcaEventId, string> = {
+      '222': 'puzzles/222/solve.ts — drawStateAtLeastMovesFromSolved, 4b3b minimum 4',
+      '333': 'puzzles/333/solve.ts — generate333ScrambleWithFloor',
+      '333bf': 'puzzles/variants.ts — withMinimumDistance, after the orientation suffix',
+      '333fm': 'puzzles/333/fewest-moves.ts — withMinimumDistance, on the padded sequence',
+      '333mbf': 'puzzles/variants.ts — generate333BlindfoldedScramble, per cube',
+      '333oh': 'puzzles/variants.ts — generate333ScrambleWithFloor',
+      '444': 'puzzles/444/solve.ts — isAtLeastTwoMovesFromSolved, on the drawn state',
+      '444bf': 'puzzles/variants.ts — withMinimumDistance, after the rotation suffix',
+      '555': 'puzzles/nxn/solve.ts — withMinimumDistance',
+      '555bf': 'puzzles/variants.ts — withMinimumDistance, after the orientation suffix',
+      '666': 'puzzles/nxn/solve.ts — withMinimumDistance',
+      '777': 'puzzles/nxn/solve.ts — withMinimumDistance',
+      clock: 'puzzles/clock/solve.ts — drawStateAtLeastMovesFromSolved',
+      minx: 'puzzles/megaminx/solve.ts — megaminxScrambleIsFarEnough',
+      pyram: 'puzzles/pyraminx/solve.ts — drawStateAtLeastMovesFromSolved, 4b3f minimum 6',
+      skewb: 'puzzles/skewb/solve.ts — drawStateAtLeastMovesFromSolved, 4b3c minimum 7',
+      sq1: 'puzzles/square1/solve.ts — drawStateAtLeastMovesFromSolved, 4b3d minimum 11',
+    } as Record<WcaEventId, string>;
+
+    expect(Object.keys(floorEnforcedBy).sort()).toEqual([...implementedEvents()].sort());
+  });
+
+  it('registers all seventeen WCA events', () => {
     const implemented = [
       '222',
       '333',
       '333bf',
       '333fm',
+      '333mbf',
       '333oh',
       '444',
       '444bf',
@@ -101,17 +155,15 @@ describe('@cubesmith/scrambler public entry point', () => {
       'skewb',
       'sq1',
     ] as const;
-    const unimplemented = ['333mbf'] as const;
 
     for (const event of implemented) expect(isImplementedEvent(event)).toBe(true);
-    for (const event of unimplemented) expect(isImplementedEvent(event)).toBe(false);
 
     // The count is asserted rather than described in prose, because "fifteen of
     // seventeen" sat in the README and in this test's own name while the real
     // number was thirteen — a hand-maintained claim with nothing checking it.
     expect([...implementedEvents()].sort()).toEqual([...implemented].sort());
-    expect(implemented.length).toBe(16);
-    expect(implemented.length + unimplemented.length).toBe(EVERY_WCA_EVENT.length);
+    expect(implemented.length).toBe(17);
+    expect(implemented.length).toBe(EVERY_WCA_EVENT.length);
   });
 
   it('the cheap events all produce a non-empty scramble through the public entry point', async () => {
@@ -123,15 +175,50 @@ describe('@cubesmith/scrambler public entry point', () => {
   });
 
   /**
-   * The one that isn't, and why. Multi-Blind is one inspection over many cubes,
-   * which does not fit a one-scramble-per-call API — a deliberate exclusion, not
-   * an oversight, and it throws rather than returning something plausible.
+   * `333mbf` used to be the one event that threw, "out of scope by design"
+   * because one inspection over many cubes was said not to fit a
+   * one-scramble-per-call API. Multi-blind is not a different scramble though,
+   * only a different number of them, so it needed an optional `count` rather
+   * than a new API. Nothing unimplemented is left, so
+   * `UnimplementedEventError` now has no event to fire on — which is why it is
+   * still exported and still tested, in `core/generate-scramble.test.ts`,
+   * against a deliberately empty registry.
    */
-  it('333mbf throws UnimplementedEventError, being out of scope by design', async () => {
-    for (const event of ['333mbf'] as const) {
-      expect(isImplementedEvent(event)).toBe(false);
-      await expect(generateScramble(event)).rejects.toBeInstanceOf(UnimplementedEventError);
+  it('333mbf is a real event, and by default is exactly one 333bf scramble', async () => {
+    expect(isImplementedEvent('333mbf')).toBe(true);
+    const bf = await generateScramble('333bf', { seed: 'mbf-shape' });
+    const mbf = await generateScramble('333mbf', { seed: 'mbf-shape' });
+    expect(mbf.moves).toBe(bf.moves);
+    expect(mbf.quality).toBe('random-state');
+    expect(mbf.scrambles).toEqual([bf.moves]);
+  });
+
+  it('333mbf draws count independent cubes, each clearing the 4b3 floor after its own suffix', async () => {
+    const result = await generateScramble('333mbf', { count: 4, seed: 'mbf-many' });
+    expect(result.scrambles).toHaveLength(4);
+    expect(result.moves).toBe(result.scrambles![0]);
+    // Four independent uniform draws collide with probability ~0, so this
+    // checks independence without forbidding a repeat.
+    expect(new Set(result.scrambles).size).toBe(4);
+    for (const scramble of result.scrambles!) {
+      expect(cubeScrambleIsFarEnough(scramble, 3)).toBe(true);
     }
+  });
+
+  it('count is rejected on a single-scramble event, naming it', async () => {
+    await expect(generateScramble('333', { count: 2 })).rejects.toBeInstanceOf(
+      InvalidScrambleCountError,
+    );
+    await expect(generateScramble('333', { count: 2 })).rejects.toThrow(/"333"/);
+  });
+
+  it('exports the count bound, and rejects past it before generating anything', async () => {
+    expect(MAX_SCRAMBLE_COUNT).toBe(100);
+    // Rejected on validation, so this costs nothing — a hundred and one
+    // random-state 3x3x3 solves would take minutes.
+    await expect(
+      generateScramble('333mbf', { count: MAX_SCRAMBLE_COUNT + 1 }),
+    ).rejects.toBeInstanceOf(InvalidScrambleCountError);
   });
 
   /**
@@ -293,16 +380,28 @@ describe('@cubesmith/scrambler public entry point', () => {
    * rendering, parsing and the derived move tables.
    */
   /**
-   * The variant events. `333fm`/`333oh` are the same scramble as `333` — same
-   * puzzle, only the human constraint differs — while the blindfolded ones
-   * must additionally orient the puzzle randomly (Regulation 4b3a), so they
-   * are *not* plain aliases.
+   * The variant events. `333oh` is the same scramble as `333` — same puzzle,
+   * only the human constraint differs — while the blindfolded ones must
+   * additionally orient the puzzle randomly (Regulation 4b3a), so they are
+   * *not* plain aliases.
+   *
+   * `333fm` used to be asserted here as a plain alias too. It is not one: an
+   * official Fewest Moves scramble is padded with `R' U' F` at both ends, and
+   * this test asserted the absence of that padding as if it were correct. Its
+   * own event tests are in `puzzles/333/fewest-moves.test.ts`.
    */
   describe('variant events', () => {
-    it('333fm and 333oh reproduce 333 exactly for the same seed', async () => {
+    it('333oh reproduces 333 exactly for the same seed', async () => {
       const base = await generateScramble('333', { seed: 'variant' });
-      expect((await generateScramble('333fm', { seed: 'variant' })).moves).toBe(base.moves);
       expect((await generateScramble('333oh', { seed: 'variant' })).moves).toBe(base.moves);
+    });
+
+    it('333fm does not — it is a puzzle of its own, with the FMC padding', async () => {
+      const base = await generateScramble('333', { seed: 'variant' });
+      const fmc = await generateScramble('333fm', { seed: 'variant' });
+      expect(fmc.moves).not.toBe(base.moves);
+      expect(fmc.moves.startsWith("R' U' F ")).toBe(true);
+      expect(fmc.moves.endsWith(" R' U' F")).toBe(true);
     });
 
     it('333bf is a 333 scramble plus a wide-move orientation suffix', async () => {
@@ -334,6 +433,64 @@ describe('@cubesmith/scrambler public entry point', () => {
         );
       }
       expect(orientations.size).toBeGreaterThan(1);
+    });
+
+    /**
+     * `444bf` used to be the deliberate exception with no orientation suffix at
+     * all — an even cube has no fixed centre, so its orientation is not a
+     * property of its state. TNoodle appends one anyway, and appends a *pure
+     * rotation* rather than a wide move, which concedes the same point: it is
+     * telling the competitor how to hold the puzzle, not changing it.
+     */
+    it('444bf is a 444 scramble plus a whole-cube rotation', async () => {
+      const base = await generateScramble('444', { seed: 'bf4' });
+      const bf = await generateScramble('444bf', { seed: 'bf4' });
+      expect(bf.moves.startsWith(base.moves)).toBe(true);
+
+      const extra = bf.moves.slice(base.moves.length).trim();
+      for (const token of extra.split(' ').filter(Boolean)) {
+        expect(token).toMatch(/^[xyz](2|')?$/);
+      }
+    });
+
+    it('444bf actually varies the orientation, and only ever by rotating', async () => {
+      const suffixes = new Set<string>();
+      for (let seed = 0; seed < 8; seed += 1) {
+        const base = await generateScramble('444', { seed: `bf4-${seed}` });
+        const bf = await generateScramble('444bf', { seed: `bf4-${seed}` });
+        suffixes.add(bf.moves.slice(base.moves.length).trim());
+      }
+      expect(suffixes.size).toBeGreaterThan(1);
+      // A rotation cannot bring a scramble closer to solved, but the floor is
+      // still measured on the printed sequence rather than on the draw.
+      for (let seed = 0; seed < 4; seed += 1) {
+        const bf = await generateScramble('444bf', { seed: `bf4-${seed}` });
+        expect(cubeScrambleIsFarEnough(bf.moves, 4)).toBe(true);
+      }
+    });
+
+    /**
+     * Regulation 4b3's two-move floor, asserted as a property of the output
+     * rather than trusted to a wrapper being in place.
+     *
+     * It is asserted here rather than in a new file because these three events
+     * are 3x3x3 solves, by far the slowest thing in this suite, and this file
+     * has already built the pruning tables by the time it gets here.
+     */
+    it('every 3x3x3 event clears the 4b3 two-move floor', async () => {
+      for (const event of ['333', '333oh', '333fm'] as const) {
+        const result = await generateScramble(event, { seed: `floor-${event}` });
+        expect(cubeScrambleIsFarEnough(result.moves, 3), event).toBe(true);
+      }
+    });
+
+    it('the floor is additive: it does not change what a 333 seed produces', async () => {
+      // The first draw clears the floor with probability 1 − 4×10⁻¹⁹, so adding
+      // the check consumes the random stream identically. A change here would
+      // mean the floor is rejecting real scrambles, which would be a bug in the
+      // check rather than a fact about the draw.
+      const direct = generate333Scramble(createRandomSource('floor-additive'));
+      expect(generate333ScrambleWithFloor(createRandomSource('floor-additive'))).toBe(direct);
     });
 
     /**

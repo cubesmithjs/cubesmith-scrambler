@@ -3,10 +3,14 @@ import {
   allMovesForSize,
   inverseWideMove,
   inverseWideMoves,
+  isWholeCubeRotation,
   maxDepthForSize,
   moveAxis,
   moveLayerSet,
+  parseScrambleToken,
   parseWideMove,
+  scrambleTokensToString,
+  scrambleTokenToString,
   wideMovesToString,
   wideMoveToString,
   type WideMove,
@@ -153,5 +157,64 @@ describe('moveAxis and moveLayerSet', () => {
     expect(moveLayerSet({ face: 'R', depth: 1, amount: 1 })).not.toBe(
       moveLayerSet({ face: 'L', depth: 1, amount: 1 }),
     );
+  });
+});
+
+describe('whole-cube rotations', () => {
+  it('recognises a block that turns every layer', () => {
+    expect(isWholeCubeRotation({ face: 'R', depth: 4, amount: 1 }, 4)).toBe(true);
+    expect(isWholeCubeRotation({ face: 'R', depth: 3, amount: 1 }, 4)).toBe(false);
+    expect(isWholeCubeRotation({ face: 'R', depth: 3, amount: 1 }, 3)).toBe(true);
+  });
+
+  it('spells them the way TNoodle does: R is x, U is y, F is z', () => {
+    expect(scrambleTokenToString({ face: 'R', depth: 4, amount: 1 }, 4)).toBe('x');
+    expect(scrambleTokenToString({ face: 'U', depth: 4, amount: 2 }, 4)).toBe('y2');
+    expect(scrambleTokenToString({ face: 'F', depth: 4, amount: 3 }, 4)).toBe("z'");
+  });
+
+  it('refuses to spell a rotation about a face WCA has no name for', () => {
+    // `L` at full depth is `x'`, not `x` about L. Rendering it as if it had its
+    // own name would put two spellings of one rotation into a scramble.
+    expect(() => scrambleTokenToString({ face: 'L', depth: 4, amount: 1 }, 4)).toThrow(
+      /no WCA spelling/,
+    );
+  });
+
+  it('leaves ordinary turns exactly as wideMoveToString renders them', () => {
+    for (const move of allMovesForSize(5)) {
+      expect(scrambleTokenToString(move, 5)).toBe(wideMoveToString(move));
+    }
+  });
+
+  it('round-trips a rotation through parse and render', () => {
+    for (const token of ['x', 'x2', "x'", 'y', 'y2', "y'", 'z', 'z2', "z'"]) {
+      expect(scrambleTokenToString(parseScrambleToken(token, 4), 4)).toBe(token);
+    }
+  });
+
+  it('resolves a rotation against the cube it is written for', () => {
+    // The reason the size is required: `x` is four layers on a 4x4x4 and five
+    // on a 5x5x5, so the token alone does not name a move.
+    expect(parseScrambleToken('x', 4).depth).toBe(4);
+    expect(parseScrambleToken('x', 5).depth).toBe(5);
+  });
+
+  it('still parses every ordinary turn token', () => {
+    expect(parseScrambleToken("Rw'", 4)).toEqual({ face: 'R', depth: 2, amount: 3 });
+    expect(parseScrambleToken('3Fw2', 7)).toEqual({ face: 'F', depth: 3, amount: 2 });
+    expect(() => parseScrambleToken('Q', 4)).toThrow(/not a valid wide-move token/);
+  });
+
+  it('joins a mixed sequence into one scramble tail', () => {
+    expect(
+      scrambleTokensToString(
+        [
+          { face: 'R', depth: 1, amount: 1 },
+          { face: 'U', depth: 4, amount: 3 },
+        ],
+        4,
+      ),
+    ).toBe("R y'");
   });
 });

@@ -18,6 +18,35 @@ export interface FaceMove {
 export const FACES: readonly Face[] = ['U', 'D', 'F', 'B', 'L', 'R'];
 export const AMOUNTS: readonly Amount[] = [1, 2, 3];
 
+/**
+ * The three axes a face turn can be on, named for the pair of opposite faces
+ * that share it.
+ *
+ * The distinction from a *face* matters wherever two moves meet. Two moves on
+ * the same face **merge** (`R R2` is `R'`); two moves on the same axis but
+ * opposite faces do not merge but do **commute** (`R L` and `L R` are the same
+ * algorithm written two ways), so only one of the two orderings is canonical.
+ * A rule that has to guarantee "these two moves are genuinely two moves, in a
+ * settled order" is therefore an axis rule, not a face rule — see
+ * `puzzles/333/fewest-moves.ts`, where the WCA's Fewest Moves padding relies on
+ * exactly that.
+ */
+export type Axis = 'UD' | 'RL' | 'FB';
+
+const AXIS_BY_FACE: Readonly<Record<Face, Axis>> = {
+  U: 'UD',
+  D: 'UD',
+  R: 'RL',
+  L: 'RL',
+  F: 'FB',
+  B: 'FB',
+};
+
+/** The axis `face` turns about: `U` and `D` both give `'UD'`. */
+export function axisOf(face: Face): Axis {
+  return AXIS_BY_FACE[face];
+}
+
 /** `{ face: 'R', amount: 3 }` → `"R'"`. */
 export function moveToString(move: FaceMove): string {
   if (move.amount === 1) return move.face;

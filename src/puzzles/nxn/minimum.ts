@@ -1,5 +1,5 @@
 import { isAtLeastTwoMovesFromSolved } from '../../core/scramble-shape';
-import { allMovesForSize, parseWideMove } from './notation';
+import { allMovesForSize, parseScrambleToken } from './notation';
 import {
   applyWideMove,
   applyWideMoves,
@@ -30,7 +30,11 @@ export function cubeScrambleIsFarEnough(scramble: string, size: number): boolean
     .trim()
     .split(/\s+/)
     .filter((token) => token.length > 0)
-    .map(parseWideMove);
+    // `parseScrambleToken`, not `parseWideMove`: an even cube's blindfolded
+    // suffix is a whole-cube rotation (`x2 y'`), which the turn-only parser
+    // rejects. The size is passed explicitly rather than by point-free `.map`,
+    // which would hand it the array index.
+    .map((token) => parseScrambleToken(token, size));
   const state = applyWideMoves(solvedCubeNxN(size), moves);
   // Solvedness here is "every face one colour", not "every facelet home": a
   // blindfolded scramble deliberately rotates the puzzle, and a rotated solved

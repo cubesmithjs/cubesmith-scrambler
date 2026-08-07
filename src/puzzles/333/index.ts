@@ -17,4 +17,23 @@ export {
 } from './state';
 export { getMoveTable, allFaceMoves, moveKey, type MoveTable } from './move-tables';
 export { randomState } from './random-state';
-export { solve333, generate333Scramble, register333Scrambler } from './solve';
+export {
+  CUBE_333_SIZE,
+  solve333,
+  generate333Scramble,
+  generate333ScrambleWithFloor,
+  register333Scrambler,
+} from './solve';
+export {
+  FEWEST_MOVES_PREFIX,
+  FEWEST_MOVES_SUFFIX,
+  generate333FewestMovesScramble,
+  register333FewestMovesScrambler,
+} from './fewest-moves';
+export {
+  endRestrictions,
+  isForbiddenFirstMove,
+  isForbiddenLastMove,
+  NO_END_RESTRICTIONS,
+  type EndAxisRestrictions,
+} from './search-restrictions';

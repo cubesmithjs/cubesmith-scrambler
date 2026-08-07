@@ -5,7 +5,9 @@ does. Numbers are read off the code or measured, never recalled. One
 conformance gap found while writing this is recorded in §8 rather than quietly
 fixed.
 
-Covers `333` and its three variant registrations: `333fm`, `333oh` and `333bf`.
+Covers `333`, its three variant registrations (`333oh`, `333bf` and `333mbf`),
+and `333fm` — which used to be a variant registration and is now a puzzle of
+its own (§5a). Multi-blind is §5b.
 
 ---
 
@@ -17,9 +19,10 @@ Covers `333` and its three variant registrations: `333fm`, `333oh` and `333bf`.
 
 | Event | Relationship |
 |---|---|
-| `333fm` | Fewest Moves — **plain alias**. Same puzzle, same scramble; only the human constraint differs. |
-| `333oh` | One-Handed — **plain alias**, same reasoning. |
+| `333oh` | One-Handed — **plain alias**. Same puzzle, same scramble; only the human constraint differs. |
+| `333fm` | Fewest Moves — **not** an alias. Every official FMC scramble is padded `R' U' F` … `R' U' F`. See §5a. |
 | `333bf` | 3x3x3 Blindfolded — **not** an alias. Regulation 4b3a additionally requires a random puzzle orientation. |
+| `333mbf` | Multi-Blind — the same scramble as `333bf`, drawn `count` times. See §5b. |
 
 Regulation **4b3** applies with no exception: random state, at least **2** moves
 to solve, equal probability for each state. None of 4b3a–4b3f alters the method
@@ -58,7 +61,9 @@ split giving up global optimality. Official scramblers make the same trade.
 | `phase1-search.ts` / `phase2-search.ts` | the two IDA\* searches |
 | `random-state.ts` | the uniform, parity-correct draw |
 | `solve.ts` | `solve333`, `generate333Scramble`, registration |
-| `../variants.ts` | `333fm` / `333oh` / `333bf` registration |
+| `search-restrictions.ts` | the end-axis restriction both searches accept |
+| `fewest-moves.ts` | `333fm` — the `R' U' F` padding and its registration |
+| `../variants.ts` | `333oh` / `333bf` / `333mbf` registration |
 
 ---
 
@@ -303,8 +308,10 @@ the printed sequence, never the state it reaches.
 
 ### The variants
 
-`333fm` and `333oh` call `generate333Scramble` directly — same puzzle, same
-scramble, and a scramble knows nothing about how a human is allowed to solve it.
+`333oh` calls `generate333Scramble` directly — same puzzle, same scramble, and
+a scramble knows nothing about how a human is allowed to solve it.
+
+`333fm` does not; see §5a.
 
 `333bf` is different. Regulation 4b3a:
 
@@ -328,11 +335,169 @@ in `puzzles/nxn/orientation.ts` and is documented in `docs/nxn-design.md`.
 
 ### WCA compliance
 
-| Requirement | `333` / `333fm` / `333oh` | `333bf` |
+| Requirement | `333` / `333oh` | `333fm` | `333bf` |
+|---|---|---|---|
+| 4b3 random state, equal probability | ✅ `random-state.ts` | ✅ same draw, unrestricted (§5a) | ✅ same draw |
+| 4b3 at least 2 moves to solve | ✅ `generate333ScrambleWithFloor` | ✅ `withMinimumDistance`, checked on the padded sequence | ✅ `withMinimumDistance`, checked after the suffix |
+| 4b3a random orientation, uniform over 24 | n/a | n/a | ✅ `orientationSuffixes` |
+| Official FMC padding | n/a | ✅ `R' U' F` both ends, seams axis-restricted | n/a |
+
+---
+
+## 5a. `333fm` — the Fewest Moves padding
+
+`333fm` was registered as a plain alias for `333` until this section was
+written. That was wrong, and unlike the rest of §8 it was wrong *visibly*: an
+FMC competitor knows their scramble starts `R' U' F`.
+
+### What the official program does
+
+TNoodle gives Fewest Moves a puzzle class of its own,
+`ThreeByThreeCubeFewestMovesPuzzle`, registered as `THREE_FM` separately from
+the `THREE` that serves `333` and `333oh`. It wraps every scramble:
+
+```
+R' U' F   <a 3x3x3 scramble>   R' U' F
+```
+
+Two reasons, both from the wca-admin discussion its source quotes:
+
+1. A two-phase solver's output contains a visible orientation step, and with
+   EO-first methods a competitor could read part of their own solution off the
+   scramble. `R' U' F` is a quarter turn on all three axes, so it guarantees at
+   least one badly-oriented edge in every orientation — "solving EO optimally
+   can't be derived from the scramble".
+2. An easy state gives a short solution, and a visibly short sequence
+   advertises an easy scramble before anyone touches the puzzle. Six extra
+   moves make the printed length ordinary regardless. This is the same leak §2
+   of `core/scramble-shape.ts` describes for scramble length.
+
+### Why it is not string concatenation
+
+The padding only works if it survives into the printed sequence. An inner
+scramble starting with `F` would print `… U' F F …`, which merges to `F2`, and
+both reasons above would be partly undone.
+
+TNoodle prevents this by restricting the **axis** the *solution* may begin and
+end on, passing the restriction into min2phase's search
+(`SearchWCA.solution(…, firstAxisRestriction, lastAxisRestriction)`; its
+`str2axis` maps a face to `index / 3 % 3`, so a restriction on `F` bars `B`
+too). It then assembles the three pieces with `MergingMode.NO_MERGING`, which
+its own source documents as "blindly append moves".
+
+The two restrictions are **different axes**, derived from the padding rather
+than fixed:
+
+| Seam | Adjacent padding move | Barred axis for the inner scramble |
 |---|---|---|
-| 4b3 random state, equal probability | ✅ `random-state.ts` | ✅ same draw |
-| 4b3 at least 2 moves to solve | ⚠️ **not enforced** — see §8 | ✅ `withMinimumDistance`, checked after the suffix |
-| 4b3a random orientation, uniform over 24 | n/a | ✅ `orientationSuffixes` |
+| prefix → scramble | the prefix's **last** move, `F` | `FB` on the scramble's **first** move |
+| scramble → suffix | the suffix's **first** move, `R'` | `RL` on the scramble's **last** move |
+
+Reading both as `F` is the easy mistake, and `fewest-moves.ts` derives them
+from `FEWEST_MOVES_PREFIX`/`_SUFFIX` so they cannot drift apart from the
+padding they protect.
+
+Because the scramble is the *inverse* of the solution, the two restrictions
+swap ends before reaching the solver: the scramble's first move is the inverse
+of the solution's last, and vice versa. Inverting never changes a move's face,
+so the axis carries over unchanged — only which end it applies to flips.
+
+### Why the restriction lives inside the search
+
+This is the part that matters for 4b3, and the tempting shortcut is wrong.
+
+The restriction is a property of the **solution**, not of the state. Drawing a
+state, solving it and redrawing when the solution's ends are unsuitable would
+exclude that state *permanently* — the solver is deterministic, so a state
+whose solution fails the test fails it every time. Roughly one state in nine
+would become unreachable, and 4b3 asks for "equal probability for each state".
+
+So `phase1Search` and `phase2Search` take an optional `EndAxisRestrictions`
+instead. A goal node reached by a barred final move simply isn't treated as a
+goal, and the search continues to a conforming (sometimes one move longer)
+solution. The heuristic stays admissible — it lower-bounds the distance to the
+goal, and a restricted route can only be longer — so IDA\* is still correct.
+Every state still gets solved, so the draw is untouched. `fewest-moves.test.ts`
+asserts exactly that: over many independent draws the restricted solve always
+succeeds, always obeys both restrictions, and always reproduces its input
+state.
+
+Which phase owns which end: the first-move restriction belongs to phase 1 and
+the last-move restriction to phase 2. When a phase comes back empty the other
+supplies that end instead — phase 1 being empty is knowable before phase 2
+runs, phase 2 being empty is not, so `solve333` checks the assembled solution
+and re-solves once with phase 1 carrying the last-move restriction. Both cases
+are far rarer than one draw in `10^5`; they are handled because 4b3 states a
+requirement rather than a likelihood.
+
+### The 4b3 floor is checked on the padded sequence
+
+Not on the drawn state — the padding moves the state by six moves, so a draw
+that qualified before padding is not what a competitor is handed. This is the
+same end of the process `333bf` is checked at, for the same reason.
+
+TNoodle checks at the same point: `Puzzle.generateWcaScramble` redraws while
+`psag.state.solveIn(wcaMinScrambleDistance - 1) != null` with
+`wcaMinScrambleDistance = 2`, and for `THREE_FM` the `psag` it tests is the one
+the `AlgorithmBuilder` returns *after* prefix and suffix have been appended.
+
+---
+
+## 5b. `333mbf` — one attempt, many cubes
+
+Multi-Blind was the last unimplemented event, and the reason given for that was
+wrong in a specific and instructive way. `variants.ts`, the README and
+`nxn-design.md` §8 all said:
+
+> it is one inspection over *many* cubes, which does not fit a
+> one-scramble-per-call API. Adding it would mean changing what
+> `generateScramble` returns for every other event.
+
+The first sentence is a fact about the event. The second was a guess about how
+the problem would have to be solved, and it was the whole objection. Neither
+reference implementation works that way:
+
+- `cubing@0.63.3` maps `case "333bf": case "333mbf":` to the **same**
+  `random333OrientedScramble()` and leaves the caller to loop.
+- TNoodle has no multi-blind puzzle class at all. `Puzzle.generateScrambles(r,
+  count)` is a bare loop over `generateWcaScramble`, and `333mbf` is served by
+  the same `333ni` generator as `333bf`.
+
+So multi-blind is not a different *scramble*, only a different *number* of
+them.
+
+### The shape
+
+Two optional additions, and nothing else changed:
+
+| | |
+|---|---|
+| `GenerateScrambleOptions.count?: number` | how many cubes; defaults to 1 |
+| `ScrambleResult.scrambles?: readonly string[]` | present for a multi-scramble event; `scrambles[0] === moves` |
+
+`event`, `moves` and `quality` are untouched, so a caller written before this
+existed keeps working — and `generateScramble('333mbf')` with no `count`
+returns exactly the `333bf` scramble the same seed gives.
+
+Each cube is a full `generate333BlindfoldedScramble`: its own uniform draw, its
+own orientation suffix, and its own 4b3 floor checked *after* that suffix. The
+N draws share one `RandomSource`, which is what makes them independent; the
+registry marks the event `multiScramble` rather than giving it a second
+"generate N" function, because there is nothing extra to do.
+
+### Three decisions worth stating
+
+1. **`count` on any other event throws** (`InvalidScrambleCountError`) rather
+   than being ignored. A caller who asks for ten and silently receives one has
+   been misled, and the mistake is invisible from the result.
+2. **The draws are not de-duplicated.** Each cube is an independent uniform
+   draw, so a collision is a legitimate outcome; removing it would bias the
+   distribution. There is a test saying so, to stop it being "fixed".
+3. **`count` is capped at `MAX_SCRAMBLE_COUNT` (100).** A guard, not a
+   regulation — the Regulations cap the *time* (H1a: 10 minutes per cube, up to
+   60) and not the number. Every cube is a full random-state solve, about
+   100 ms warm, in a package with no Worker to hide it in, so an unbounded
+   `count` fed from user input would block a caller's main thread for minutes.
 
 ---
 
@@ -437,32 +602,50 @@ a particular state being "hard" in any intuitive sense.
 
 ## 8. Known limitations
 
+### Fixed since this document was written
+
+**The 4b3 two-move floor is now enforced for `333`, `333fm` and `333oh`.** This
+section used to file its absence under "Current bugs": `register333Scrambler`
+registered `generate333Scramble` bare, and `variants.ts` did the same for the
+other two, so only the blindfolded path went through the check —
+while `README.md` claimed the floor applied everywhere and
+`docs/blindfolded-review.md` §5 already listed it as fixed.
+
+`generate333ScrambleWithFloor` (`puzzles/333/solve.ts`) now wraps the draw in
+`withMinimumDistance(3, …)`, and both `333` and `333oh` register through it;
+`333fm` got its own wrapper with §5a, applied to the *padded* sequence.
+
+Two things worth keeping from the old entry. The impact was about
+`4 × 10^-19` per scramble — 19 states within one move of solved out of
+`4.3 × 10^19`, never to be observed — and that was never the argument: 4b3
+states a requirement, not a likelihood. And the wrapper deliberately lives at
+the registration sites rather than inside `generate333Scramble`, because
+`333bf` calls that function too and its floor has to be checked *after* the
+orientation suffix.
+
 ### Current bugs
 
-**The 4b3 two-move floor is not enforced for `333`, `333fm` or `333oh`.**
+**A same-face pair can be printed at the phase-1 / phase-2 boundary.**
 
-`docs/blindfolded-review.md` §4.1 records this floor being added and states it
-was "applied to `333`, `555`, `666`, `777` and both blindfolded events". For the
-NxN events and for `333bf` that is accurate. For plain `333` it is not:
-`register333Scrambler` (`puzzles/333/solve.ts:37`) registers
-`generate333Scramble` directly, with no `withMinimumDistance` wrapper, and
-`variants.ts` registers `333fm` and `333oh` the same way. Only the blindfolded
-path goes through the check.
+Each search prunes consecutive same-face moves within itself, but neither knows
+the other's moves, so phase 1's last move and phase 2's first move can turn the
+same face. The scramble is the inverse of the solution, so it surfaces mid-string
+— `… R2 L2 B2 B' L' …` in the seed `probe-5` scramble, where `B2 B'` merges to
+`B`.
 
-- **Impact:** a scramble could in principle be produced from a state 0 or 1
-  moves from solved. There are 19 such states out of `4.3 × 10^19`, so the
-  probability is about `4 × 10^-19` per scramble — it will not be observed.
-- **Why it still matters:** it is the same argument the review itself makes —
-  the regulation states a requirement, not a likelihood, and "too unlikely to
-  happen" is not "cannot happen". The review's own §5 summary table claims this
-  as fixed for `333`.
-- **Fix:** wrap the three registrations in `withMinimumDistance(3, …)` exactly
-  as `generate333BlindfoldedScramble` does. `cubeScrambleIsFarEnough` already
-  parses a rendered scramble and applies it to a facelet cube, so it works
-  unchanged on a `333` scramble string. Seeded output would not change — the
-  first draw passes with probability `1 − 4 × 10^-19` — so this is additive, not
-  a behaviour change. Not applied here, because this document's remit is to
-  describe the implementation; it is flagged for a decision.
+- **Impact:** cosmetic on the state, which is uniform either way, but it is
+  exactly the leak `core/scramble-shape.ts` §2 warns about: the printed sequence
+  is one move longer than the algorithm it represents, and a competitor merging
+  it gets a shorter scramble than the sheet shows. Measured at 1 scramble in 20
+  over a 20-seed sample.
+- **Where it applies:** `333`, `333oh`, `333bf`, the inner scramble of `333fm`,
+  and `444`'s 3x3x3 hand-off. Not the padding seams of `333fm`, which are
+  protected by the axis restriction of §5a.
+- **Fix:** seed `phase2Search`'s same-face pruning with phase 1's last move, so
+  the rule spans the boundary. One condition, but it changes `333` output for
+  every seed — a breaking change to seeded scrambles — so it wants its own
+  release note rather than being folded into an unrelated change. Found while
+  implementing §5a; not fixed there.
 
 ### Rough edges, stated plainly
 
@@ -488,7 +671,7 @@ path goes through the check.
 
 ### Planned improvements
 
-- Enforce the 4b3 floor on `333`/`333fm`/`333oh` (above).
+- Close the phase-boundary same-face pair (above), with a release note.
 - Ship serialized pruning tables.
 - Consider a phase-boundary sweep if solution length ever becomes a goal.
 

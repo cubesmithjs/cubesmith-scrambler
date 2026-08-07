@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AMOUNTS,
   FACES,
+  axisOf,
   inverseMove,
   inverseMoves,
   moveToString,
@@ -93,5 +94,31 @@ describe('inverseMoves', () => {
     const original = [...moves];
     inverseMoves(moves);
     expect(moves).toEqual(original);
+  });
+});
+
+describe('axisOf', () => {
+  it('pairs each face with the opposite one', () => {
+    expect(axisOf('U')).toBe(axisOf('D'));
+    expect(axisOf('R')).toBe(axisOf('L'));
+    expect(axisOf('F')).toBe(axisOf('B'));
+  });
+
+  it('gives three distinct axes across the six faces', () => {
+    expect(new Set(FACES.map(axisOf)).size).toBe(3);
+  });
+
+  it('names each axis for its face pair', () => {
+    expect(axisOf('U')).toBe('UD');
+    expect(axisOf('R')).toBe('RL');
+    expect(axisOf('F')).toBe('FB');
+  });
+
+  it('ignores the amount — it is a property of the face alone', () => {
+    // The distinction the Fewest Moves seams rely on: `F` and `B2` cannot
+    // merge but do commute, so both are barred by the same axis restriction.
+    for (const amount of AMOUNTS) {
+      expect(axisOf(parseMove(moveToString({ face: 'B', amount })).face)).toBe('FB');
+    }
   });
 });

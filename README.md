@@ -35,8 +35,13 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**Sixteen of the seventeen WCA events work end to end.** Only `333mbf` is
-missing, and it is out of scope by design rather than unbuilt (see below).
+**All seventeen WCA events work end to end.** `333mbf` was the last one, and it
+turned out to need an optional `count`, not a new API (see below).
+
+> ⚠️ **Upgrading to 0.10.0 from 0.9.x?** `333fm` and `444bf` now produce
+> different scrambles for the same seed — `333fm`'s previous output was not a
+> Fewest Moves scramble at all. No export changed, but recorded seeded fixtures
+> for those two events will not match. See [`CHANGELOG.md`](./CHANGELOG.md).
 
 Every implemented puzzle has a design document under [`docs/`](./docs/), plus a
 [conformance review of the blindfolded events](./docs/blindfolded-review.md) and
@@ -51,11 +56,12 @@ the [4x4x4 design](./docs/444-design.md).
 | `clock` | random-state | ✅ Dials and pins; the official 14-token template proved to be a unimodular basis for all 12^14 states |
 | `minx` | random-moves | ✅ Dodecahedral geometry, Pochmann notation, 77 moves (random-moves is what 4b3e *requires* here) |
 | `555` `666` `777` | random-moves | ✅ Shared NxN facelet model; 60 / 80 / 100 moves, no redundant move anywhere |
-| `333fm` `333oh` | random-state | ✅ Plain aliases for `333` — same puzzle, only the human constraint differs |
-| `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a) |
+| `333oh` | random-state | ✅ Plain alias for `333` — same puzzle, only the human constraint differs |
+| `333fm` | random-state | ✅ A `333` scramble padded with `R' U' F` at **both** ends, as the official program emits it, with the inner scramble axis-restricted at both seams so the padding cannot merge away |
+| `333bf` `555bf` | as their base | ✅ Base scramble **plus a uniformly random puzzle orientation** (Regulation 4b3a), carried by a wide move |
 | `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
-| `444` `444bf` | random-state | ✅ Reduction (centres, then wings with verified centre-neutral generators) + 3x3x3 hand-off; parity fixed by derived gadgets, not memorised algorithms. Long (~140 moves) and slow (~2s) by design — correctness first |
-| `333mbf` | — | ⛔ Deliberately out of scope: one inspection over many cubes doesn't fit a one-scramble-per-call API, so it throws `UnimplementedEventError` |
+| `444` `444bf` | random-state | ✅ Reduction (centres, then wings with verified centre-neutral generators) + 3x3x3 hand-off; parity fixed by derived gadgets, not memorised algorithms. Long (~140 moves) and slow (~2s) by design — correctness first. `444bf` adds a random **whole-cube rotation** (`x`/`y`/`z`), which is how 4b3a is satisfied on a cube with no fixed centre |
+| `333mbf` | random-state | ✅ One attempt, many cubes: `count` draws that many independent `333bf` scrambles, each with its own orientation suffix and its own 4b3 floor. `moves` is still the first of them |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
 `generateScramble()` / registry / typed "not implemented" errors, seeded and
@@ -90,6 +96,8 @@ const { moves: megaminx } = await generateScramble('minx');
 const { moves: big } = await generateScramble('777');
 // blindfolded events additionally orient the puzzle randomly:
 const { moves: blind } = await generateScramble('333bf');
+// multi-blind is one attempt over many cubes, so it takes a count:
+const { scrambles } = await generateScramble('333mbf', { count: 5 });
 // deterministic given a seed:
 const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' });
 ```
@@ -97,7 +105,66 @@ const { moves: reproducible } = await generateScramble('333', { seed: 'my-seed' 
 `ScrambleResult` also carries `quality`, which is `'random-state'` or
 `'random-moves'` depending on what the event's regulation calls for — see
 below. `isImplementedEvent(event)` answers whether an event is callable
-without having to catch `UnimplementedEventError`.
+without having to catch `UnimplementedEventError` — which, now that every
+event is implemented, no call can currently raise.
+
+### Reading and inverting notation
+
+The package can parse the notation it emits — and the fuller notation an
+algorithm library is written in.
+
+```ts
+import { parseAlgorithm, serializeAlgorithm, invertAlgorithm } from '@cubesmith/scrambler';
+
+const alg = parseAlgorithm("R U R' U' // sexy move");
+serializeAlgorithm(invertAlgorithm(alg)); // "U R U' R'"
+
+// wide moves, slices, rotations, groups, commutators and conjugates:
+serializeAlgorithm(invertAlgorithm(parseAlgorithm("[R: (U Rw U')2]"))); // "[R: (U Rw' U')2]"
+```
+
+Parse errors carry the offset, which is what makes this usable as a validator:
+
+```ts
+try {
+  parseAlgorithm('R U Q');
+} catch (error) {
+  (error as AlgorithmSyntaxError).offset; // 4
+}
+```
+
+This layer is **syntax only**. There is no puzzle behind it, so there is no
+`simplify()` and no move cancellation: `R2` inverts to `R2'`, not to `R2`, and
+`R R` is not equal to `R2`. Saying otherwise needs a move order, which is a
+property of a puzzle rather than of notation. The five non-cube notations —
+Megaminx, Clock, Pyraminx, Skewb and Square-1 — are deliberately **not** part
+of this grammar, and parsing one throws. See
+[`docs/notation-design.md`](./docs/notation-design.md).
+
+### Multi-blind, and the `count` option
+
+`333mbf` is the only event where one attempt covers many cubes, and it is the
+only event `count` applies to. Passing it anywhere else throws
+`InvalidScrambleCountError` rather than being quietly ignored, so a caller who
+asks for ten and gets one finds out.
+
+```ts
+const result = await generateScramble('333mbf', { count: 5 });
+result.scrambles;   // five independent 3BLD scrambles
+result.moves;       // === result.scrambles[0]
+```
+
+Three things worth knowing:
+
+- **`moves` is still the first scramble**, and `scrambles` is an optional
+  addition, so nothing written before multi-blind existed had to change.
+- **The draws are independent and are not de-duplicated.** Each cube is its own
+  uniform draw with its own orientation suffix and its own 4b3 floor, so a
+  repeat is a legitimate outcome; removing one would bias the distribution.
+- **`count` is capped at `MAX_SCRAMBLE_COUNT` (100).** That is a guard, not a
+  regulation — nothing in the WCA Regulations caps the number of cubes. Every
+  cube is a full random-state 3x3x3 solve, around 100 ms once the pruning
+  tables are warm, and this package has no Worker to hide that in.
 
 ## Scramble shape — what the WCA Regulations require beyond "random state"
 
@@ -108,11 +175,12 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
 - **A minimum number of moves to solve.** Regulation 4b3 sets a floor of 2
   moves, with per-puzzle exceptions: **2x2x2 ≥ 4** (4b3b), **Skewb ≥ 7**
   (4b3c), **Square-1 ≥ 11** (4b3d), **Pyraminx ≥ 6** (4b3f). The base floor of
-  2 is enforced for every event too, including the random-*moves* cubes, where
-  4b3e restates it — and for the blindfolded events it is checked **after** the
-  orientation suffix, because a wide move moves the state by a move as well as
-  reorienting it (see [`docs/blindfolded-review.md`](./docs/blindfolded-review.md)
-  §4.2). Enforced by
+  2 is enforced for every one of the seventeen events too, including the
+  random-*moves* cubes and Megaminx, where 4b3e restates it. For the
+  blindfolded events it is checked **after** the orientation suffix, because a
+  wide move moves the state by a move as well as reorienting it (see
+  [`docs/blindfolded-review.md`](./docs/blindfolded-review.md) §4.2), and for
+  `333fm` after the `R' U' F` padding, for the same reason. Enforced by
   redrawing, which is what keeps the "equal probability for each state" the
   regulation also demands — the conditional distribution of a uniform draw is
   uniform on the condition.
@@ -284,8 +352,11 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
   `orientation.ts` provides the random puzzle orientation the blindfolded
   events need.
 - **`src/puzzles/variants.ts`** — the events that are the same puzzle as one
-  already implemented: `333fm`/`333oh` as plain aliases, `333bf`/`555bf` with
-  the orientation suffix added.
+  already implemented: `333oh` as a plain alias, `333bf`/`555bf` with the
+  orientation suffix added. `333fm` is deliberately **not** here — it has its
+  own generator in `src/puzzles/333/fewest-moves.ts`, because an official
+  Fewest Moves scramble is padded with `R' U' F` at both ends and the padding
+  has to reach into the solver to survive.
 - **`src/puzzles/square1/`** — the shape-changing puzzle: a 24-slot model where
   a corner is one piece id in two consecutive slots, an exact enumeration
   reproducing the published 3,678 twistable shapes, a two-phase solver, and an
@@ -297,10 +368,11 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
   The route is reduction — centres, then wings over a *verified* centre-neutral
   generator library — handed off to the 3x3x3 solver, with parity fixed by
   **derived** gadgets rather than memorised algorithms. Long (~140 moves) and
-  slow (~2s warm) by design: correctness first. `444bf` is the one blindfolded
-  event with **no** orientation suffix, because an even cube has no observable
-  orientation and the frame draw already is 4b3a's randomisation
-  (`docs/444-design.md` §11). Still open, and not blocking correctness:
+  slow (~2s warm) by design: correctness first. `444bf` ends with a **whole-cube
+  rotation** (`x`, `y`, `z`) rather than the wide move the odd cubes use — an
+  even cube has no fixed centre, so the official program reorients it with
+  something that cannot change the state at all (`docs/444-design.md` §11).
+  Still open, and not blocking correctness:
   checkpoint H's empirical half — solver totality measured over a large sample
   rather than the dozens run so far.
 

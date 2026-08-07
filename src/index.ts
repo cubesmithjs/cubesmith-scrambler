@@ -5,7 +5,7 @@
  * Next.js server and client contexts.
  */
 import { register222Scrambler } from './puzzles/222';
-import { register333Scrambler } from './puzzles/333';
+import { register333Scrambler, register333FewestMovesScrambler } from './puzzles/333';
 import { registerClockScrambler } from './puzzles/clock';
 import { registerMegaminxScrambler } from './puzzles/megaminx';
 import { registerRandomMoveCubeScramblers } from './puzzles/nxn';
@@ -24,6 +24,9 @@ import { registerVariantScramblers } from './puzzles/variants';
 // that kind of removal.
 register222Scrambler();
 register333Scrambler();
+// A puzzle in its own right, not a variant of 333 — its scramble is padded
+// with `R' U' F` at both ends. See `puzzles/333/fewest-moves.ts`.
+register333FewestMovesScrambler();
 registerPyraminxScrambler();
 registerSkewbScrambler();
 registerClockScrambler();
@@ -35,7 +38,8 @@ register444Scrambler();
 registerVariantScramblers();
 
 export { generateScramble } from './core/generate-scramble';
-export { UnimplementedEventError } from './core/errors';
+export { InvalidScrambleCountError, UnimplementedEventError } from './core/errors';
+export { MAX_SCRAMBLE_COUNT } from './core/types';
 export type {
   GenerateScrambleOptions,
   ScrambleQuality,
@@ -56,5 +60,27 @@ export {
   type Face,
   type FaceMove,
 } from './notation/move';
+
+/**
+ * Full WCA algorithm notation — read, invert, write.
+ *
+ * Separate from the `move.ts` primitives above, which stay exactly as they
+ * are: those are the narrow face-move type the cube puzzles are built on, and
+ * nothing here supersedes them. This layer is syntax only — there is no puzzle
+ * behind it, so no `simplify()` and no move cancellation. See
+ * `docs/notation-design.md`.
+ */
+export { parseAlgorithm, serializeAlgorithm, invertAlgorithm } from './notation/alg';
+export { AlgorithmSyntaxError } from './notation/alg';
+export type {
+  Algorithm,
+  AlgorithmNode,
+  CommutatorNode,
+  ConjugateNode,
+  GroupNode,
+  MoveFamily,
+  MoveNode,
+  PauseNode,
+} from './notation/alg';
 
 export { createRandomSource, type RandomSource } from './random/random-source';

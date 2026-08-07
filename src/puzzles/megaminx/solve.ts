@@ -1,11 +1,19 @@
 import { registerScrambler } from '../../core/scrambler-registry';
+import { isAtLeastTwoMovesFromSolved } from '../../core/scramble-shape';
 import type { RandomSource } from '../../random/random-source';
 import { randomInt } from '../../utils/random-int';
 import {
+  allMovesMegaminx,
   megaminxMovesToString,
   type MegaminxDirection,
   type MegaminxMove,
 } from './notation';
+import {
+  applyMegaminxMove,
+  applyMegaminxMoves,
+  isSolvedMegaminx,
+  SOLVED_MEGAMINX_STATE,
+} from './state';
 
 /**
  * Megaminx is a **random-moves** event, not random-state.
@@ -64,8 +72,45 @@ export function megaminxScrambleMoves(random: RandomSource): MegaminxMove[] {
   return moves;
 }
 
+/**
+ * Regulation 4b3e's floor, for the one event here that has no solver.
+ *
+ * > 5x5x5 Cube, 6x6x6 Cube, 7x7x7 Cube, and Megaminx: sufficiently many random
+ * > moves (instead of random state), **at least 2 moves to solve**.
+ *
+ * Two moves is the one threshold that needs no distance function — a state is
+ * closer than that exactly when it is solved, or when a single move solves it
+ * — which is why `core/scramble-shape.ts` can express it generically and why
+ * this reuses that rather than growing a bespoke check. The neighbourhood is
+ * `allMovesMegaminx()`, the puzzle's own six tokens (`R++ R-- D++ D-- U U'`),
+ * not a cube's eighteen.
+ */
+export function megaminxScrambleIsFarEnough(moves: readonly MegaminxMove[]): boolean {
+  return isAtLeastTwoMovesFromSolved(
+    applyMegaminxMoves(SOLVED_MEGAMINX_STATE, moves),
+    allMovesMegaminx(),
+    applyMegaminxMove,
+    isSolvedMegaminx,
+  );
+}
+
+/**
+ * Regenerates until the scramble clears the floor. 77 independent coin flips
+ * landing within one move of solved is not something that will be seen — but
+ * "so unlikely it cannot happen" is not "cannot happen", and the regulation
+ * states a requirement rather than a likelihood. Same shape, and the same
+ * reasoning, as `nxn/minimum.ts`'s `withMinimumDistance`.
+ */
+const MEGAMINX_DRAW_ATTEMPTS = 100;
+
 export function generateMegaminxScramble(random: RandomSource): string {
-  return megaminxMovesToString(megaminxScrambleMoves(random));
+  for (let attempt = 0; attempt < MEGAMINX_DRAW_ATTEMPTS; attempt += 1) {
+    const moves = megaminxScrambleMoves(random);
+    if (megaminxScrambleIsFarEnough(moves)) return megaminxMovesToString(moves);
+  }
+  throw new Error(
+    `megaminx: ${MEGAMINX_DRAW_ATTEMPTS} scrambles in a row were within one move of solved`,
+  );
 }
 
 /** Registers `'minx'` — called explicitly from `src/index.ts`. Declared `random-moves`, per Regulation 4b3e. */

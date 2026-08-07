@@ -53,7 +53,7 @@ are observed ending in exactly that, e.g. `… 3Fw` and `… 3Fw 3Rw`.
 | 5BLD tokens | `3Uw`, `3Fw`, `3Lw` and their pairs — **three slices wide**, as required |
 | Placement | appended to the end of the scramble |
 | `555bf` quality | declared `random-moves`, matching 4b3e |
-| `444bf` | absent until `444` exists, throwing rather than aliasing something else |
+| `444bf` | a whole-cube rotation, `x`/`y`/`z`, from TNoodle's 24-rotation vocabulary (see §4.5) |
 | `333mbf` | out of scope by design |
 
 **Verdict on 4b3a: conforming.** The distribution over orientations is uniform
@@ -128,6 +128,14 @@ produces. Worth doing before 1.0, worth doing on purpose rather than in passing.
 
 ### 4.5 `444bf` — a note for when `444` lands
 
+> **Superseded 2026-08-07.** The conclusion below was acted on when `444` landed
+> — `444bf` shipped with no suffix — and then reversed. TNoodle appends one, and
+> what it appends is a **pure whole-cube rotation** (`x`, `y`, `z`), not a wide
+> move: the official program does not claim an even cube's orientation is
+> observable either, it just tells the competitor how to hold the puzzle. The
+> package now matches it. The full argument, and why "presentation decision" was
+> the right analysis but the wrong conclusion, is in `444-design.md` §11.
+
 An even cube has no fixed centres, so its orientation is not observable at all,
 and the random frame is already part of a uniform random-state draw. 4b3a is
 therefore satisfied without any suffix. Whether to emit one anyway, for
@@ -142,7 +150,7 @@ decision rather than a compliance one — recorded in `444-design.md` §11.
 |---|---|
 | 4b3a random orientation, uniform over 24 | conforming, before and after this review |
 | 5BLD three-slice-wide orientation moves | conforming |
-| 4b3 two-move floor, `333` and NxN | **was missing — now enforced** |
+| 4b3 two-move floor, `333` and NxN | **was missing — now enforced.** This row was accurate for the NxN cubes when written and *not* for `333`, which kept registering bare for months afterwards; it became true for all sixteen events on 2026-08-07 (`333-design.md` §8, `megaminx-design.md` §8) |
 | 4b3 floor for blindfolded, checked after the suffix | **was checked at the wrong point — now correct** |
 | Orientation-agnostic solvedness | **new predicate; the old one was a trap** |
 | Same-face seam at the suffix | cosmetic, open, deliberately deferred |

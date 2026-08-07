@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
 import {
+  allMovesMegaminx,
   inverseMegaminxMoves,
+  megaminxMovesToString,
   megaminxMoveToString,
   parseMegaminxMove,
 } from './notation';
@@ -19,6 +21,7 @@ import {
   MEGAMINX_LINES,
   MEGAMINX_MOVES_PER_LINE,
   MEGAMINX_SCRAMBLE_LENGTH,
+  megaminxScrambleIsFarEnough,
   megaminxScrambleMoves,
 } from './solve';
 
@@ -134,5 +137,53 @@ describe('end-to-end round trip', () => {
     expect(seen.size).toBeLessThanOrEqual(60);
     // And they are well spread rather than stuck on a handful.
     expect(seen.size).toBeGreaterThan(40);
+  });
+});
+
+/**
+ * Regulation 4b3e's floor. Megaminx has no solver and no distance function, so
+ * the only threshold available without one is the base case — solved, or one
+ * move from solved — which is exactly the threshold the regulation names.
+ */
+describe('the two-move floor (Regulation 4b3e)', () => {
+  it('rejects the solved state', () => {
+    expect(megaminxScrambleIsFarEnough([])).toBe(false);
+  });
+
+  it('rejects every state one move from solved, in both directions of all three kinds', () => {
+    for (const move of allMovesMegaminx()) {
+      expect(megaminxScrambleIsFarEnough([move]), megaminxMoveToString(move)).toBe(false);
+    }
+    // The inverses too — one move from solved means either direction.
+    for (const move of allMovesMegaminx()) {
+      expect(megaminxScrambleIsFarEnough(inverseMegaminxMoves([move]))).toBe(false);
+    }
+  });
+
+  it('accepts a two-move state, so the floor is a floor and not a blanket', () => {
+    expect(
+      megaminxScrambleIsFarEnough([
+        { kind: 'R', direction: 1 },
+        { kind: 'U', direction: 1 },
+      ]),
+    ).toBe(true);
+  });
+
+  it('holds for every generated scramble', () => {
+    for (let seed = 0; seed < 200; seed += 1) {
+      const moves = megaminxScrambleMoves(createRandomSource(`minx-floor-${seed}`));
+      expect(megaminxScrambleIsFarEnough(moves), `seed ${seed}`).toBe(true);
+    }
+  });
+
+  it('does not change what a seed produces — the first draw passes essentially always', () => {
+    // The redraw loop is a requirement, not a filter that bites. If this ever
+    // fails, the floor is rejecting real scrambles and something is wrong with
+    // the check rather than with the draw.
+    for (let seed = 0; seed < 50; seed += 1) {
+      const random = createRandomSource(`minx-additive-${seed}`);
+      const drawn = megaminxMovesToString(megaminxScrambleMoves(random));
+      expect(generateMegaminxScramble(createRandomSource(`minx-additive-${seed}`))).toBe(drawn);
+    }
   });
 });

@@ -9,6 +9,17 @@ export type EventScrambler = (
 interface Registration {
   readonly scramble: EventScrambler;
   readonly quality: ScrambleQuality;
+  /**
+   * Whether the event covers many cubes in one attempt, and therefore accepts
+   * `options.count`. True only for `333mbf`.
+   *
+   * Note what this does *not* need: a separate "generate N" function. The N
+   * scrambles are N independent calls to the same `scramble`, sharing one
+   * `RandomSource`, which is exactly what TNoodle's `generateScrambles(r,
+   * count)` does — a bare loop over `generateWcaScramble`. Independence comes
+   * from the source being stateful, not from anything the event has to know.
+   */
+  readonly multiScramble: boolean;
 }
 
 const registry = new Map<WcaEventId, Registration>();
@@ -28,7 +39,23 @@ export function registerScrambler(
   scramble: EventScrambler,
   quality: ScrambleQuality = 'random-state',
 ): void {
-  registry.set(event, { scramble, quality });
+  registry.set(event, { scramble, quality, multiScramble: false });
+}
+
+/**
+ * Registers an event whose attempt covers **many** cubes, so `generateScramble`
+ * will accept `options.count` for it and return a `scrambles` array.
+ *
+ * Separate from `registerScrambler` rather than a fourth parameter on it,
+ * because there is exactly one such event (`333mbf`) and a boolean at fifteen
+ * other call sites would carry no information.
+ */
+export function registerMultiScrambler(
+  event: WcaEventId,
+  scramble: EventScrambler,
+  quality: ScrambleQuality = 'random-state',
+): void {
+  registry.set(event, { scramble, quality, multiScramble: true });
 }
 
 export function getScrambler(event: WcaEventId): Registration | undefined {

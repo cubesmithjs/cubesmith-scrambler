@@ -596,10 +596,63 @@ Drawing in a fixed frame produces each *physical* position exactly 24 times, one
 per whole-cube rotation, so the marginal over positions is uniform. For `444bf`
 that is not a compromise but the mechanism: an even cube has no fixed centre, so
 its orientation is not observable, and the frame draw **is** Regulation 4b3a's
-random orientation. No orientation suffix is needed, unlike `333bf` and `555bf`
-where the puzzle does have observable centres. Whether to emit one anyway, for
-consistency with what competitors are used to seeing, is a presentation question
-and not a compliance one.
+random orientation.
+
+### The orientation suffix: an argument, and why it was overruled anyway
+
+This section originally continued: *"No orientation suffix is needed, unlike
+`333bf` and `555bf` where the puzzle does have observable centres. Whether to emit
+one anyway, for consistency with what competitors are used to seeing, is a
+presentation question and not a compliance one."* `puzzles/nxn/orientation.ts`
+enforced that by **throwing** if asked for an even-cube suffix.
+
+The reasoning is kept because it is still correct, and because getting the
+conclusion wrong while the reasoning was right is the more interesting half of the
+story. What it missed is that a presentation question is not the same as a
+non-question.
+
+**What the official program does.** TNoodle registers `FOUR_NI` →
+`NoInspectionFourByFourCubePuzzle`, separately from `FOUR`, and it appends
+`getRandomOrientationMoves(size - 1)` — its source comment is literally *"Append
+reorientation to scramble."* cubing.js agrees independently
+(`case "444bf": random444OrientedScramble`, distinct from the plain
+`random444Scramble`). The package was alone.
+
+**And what it appends is the interesting part.** `getRandomOrientationMoves` takes
+a *thickness*, and `CubeMove.toString` changes vocabulary at full thickness:
+
+```java
+} else if (innerSlice == size - 1) {
+    // Turning all the slices is a rotation
+    String rotationName = faceRotationsByName.get(face);   // R->x, U->y, F->z
+```
+
+`size - 1` is the 0-based index of the deepest slice, so `size - 1` means *every*
+layer. A `444bf` suffix is therefore spelled `x`, `y`, `z` — a **pure whole-cube
+rotation**, not a wide move. Compare the odd cubes, where TNoodle passes
+`size / 2` and gets `Rw` on a 3x3x3 and `3Rw` on a 5x5x5: those are genuine block
+turns, which reorient *and* turn.
+
+So TNoodle is not claiming a 4x4x4's orientation is observable. It appends
+something that provably cannot change the state — and therefore cannot affect the
+uniformity argument above, or the 4b3 floor, at all. It is an instruction about how
+to pick the puzzle up, which is precisely what 4b3a asks for on a puzzle where the
+competitor cannot see the orientation for themselves.
+
+**Resolution.** The package now matches TNoodle: `444bf` is a `444` scramble plus a
+uniformly random one of the 24 rotations, drawn from TNoodle's own vocabulary
+`{∅, x, x2, x', z, z'} × {∅, y, y2, y'}` — six choices of which face ends up on
+top, times four turns about it. The vocabulary is reproduced rather than searched
+for, but it is *verified* to reach 24 distinct orientations, because the odd-cube
+case is a standing demonstration that a plausible construction can fall short (the
+obvious `Rw^a Fw^b` reaches only 16). The count and the uniformity of the draw are
+both asserted in `puzzles/nxn/orientation.test.ts`.
+
+The cost of matching is at most two extra tokens. The cost of not matching was
+emitting output unlike every official 4BLD scramble a competitor has ever seen, on
+the strength of our own first-principles argument that the official program does
+unnecessary work. That is not a position a conformance-focused package should hold
+unilaterally, however good the argument.
 
 ### The reduction and the pairing do not change the distribution
 
@@ -699,12 +752,13 @@ Each ends in a commit and a report, and each has a gate:
    The targeted gadget for the permutation mismatch was shown **not to exist** in
    the pair-preserving family, where dedge and corner parity are locked together.
 7. ✅ **Generation, `444bf`, checkpoint E.** `444` and `444bf` are registered and
-   reachable through `generateScramble`. `444bf` is the only blindfolded event with
-   **no** orientation suffix, because an even cube has no observable orientation and
-   the frame draw already is 4b3a's randomisation (§11) — `nxn/orientation.ts`
-   enforces that by throwing. Checkpoint E holds: the solution's inverse applied to
-   solved reproduces the drawn state exactly, which is the injectivity §11 needs.
-   Measured: 137 moves mean, 205 worst, ~1.8s per scramble warm.
+   reachable through `generateScramble`. `444bf` appends a uniformly random
+   **whole-cube rotation** (`x`, `y`, `z`), matching TNoodle — it was originally
+   the one blindfolded event here with no suffix at all, and §11 records both the
+   argument for that and why it was overruled. Checkpoint E holds: the solution's
+   inverse applied to solved reproduces the drawn state exactly, which is the
+   injectivity §11 needs. Measured: 137 moves mean, 205 worst, ~1.8s per scramble
+   warm.
 
    Still open, and not blocking correctness: **checkpoint H's empirical half** —
    totality measured over a large sample rather than the dozens run so far — plus

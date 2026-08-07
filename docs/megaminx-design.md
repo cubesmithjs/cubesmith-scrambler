@@ -422,37 +422,67 @@ it only draws 77 directions and joins strings.
 
 ## 8. Known limitations
 
-### Current bugs
+### Fixed since this document was written
 
-**The 4b3e two-move floor is not enforced.**
+**The 4b3e two-move floor is now enforced.** `megaminxScrambleIsFarEnough`
+(`puzzles/megaminx/solve.ts`) applies the drawn moves to a solved puzzle and
+tests `isAtLeastTwoMovesFromSolved(state, allMovesMegaminx(),
+applyMegaminxMove, isSolvedMegaminx)` — the generic helper from
+`core/scramble-shape.ts`, with the puzzle's own six tokens as the one-move
+neighbourhood rather than a cube's eighteen. `generateMegaminxScramble` redraws
+until the check passes, capped at 100 attempts, in the same shape as
+`nxn/minimum.ts`'s `withMinimumDistance`.
 
-4b3e requires *"sufficiently many random moves (instead of random state), at
-least 2 moves to solve"* — for the Megaminx as much as for 5x5x5, 6x6x6 and
-7x7x7. `puzzles/nxn/minimum.ts` enforces exactly this for the three cubes, and
-`docs/blindfolded-review.md` §4.1 documents adding it there. The Megaminx was not
-included: `registerMegaminxScrambler` wires `generateMegaminxScramble` directly,
-with no `withMinimumDistance`-style wrapper.
+Seeded output does not change: the first draw clears the floor with probability
+indistinguishable from 1, so the redraw loop consumes the random stream
+identically. `solve.test.ts` asserts that directly rather than assuming it.
 
-- **Impact:** a 77-move sequence of independent random directions landing within
-  one move of solved requires an essentially exact cancellation. The probability
-  is not calculated here, but it is far below anything observable — the same
-  order of unlikelihood as the NxN case the review describes as "not something
-  that will be seen".
-- **Why it still matters:** the review's own standard — *"'so unlikely it cannot
-  happen' is not the same as 'cannot happen', and the regulation states a
-  requirement rather than a likelihood"* — applies unchanged here.
-- **Fix:** the check needs a Megaminx-shaped equivalent of
-  `cubeScrambleIsFarEnough`: apply the parsed scramble to a solved puzzle and
-  test `isAtLeastTwoMovesFromSolved(state, allMovesMegaminx(), applyMegaminxMove,
-  isSolvedMegaminx)`. Every piece of that already exists — the generic helper in
-  `core/scramble-shape.ts`, the move list, the applier and the predicate. The
-  only design question is which solvedness predicate to use: `isSolvedMegaminx`
-  is orientation-*dependent* (it requires centres home), and the NxN review's
-  §4.3 records exactly this being a trap there. For the Megaminx it is arguably
-  the right predicate, because `R`/`D` genuinely reorient the puzzle and a
-  reoriented Megaminx is not "solved" in the same trivial way a rotated cube is —
-  but that is a decision to make deliberately, not in passing. Not applied here;
-  flagged.
+**This is *not* stricter than the official program**, contrary to what the plan
+that scheduled the work first believed. `MegaminxPuzzle.generateRandomMoves`
+has no check of its own — which is what a first reading finds — but it is not
+the entry point. `Puzzle.generateWcaScramble` is, it is `final`, and it redraws
+while `psag.state.solveIn(wcaMinScrambleDistance - 1) != null` with
+`wcaMinScrambleDistance = 2`. `MegaminxPuzzle` does not override `solveIn`. So
+TNoodle enforces exactly this floor on Megaminx, generically, and the package
+is matching it rather than exceeding it.
+
+### The one part of that fix that is not complete
+
+**The floor is measured against the identity state, not against "solved as a
+competitor means it".**
+
+`isSolvedMegaminx` requires the centre permutation to be the identity. But `R`
+and `D` in Pochmann notation are whole-puzzle rotations composed with a single
+face turn — which is why §3 can say the centres only ever move as a rigid body
+— so a scramble genuinely reorients the puzzle, and a *rotated* solved Megaminx
+would be reported as unsolved while a competitor would call it solved and
+stop the clock.
+
+This is the same trap `docs/blindfolded-review.md` §4.3 identifies for the
+cubes, where it was closed by adding `isUniformlyColouredNxN` alongside
+`isSolvedNxN`. An earlier draft of this section argued the strict predicate was
+"arguably the right one" for the Megaminx because a reoriented Megaminx is not
+solved "in the same trivial way a rotated cube is". That argument does not
+hold: a rotated solved Megaminx is exactly as solved as a rotated solved cube.
+
+The real reason the strict predicate is in place is narrower and worth stating
+plainly: **the piece model cannot currently express the other one.** There is
+no facelet model here, and deciding "is this state a pure rotation of solved"
+needs the rotation induced on corners and edges by the centre permutation —
+derivable from `geometry.ts` (`facesAtCorner`, `cornerFaceCycle`,
+`FACE_CENTERS`, `rotateFifths` are all present) but a piece of work in its own
+right, not a line in a floor check.
+
+- **What is closed:** every state that is solved, or one move from solved, in
+  the puzzle's fixed frame.
+- **What remains open:** the 59 non-identity rotations of solved, and their
+  one-move neighbourhoods. A 77-token draw landing on one of those is on the
+  order of `10^-66` — far below even the `4 × 10^-19` figure the cube case
+  calls unobservable.
+- **Fix:** derive the corner/edge permutation induced by a centre-permutation
+  rotation and add an orientation-agnostic `isSolvedUpToRotationMegaminx`, then
+  pass that to `isAtLeastTwoMovesFromSolved` instead. Deferred deliberately;
+  it is a new capability rather than a correction to this one.
 
 ### Rough edges, stated plainly
 
@@ -472,7 +502,8 @@ with no `withMinimumDistance`-style wrapper.
 
 ### Planned improvements
 
-- Enforce the 4b3e floor (above), after deciding the solvedness predicate.
+- Add an orientation-agnostic solvedness predicate and measure the 4b3e floor
+  against it (above).
 - Add `solve.bench.ts` so `minx` is tracked alongside every other event.
 
 ---

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { axisOf } from '../../notation/move';
 import { createRandomSource } from '../../random/random-source';
 import { phase1Search } from './phase1-search';
 import { phase2Search } from './phase2-search';
@@ -43,5 +44,57 @@ describe('phase2Search', () => {
         expect(moves[i]!.face).not.toBe(moves[i - 1]!.face);
       }
     }
+  });
+});
+
+describe('phase2Search — end-axis restrictions', () => {
+  /** A G1 state to solve, reached the way `solve333` reaches one. */
+  function g1StateFrom(seed: string, trial: number) {
+    const random = createRandomSource(`${seed}-${trial}`);
+    const scrambled = randomState(random);
+    return applyMoves(scrambled, phase1Search(scrambled));
+  }
+
+  it('never closes on a barred axis, and still solves', () => {
+    // The end that matters most for `333fm`: a two-phase solution's last move
+    // is a phase-2 move in all but a vanishing fraction of cases.
+    for (let trial = 0; trial < 20; trial += 1) {
+      const g1State = g1StateFrom('phase2-last-axis', trial);
+      const moves = phase2Search(g1State, { lastMoveAxis: 'FB' });
+      expect(isSolved(applyMoves(g1State, moves))).toBe(true);
+      if (moves.length > 0) {
+        expect(axisOf(moves[moves.length - 1]!.face)).not.toBe('FB');
+      }
+    }
+  });
+
+  it('never opens on a barred axis, and still solves', () => {
+    for (let trial = 0; trial < 20; trial += 1) {
+      const g1State = g1StateFrom('phase2-first-axis', trial);
+      const moves = phase2Search(g1State, { firstMoveAxis: 'UD' });
+      expect(isSolved(applyMoves(g1State, moves))).toBe(true);
+      if (moves.length > 0) {
+        expect(axisOf(moves[0]!.face)).not.toBe('UD');
+      }
+    }
+  });
+
+  it('honours both ends at once, including the four-of-ten case', () => {
+    // `'UD'` bars four of the ten phase-2 moves — the harshest restriction
+    // available here — and a solution still exists for every state.
+    for (let trial = 0; trial < 20; trial += 1) {
+      const g1State = g1StateFrom('phase2-both-axes', trial);
+      const moves = phase2Search(g1State, { firstMoveAxis: 'UD', lastMoveAxis: 'UD' });
+      expect(isSolved(applyMoves(g1State, moves))).toBe(true);
+      if (moves.length > 0) {
+        expect(axisOf(moves[0]!.face)).not.toBe('UD');
+        expect(axisOf(moves[moves.length - 1]!.face)).not.toBe('UD');
+      }
+    }
+  });
+
+  it('an unrestricted call is unchanged', () => {
+    const g1State = g1StateFrom('phase2-restrictions-default', 0);
+    expect(phase2Search(g1State, {})).toEqual(phase2Search(g1State));
   });
 });

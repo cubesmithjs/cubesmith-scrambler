@@ -1,6 +1,6 @@
-import { registerScrambler } from '../core/scrambler-registry';
+import { registerMultiScrambler, registerScrambler } from '../core/scrambler-registry';
 import type { RandomSource } from '../random/random-source';
-import { generate333Scramble } from './333/solve';
+import { CUBE_333_SIZE, generate333Scramble, generate333ScrambleWithFloor } from './333/solve';
 import { generate444Scramble } from './444/solve';
 import { generateCubeNxNScramble, RANDOM_MOVE_CUBES } from './nxn/solve';
 import { withMinimumDistance } from './nxn/minimum';
@@ -10,12 +10,23 @@ import { withRandomOrientation } from './nxn/orientation';
  * Events that are the *same puzzle* as one already implemented, differing only
  * in how a human is allowed to solve it.
  *
- * `333fm` (Fewest Moves) and `333oh` (One-Handed) are plain aliases for
- * `333`: identical cube, identical notation, identical scramble requirements —
- * only the human constraint differs, and a scramble knows nothing about that.
+ * `333oh` (One-Handed) is a plain alias for `333`: identical cube, identical
+ * notation, identical scramble requirements — only the human constraint
+ * differs, and a scramble knows nothing about that. TNoodle agrees, serving
+ * `333oh` from the same `THREE` puzzle it serves `333` from.
  *
- * The **blindfolded** events are not plain aliases, and this is the one place
- * that distinction bites. WCA Regulation 4b3a:
+ * **`333fm` used to be registered here too, and that was a bug.** The claim
+ * that Fewest Moves has "identical scramble requirements" to `333` was simply
+ * false: an official FMC scramble is padded with `R' U' F` at both ends, which
+ * is why TNoodle gives it a puzzle class of its own
+ * (`ThreeByThreeCubeFewestMovesPuzzle`, registered as `THREE_FM`). It now has
+ * a generator of its own here as well — see `333/fewest-moves.ts`, which also
+ * explains what the padding is for and why it needs the solver's cooperation.
+ * Unlike every other gap this package has had, this one was visible on the
+ * first scramble: an FMC competitor knows their scramble starts `R' U' F`.
+ *
+ * The **blindfolded** events are not plain aliases either, and this is the one
+ * place that distinction bites. WCA Regulation 4b3a:
  *
  * > For blindfolded events, the scramble sequence must orient the puzzle
  * > randomly (equal probability for each orientation).
@@ -28,15 +39,32 @@ import { withRandomOrientation } from './nxn/orientation';
  * for a complete set of 24 suffixes rather than assuming a vocabulary that
  * covers them.
  *
- * One blindfolded event is deliberately absent:
+ * **`333mbf`** (Multi-Blind) is here too, and it used to be the one deliberate
+ * absence. The reason given was:
  *
- * - **`333mbf`** (Multi-Blind) is out of scope by design, not oversight: it is
- *   one inspection over *many* cubes, which does not fit a one-scramble-per-call
- *   API. Adding it would mean changing what `generateScramble` returns for
- *   every other event.
+ * > it is one inspection over *many* cubes, which does not fit a
+ * > one-scramble-per-call API. Adding it would mean changing what
+ * > `generateScramble` returns for every other event.
+ *
+ * The first sentence is true and the second was not, which is the part that
+ * mattered — it was the whole objection, and it was a guess about how the
+ * problem would have to be solved rather than a fact about it. Neither
+ * reference implementation works that way. `cubing@0.63.3` maps
+ * `case "333bf": case "333mbf":` to the *same* `random333OrientedScramble()`
+ * and leaves the caller to loop; TNoodle has no multi-blind puzzle class at
+ * all, and its `generateScrambles(r, count)` is a bare loop over the ordinary
+ * `333ni` generator.
+ *
+ * So multi-blind is not a different *scramble*, it is a different *number* of
+ * them, and the package says that in the two places it costs nothing:
+ * `options.count` on the way in, `result.scrambles` on the way out. Both are
+ * optional additions — `event`, `moves` and `quality` are untouched, and
+ * `moves` is still `scrambles[0]` — so nothing that existed before this
+ * changed. Each cube is a full `generate333BlindfoldedScramble`: its own
+ * uniform draw, its own orientation suffix, its own 4b3 floor checked after
+ * that suffix.
  */
 
-const CUBE_333_SIZE = 3;
 const CUBE_444_SIZE = 4;
 
 /**
@@ -66,22 +94,32 @@ function generate333BlindfoldedScramble(random: RandomSource): string {
 }
 
 /**
- * 4x4x4 blindfolded — the **only** blindfolded event here with no orientation suffix.
+ * 4x4x4 blindfolded — a `444` scramble plus a random **whole-cube rotation**.
  *
- * Regulation 4b3a wants a random starting orientation, and for 3BLD and 5BLD that has
- * to be appended, because those cubes have fixed centres and so a visible orientation
- * that single-layer turns never change. A 4x4x4 has no fixed centre: its orientation is
- * not observable, and the random-state draw already happens in a random frame, which
- * *is* 4b3a's random orientation. Section 11 of the 4x4x4 design document works this
- * through.
+ * This event used to be the one blindfolded event here with no orientation suffix
+ * at all, on the argument in §11 of the 4x4x4 design document: a 4x4x4 has no fixed
+ * centre, so its orientation is not observable, and the random-state draw already
+ * happens in a random frame. That argument is still in §11 and is still sound.
  *
- * `nxn/orientation.ts` agrees, and says so by throwing: asking it for a suffix for an
- * even cube is an error, not a no-op. So 444bf is 444 plus the 4b3 floor, and the
- * difference between the two events is that the floor is checked on the printed
- * sequence.
+ * It was overruled by what the official program actually emits.
+ * TNoodle's `NoInspectionFourByFourCubePuzzle` appends
+ * `getRandomOrientationMoves(size - 1)`, which at full thickness spells a rotation
+ * — `x`, `y`, `z` — rather than a wide move. So TNoodle does not claim the
+ * orientation is observable either; it appends something that changes nothing about
+ * the state and only tells the competitor how to pick the puzzle up. cubing.js
+ * agrees that `444bf` differs from `444`. Being alone against both was not a
+ * position worth holding for a suffix that costs at most two tokens.
+ *
+ * The 4b3 floor is checked after the suffix, matching the other blindfolded events.
+ * For this one it cannot change the answer — a rotation preserves distance to solved
+ * exactly — but the check belongs on the sequence handed to a competitor rather than
+ * on an intermediate, and writing it the same way as the others is what keeps that
+ * true if the suffix ever stops being a pure rotation.
  */
 function generate444BlindfoldedScramble(random: RandomSource): string {
-  return withMinimumDistance(CUBE_444_SIZE, () => generate444Scramble(random));
+  return withMinimumDistance(CUBE_444_SIZE, () =>
+    withRandomOrientation(generate444Scramble(random), random, CUBE_444_SIZE),
+  );
 }
 
 function generate555BlindfoldedScramble(random: RandomSource): string {
@@ -99,14 +137,18 @@ function generate555BlindfoldedScramble(random: RandomSource): string {
  * the puzzles they build on, same as every other registration.
  */
 export function registerVariantScramblers(): void {
-  // Same puzzle, same scramble — only the human constraint differs.
-  registerScrambler('333fm', (random) => generate333Scramble(random));
-  registerScrambler('333oh', (random) => generate333Scramble(random));
+  // Same puzzle, same scramble — only the human constraint differs. `333fm`
+  // is deliberately not here; it is a puzzle of its own now.
+  registerScrambler('333oh', (random) => generate333ScrambleWithFloor(random));
 
   // Same puzzle, plus a random orientation (Regulation 4b3a).
   registerScrambler('333bf', generate333BlindfoldedScramble);
   registerScrambler('444bf', generate444BlindfoldedScramble);
   registerScrambler('555bf', generate555BlindfoldedScramble, 'random-moves');
+
+  // Same scramble as `333bf`, drawn `options.count` times — the only event
+  // where one attempt covers many cubes.
+  registerMultiScrambler('333mbf', generate333BlindfoldedScramble);
 }
 
 export { generate333BlindfoldedScramble, generate555BlindfoldedScramble };

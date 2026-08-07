@@ -34,9 +34,18 @@ const NUMBER_WORDS: Readonly<Record<number, string>> = {
   17: 'Seventeen',
 };
 
+const EVENT_TOTAL = 17;
+
 describe('the README status claims', () => {
   it('states the number of working events that the registry actually holds', () => {
     const count = [...implementedEvents()].length;
+    // "Seventeen of the seventeen" would be true and badly written, so the
+    // complete case gets its own sentence — and this test still fails the
+    // moment the registry stops holding all of them.
+    if (count === EVENT_TOTAL) {
+      expect(README).toContain('**All seventeen WCA events work end to end.**');
+      return;
+    }
     const word = NUMBER_WORDS[count];
     expect(word, `no word for ${count}`).toBeDefined();
     expect(README).toContain(`**${word} of the seventeen WCA events work end to end.**`);
@@ -45,10 +54,6 @@ describe('the README status claims', () => {
   it('lists every event in the status table', () => {
     for (const event of [...implementedEvents()]) {
       expect(README, event).toContain(`\`${event}\``);
-    }
-    for (const event of ['333mbf'] as const) {
-      expect(README, event).toContain(`\`${event}\``);
-      expect(isImplementedEvent(event)).toBe(false);
     }
   });
 
@@ -64,20 +69,18 @@ describe('the README status claims', () => {
     }
   });
 
-  it('says an unimplemented event throws rather than that it works', () => {
-    // 333mbf is now the only unimplemented event, and the README must be explicit
-    // that calling it throws — a status line that reads like a working feature is
-    // the kind of drift this test exists to catch. (`444` used to be the one in
-    // flight here; its row now has to claim the opposite, which the check below
-    // pins.)
-    const multi = readmeLines().find((line) => line.startsWith('| `333mbf` |'));
-    expect(multi).toBeDefined();
-    expect(multi).toMatch(/throws/);
-
-    const status = readmeLines().find((line) => line.startsWith('| `444` `444bf` |'));
-    expect(status).toBeDefined();
-    expect(status).not.toMatch(/throws/);
-    expect(status).toMatch(/random-state/);
+  it('does not say a working event throws', () => {
+    // The direction this check runs in has flipped twice. It first pinned
+    // `444`'s row while `444` was in flight, then `333mbf`'s while that was the
+    // last unimplemented event. Nothing throws now, so what it guards is the
+    // opposite claim: no row in the status table may describe a registered
+    // event as throwing.
+    for (const event of [...implementedEvents()]) {
+      const row = readmeLines().find((line) => line.startsWith(`| \`${event}\` `));
+      if (row === undefined) continue; // Some events share a row; the table test covers presence.
+      expect(row, event).not.toMatch(/throws/);
+    }
+    expect(isImplementedEvent('333mbf')).toBe(true);
   });
 
   it('points at the design documents, which are the detail the README does not carry', () => {

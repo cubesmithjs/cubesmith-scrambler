@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 // package entry point, not by the core module.
 import { generateScramble } from '../../index';
 import { createRandomSource } from '../../random/random-source';
+import { cubeScrambleIsFarEnough } from '../nxn/minimum';
 import { parseWideMove } from '../nxn/notation';
 import { randomCube444State } from './coordinates';
 import { generate444Scramble, solve444 } from './solve';
@@ -75,7 +76,15 @@ describe('generating 444 scrambles', () => {
       const result = await generateScramble(event, { seed: `cubesmith ${event}` });
       expect(result.event).toBe(event);
       expect(result.quality).toBe('random-state');
-      expect(is444Solved(applyScramble(result.moves))).toBe(false);
+
+      // A `444bf` scramble ends with a whole-cube rotation, and the piece model
+      // used here has no move for one — nor could it usefully have, since a
+      // rotation moves no piece relative to any other. So the turns go through
+      // this model, and the whole printed sequence, rotation included, goes
+      // through the facelet model that `cubeScrambleIsFarEnough` uses.
+      const turns = result.moves.split(/\s+/).filter((token) => !/^[xyz]/.test(token));
+      expect(is444Solved(applyScramble(turns.join(' ')))).toBe(false);
+      expect(cubeScrambleIsFarEnough(result.moves, 4)).toBe(true);
     }
   });
 });

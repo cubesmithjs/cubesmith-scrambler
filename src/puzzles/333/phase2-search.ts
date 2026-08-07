@@ -2,6 +2,12 @@ import type { FaceMove } from './move-tables';
 import { isSolvedPhase2, toPhase2Coordinate, type Phase2Coordinate } from './phase2-coordinates';
 import { phase2Heuristic } from './phase2-pruning';
 import { PHASE2_MOVES, nextCornerPerm, nextEdge8Perm, nextUdSliceOrder } from './phase2-tables';
+import {
+  isForbiddenFirstMove,
+  isForbiddenLastMove,
+  NO_END_RESTRICTIONS,
+  type EndAxisRestrictions,
+} from './search-restrictions';
 import type { CubeState } from './state';
 
 /**
@@ -9,8 +15,17 @@ import type { CubeState } from './state';
  * `phase1Search` — same algorithm, different coordinates/heuristic/move
  * set. `state` must already be in G1 (the caller — `solve.ts` — is
  * responsible for running `phase1Search` first).
+ *
+ * `restrictions` works the same way it does in `phase1Search`, and matters
+ * more here: the last move of a two-phase solution is almost always a phase-2
+ * move. Of the ten moves available, an axis restriction rules out at most
+ * four (`U`/`U2`/`U'`/`D`… for `'UD'`, or the two half turns for `'RL'` and
+ * `'FB'`), so a conforming solution always exists.
  */
-export function phase2Search(state: CubeState): FaceMove[] {
+export function phase2Search(
+  state: CubeState,
+  restrictions: EndAxisRestrictions = NO_END_RESTRICTIONS,
+): FaceMove[] {
   const start = toPhase2Coordinate(state);
   if (isSolvedPhase2(start)) return [];
 
@@ -18,7 +33,7 @@ export function phase2Search(state: CubeState): FaceMove[] {
   const path: FaceMove[] = [];
 
   for (;;) {
-    const result = dfs(start, 0, bound, path);
+    const result = dfs(start, 0, bound, path, restrictions);
     if (result.found) return [...path];
     if (result.nextBound === Infinity) {
       throw new Error('phase2Search: no path to solved found — the input state may not be in G1');
@@ -29,17 +44,25 @@ export function phase2Search(state: CubeState): FaceMove[] {
 
 type DfsResult = { found: true } | { found: false; nextBound: number };
 
-function dfs(coord: Phase2Coordinate, g: number, bound: number, path: FaceMove[]): DfsResult {
+function dfs(
+  coord: Phase2Coordinate,
+  g: number,
+  bound: number,
+  path: FaceMove[],
+  restrictions: EndAxisRestrictions,
+): DfsResult {
   const h = phase2Heuristic(coord.cornerPerm, coord.edge8Perm, coord.udSliceOrder);
   const f = g + h;
   if (f > bound) return { found: false, nextBound: f };
-  if (isSolvedPhase2(coord)) return { found: true };
 
   let minExceeding = Infinity;
   const lastMove = path[path.length - 1];
 
+  if (isSolvedPhase2(coord) && !isForbiddenLastMove(lastMove, restrictions)) return { found: true };
+
   for (const move of PHASE2_MOVES) {
     if (lastMove && lastMove.face === move.face) continue;
+    if (g === 0 && isForbiddenFirstMove(move, restrictions)) continue;
 
     const nextCoord: Phase2Coordinate = {
       cornerPerm: nextCornerPerm(coord.cornerPerm, move),
@@ -47,7 +70,7 @@ function dfs(coord: Phase2Coordinate, g: number, bound: number, path: FaceMove[]
       udSliceOrder: nextUdSliceOrder(coord.udSliceOrder, move),
     };
     path.push(move);
-    const result = dfs(nextCoord, g + 1, bound, path);
+    const result = dfs(nextCoord, g + 1, bound, path, restrictions);
     if (result.found) return result;
     if (result.nextBound < minExceeding) minExceeding = result.nextBound;
     path.pop();

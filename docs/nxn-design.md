@@ -503,10 +503,12 @@ applies every move to a full facelet cube.
 
 ### Current bugs
 
-None known in this module. (The related gap is in `puzzles/megaminx/`, the fourth
-4b3e event, which has no equivalent floor check — see `docs/megaminx-design.md`
-§8. And `333`/`333fm`/`333oh` do not route through `withMinimumDistance` either
-— see `docs/333-design.md` §8. This module's own three events do.)
+None known in this module. (The two related gaps this section used to point at
+are both closed: `puzzles/megaminx/`, the fourth 4b3e event, now has its own
+floor check — `docs/megaminx-design.md` §8, which records the one residual it
+still carries — and `333`/`333fm`/`333oh` now route through
+`withMinimumDistance` too, per `docs/333-design.md` §8. All sixteen events
+enforce the floor.)
 
 ### Rough edges, stated plainly
 
@@ -533,12 +535,20 @@ None known in this module. (The related gap is in `puzzles/megaminx/`, the fourt
    principles.
 4. **`444` and `444bf` are implemented, but not by this module** — they are
    random-*state* events served by `puzzles/444/`, and are deliberately excluded
-   from `RANDOM_MOVE_CUBES`. `444bf` takes **no** orientation suffix from this
-   module: an even cube has no fixed centres, so its orientation is not
-   observable and 4b3a is satisfied without one (`docs/444-design.md` §11).
-   `orientation.ts` enforces that by throwing if asked for a `444bf` suffix.
-5. **`333mbf` is out of scope by design**, not oversight: it is one inspection
-   over *many* cubes, which does not fit a one-scramble-per-call API.
+   from `RANDOM_MOVE_CUBES`. `444bf` does take its orientation suffix from
+   `orientation.ts`, but a different kind of one: a **pure whole-cube rotation**
+   (`x`, `y`, `z`) rather than a wide move, because an even cube has no fixed
+   centre for a partial reorientation to be meaningful about. That is what
+   TNoodle emits, and it means the suffix cannot change the state or the 4b3
+   distance. `orientation.ts` used to throw for even cubes instead; the argument
+   for that and the reason it was overruled are in `docs/444-design.md` §11.
+5. **`333mbf` is implemented**, and this item used to say it was out of scope
+   "because it is one inspection over many cubes, which does not fit a
+   one-scramble-per-call API". The first half is true; the second was a guess
+   about the solution rather than a fact about the problem. Multi-blind is not
+   a different scramble, only a different number of them, so it needed an
+   optional `count` in and an optional `scrambles` out — no existing field
+   changed. See `puzzles/variants.ts` and `333-design.md`.
 
 ### Planned improvements
 

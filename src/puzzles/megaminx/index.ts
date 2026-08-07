@@ -28,6 +28,7 @@ export {
 } from './state';
 export {
   generateMegaminxScramble,
+  megaminxScrambleIsFarEnough,
   megaminxScrambleMoves,
   MEGAMINX_LINES,
   MEGAMINX_MOVES_PER_LINE,
