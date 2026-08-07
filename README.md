@@ -7,6 +7,16 @@ Next.js Server and Client Components.
 
 Not affiliated with or endorsed by the World Cube Association.
 
+**Live demo:** <https://cubesmithjs.github.io/cubesmith-scrambler-demo/>
+
+Every scramble on that page is generated in your own browser tab with no Worker
+involved, which makes the claim above checkable rather than just stated. It is a
+static deployment, so it shows the client half only, and the first 3x3x3 takes
+several seconds on the main thread while its pruning table is built — that cost
+is real, and the page explains it rather than hiding it behind a spinner. The
+[demo source](https://github.com/cubesmithjs/cubesmith-scrambler-demo) also
+builds a server version that runs both call sites side by side and times them.
+
 ## Why this exists
 
 `cubing/scramble`, a popular existing scramble-generation package, always
