@@ -15,6 +15,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runs before `npm ci` on purpose: both failures below are knowable from
+      # the checkout alone, and failing in five seconds with a sentence beats
+      # failing after a full test run with npm's `403 Forbidden`, which reads
+      # like a credentials problem and is not one.
+      #
+      # This exists because of a real incident on 2026-08-08. The v0.11.0
+      # release was created moments before the 0.11.0 commit reached `main`, so
+      # the tag was cut from the previous commit. A tag is a fixed pointer and
+      # this job checks out the *tag*, so it rebuilt 0.10.0 and tried to
+      # republish it — and would have kept doing so on every re-run, because
+      # `main` moving forward afterwards does not drag the tag along. The fix is
+      # to delete the release *and* the tag (deleting a release leaves its tag
+      # behind), then recreate it.
+      - name: Verify the tag matches the version being published
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Release tag '${GITHUB_REF_NAME}' does not match package.json version '${PKG}'."
+            echo "The checked-out commit is not the one you meant to release."
+            echo "Almost always: the release was created before the version-bump commit reached 'main',"
+            echo "so the tag points at an older commit. Confirm the bump is on 'main', then delete BOTH"
+            echo "the release and the tag '${GITHUB_REF_NAME}' and recreate the release."
+            exit 1
+          fi
+
+          if npm view "@cubesmith/scrambler@${PKG}" version >/dev/null 2>&1; then
+            echo "::error::@cubesmith/scrambler@${PKG} is already on the registry, and npm versions are immutable."
+            echo "Bump the version in package.json and tag the new commit; ${PKG} can never be reused."
+            exit 1
+          fi
+
+          echo "Tag '${GITHUB_REF_NAME}' matches package.json '${PKG}', which is not yet published."
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
