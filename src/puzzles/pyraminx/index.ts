@@ -8,6 +8,7 @@ export {
   inversePyraminxMove,
   inversePyraminxMoves,
   parsePyraminxMove,
+  parsePyraminxScramble,
   pyraminxMovesToString,
   pyraminxMoveToString,
   PYRAMINX_AMOUNTS,

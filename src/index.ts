@@ -97,4 +97,30 @@ export type {
   SyntaxErrorReason,
 } from './notation/alg';
 
+/**
+ * One door onto **all six** notations, keyed on the event.
+ *
+ * `parseAlgorithm` reads the twelve cube events. The other five — Megaminx,
+ * Clock, Pyraminx, Skewb and Square-1 — are written in grammars of their own,
+ * whose parsers lived inside this package, fully tested, and were reachable
+ * from nowhere outside it until v0.12. `validateScramble` is that reach, and
+ * it gives all five what v0.11 gave cube notation: an offset, a span, and a
+ * stable code instead of an English sentence.
+ *
+ * `ScrambleSyntaxError` is deliberately **not** a subclass of
+ * `AlgorithmSyntaxError`, and `ScrambleErrorReason` deliberately not a member
+ * of `SyntaxErrorReason` — see their doc comments. Two grammars, two unions,
+ * and an existing cube-only consumer's exhaustive table keeps compiling.
+ */
+export { validateScramble } from './core/validate-scramble';
+export type { ScrambleValidation } from './core/validate-scramble';
+export { ScrambleSyntaxError } from './core/scramble-errors';
+export type {
+  BespokeNotation,
+  Notation,
+  ScrambleErrorReason,
+  ScrambleSyntaxErrorDetail,
+} from './core/scramble-errors';
+export { notationForEvent } from './core/event-notation';
+
 export { createRandomSource, type RandomSource } from './random/random-source';

@@ -4,7 +4,8 @@ Written *after* the implementation, to record what `src/puzzles/megaminx/`
 actually does. This is the only implemented puzzle here with **no solver**, and
 that is a regulation requirement rather than a shortcut — §5 makes the case.
 
-Target: `generateScramble('minx')`, shipped since v0.7.
+Target: `generateScramble('minx')`, shipped since v0.7. Public notation
+validation (`validateScramble('minx', …)`) shipped since v0.12 — §2 and §6.
 
 ---
 
@@ -103,6 +104,28 @@ R-- D-- R++ D-- R-- D++ R++ D++ R++ D-- U'
 
 Ten alternating `R`/`D` tokens, then a `U`. Seven such groups, **always exactly
 77 tokens**.
+
+### Reason codes
+
+`parseMegaminxScramble(text)` — the whole-string function added in v0.12 — walks
+`notation/tokenize-words.ts` and calls `parseMegaminxMove` per token, converting
+its rejection into a `ScrambleSyntaxError` with an `offset`, a `length` (the
+token's) and a stable code. The per-token function is unchanged: it is on the
+generation path, and the wrapper wraps rather than replaces.
+
+| Code | Example | Carries |
+|---|---|---|
+| `megaminx-not-a-move` | `X++` | `token`, `char` |
+| `megaminx-bad-direction` | `R+++`, `U++`, `R'` | `token` |
+
+**Two codes, not one.** The single English sentence covered both, and they are
+different mistakes: `X++` names a move that does not exist, while `R+++` names
+one that does and spells its direction wrong. The classification re-tests only
+the leading letter, against `MEGAMINX_MOVE_KINDS` — the grammar itself stays in
+`parseMegaminxMove`, where there is one copy of it.
+
+🔴 No message strings ship for these codes, in any language. The package returns
+the code and the data; the sentence belongs to the consumer.
 
 ---
 
@@ -372,6 +395,21 @@ any other module here.
 - **A corner touching other than 3 faces, or an edge other than 2**, throws
   during table construction.
 - **A state within one move of solved** is *not* handled — see §8.
+
+### Public validation, since v0.12
+
+`validateScramble('minx', text)` is the public door: it dispatches on the event
+and returns `{ valid: true, notation: 'megaminx' }` or `{ valid: false, error }`
+without throwing. Tests cover a generated scramble, empty input, both reason
+codes with their offsets and spans, and an offset in the middle of a scramble
+rather than only at the first token.
+
+**What it does not check.** Only that the string is Megaminx notation. Not that
+the scramble is 77 tokens, not that it follows the alternating template of §5,
+not Regulation 4b3's floor, and nothing at all about the resulting state. A
+hand-written `U U' U U'` is valid notation and a useless scramble, and this says
+so by design — a validator that conflated the two would have no answer for
+"is what my user typed even parseable".
 
 ---
 

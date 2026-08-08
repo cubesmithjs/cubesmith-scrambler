@@ -173,8 +173,69 @@ This layer is **syntax only**. There is no puzzle behind it, so there is no
 `R R` is not equal to `R2`. Saying otherwise needs a move order, which is a
 property of a puzzle rather than of notation. The five non-cube notations —
 Megaminx, Clock, Pyraminx, Skewb and Square-1 — are deliberately **not** part
-of this grammar, and parsing one throws. See
-[`docs/notation-design.md`](./docs/notation-design.md).
+of this grammar, and parsing one throws; `validateScramble` below is the door
+onto those. See [`docs/notation-design.md`](./docs/notation-design.md).
+
+### Validating a scramble, for any of the seventeen events
+
+Cube notation covers twelve events. The other five are written in grammars of
+their own, and since 0.12 there is one entry point onto all six, keyed on the
+event rather than on which parser you guessed:
+
+```ts
+import { validateScramble } from '@cubesmith/scrambler';
+
+validateScramble('minx', 'R++ D-- U').valid; // true
+validateScramble('sq1', '(1, 0) / (0, -2) /').valid; // true
+validateScramble('333', "R U R' U'").valid; // true
+
+const bad = validateScramble('clock', 'UR4+ UR9+');
+bad.valid; // false
+if (!bad.valid && bad.notation !== 'cube') {
+  bad.error.reason; // 'clock-hour-out-of-range'
+  bad.error.offset; // 5
+  bad.error.length; // 4  — how much to underline
+  bad.error.hours;  // 9
+}
+```
+
+The invalid arm carries **one of two error classes**, and `notation` says
+which. A cube failure is the `AlgorithmSyntaxError` above with a
+`SyntaxErrorReason`; the other five are a `ScrambleSyntaxError` with a
+`ScrambleErrorReason` — one of thirteen documented string codes, each prefixed
+by the grammar that produced it (`megaminx-*`, `clock-*`, `pyraminx-*`,
+`skewb-*`, `square1-*`), carrying whatever a message would interpolate
+(`token`, `char`, `pins`, `hours`).
+
+🔴 The two are **deliberately separate**, and neither class extends the other:
+
+```ts
+import { AlgorithmSyntaxError, ScrambleSyntaxError } from '@cubesmith/scrambler';
+
+const clock = validateScramble('clock', 'UR9+');
+!clock.valid && clock.error instanceof AlgorithmSyntaxError; // false
+```
+
+If `ScrambleSyntaxError` subclassed `AlgorithmSyntaxError`, an existing
+`catch`-and-classify would silently start receiving Clock and Square-1 codes
+its table has never heard of; if the codes were added to `SyntaxErrorReason`, a
+cube-only consumer's exhaustive `Record<SyntaxErrorReason, …>` would stop
+compiling on upgrade even though nothing it does had changed. Two grammars, two
+unions, two classes. **The package ships no message strings for the new codes
+either, and never will** — same rule as 0.11.
+
+The valid arm is `{ valid: true, notation }` and carries **no parsed form**.
+There is no shared tree to hand back: the five notations have five node types,
+and merging them would be actively wrong — a Pyraminx `2` means
+*counterclockwise*, not a half turn — while publishing all five would freeze
+five types written for a solver's convenience. Adding a payload later is
+additive, so the door is left open rather than nailed shut.
+
+`validateScramble` answers *"is this valid notation for this event"* and
+nothing else. Whether a scramble is WCA-legal — Regulation 4b3 floors,
+orientation suffixes, shape distributions — is a different question, and
+whether `(13, 0)` is reachable on a real Square-1 is a question about a puzzle.
+Empty input is valid, as it is for `validateAlgorithm`.
 
 ### Multi-blind, and the `count` option
 

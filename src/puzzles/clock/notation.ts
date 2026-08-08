@@ -25,6 +25,9 @@
  * *unimodular* basis for them — see `mechanics.ts`.
  */
 
+import { ScrambleSyntaxError } from '../../core/scramble-errors';
+import { tokenizeWords } from '../../notation/tokenize-words';
+
 export type ClockCorner = 'UR' | 'DR' | 'DL' | 'UL';
 
 /** Order matters: it's the order corners are listed in a closing pin declaration. */
@@ -108,27 +111,89 @@ const PIN_SET_NAMES = new Set<string>(CLOCK_PIN_SETS);
  * declaration and a letter group with an amount is a dial move, which is
  * what keeps `DL` and `DL5-` unambiguous. Consecutive bare groups are
  * folded into the single declaration they represent.
+ *
+ * Since v0.12 it walks `tokenizeWords` rather than `text.split(/\s+/)`, purely
+ * so that a rejection can say **where**. The old splitter discarded positions,
+ * which is why this parser could report a bad token but never point at it. The
+ * successful path is unchanged.
+ *
+ * @throws {ScrambleSyntaxError} carrying an `offset`, a `length` and a
+ * {@link ScrambleErrorReason}. Three of the four codes it can produce are the
+ * three conditions below; the fourth comes from the hour range.
  */
 export function parseClockScramble(text: string): ClockToken[] {
   const tokens: ClockToken[] = [];
   const trailingPins: ClockCorner[] = [];
 
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  for (const { text: word, offset } of tokenizeWords(text)) {
     if (word === 'y2') {
       tokens.push({ kind: 'flip' });
       continue;
     }
+
+    const span = { length: word.length, token: word } as const;
     const match = /^([A-Z]+)(\d+[+-])?$/.exec(word);
-    if (!match || !PIN_SET_NAMES.has(match[1]!)) {
-      throw new Error(`clock-notation: "${word}" is not a valid Clock token`);
+
+    // Two conditions that used to share one `||` and one message, split
+    // because they are different mistakes: `5+` and `UR3` are not shaped like
+    // a Clock token at all, while `XY1+` is — and names a pin set that does
+    // not exist. A consumer can say so.
+    if (!match) {
+      throw new ScrambleSyntaxError(
+        'clock',
+        text,
+        offset,
+        `"${word}" is not a valid Clock token`,
+        { reason: 'clock-not-a-token', ...span },
+      );
     }
-    const pins = match[1] as ClockPinSet;
+    const name = match[1]!;
+    if (!PIN_SET_NAMES.has(name)) {
+      throw new ScrambleSyntaxError(
+        'clock',
+        text,
+        offset,
+        `"${word}" is not a valid Clock token`,
+        { reason: 'clock-not-a-pin-set', ...span, pins: name },
+      );
+    }
+
+    const pins = name as ClockPinSet;
     if (match[2]) {
-      tokens.push({ kind: 'dial', pins, amount: parseClockAmount(match[2]) });
+      const amount = match[2];
+      try {
+        tokens.push({ kind: 'dial', pins, amount: parseClockAmount(amount) });
+      } catch {
+        // `parseClockAmount` has two throws, and only one is reachable from
+        // here: the `\d+[+-]` this regex already matched satisfies its own,
+        // so the shape can never be the complaint and the range always is.
+        throw new ScrambleSyntaxError(
+          'clock',
+          text,
+          offset,
+          `"${amount}" exceeds the 0..6 hour range`,
+          {
+            reason: 'clock-hour-out-of-range',
+            ...span,
+            pins: name,
+            hours: Number.parseInt(amount, 10),
+          },
+        );
+      }
       continue;
     }
+
     if (!CLOCK_CORNERS.includes(pins as ClockCorner)) {
-      throw new Error(`clock-notation: "${word}" can only close a scramble as a single corner`);
+      // A *positional* rule, and the one this notation's tail turns on — which
+      // is why it is worth an offset. `U` and `ALL` are legal pin sets to turn
+      // and illegal ones to end with.
+      throw new ScrambleSyntaxError(
+        'clock',
+        text,
+        offset,
+        `"${word}" can only close a scramble as a single corner`,
+        { reason: 'clock-pin-not-a-corner', ...span, pins: name },
+      );
     }
     trailingPins.push(pins as ClockCorner);
   }

@@ -4,7 +4,8 @@ Written *after* the implementation, to record what `src/puzzles/pyraminx/`
 actually does. Every count below is computed by the code and cross-checked
 against a figure published independently of it.
 
-Target: `generateScramble('pyram')`, shipped since v0.4.
+Target: `generateScramble('pyram')`, shipped since v0.4. Public notation
+validation (`validateScramble('pyram', …)`) shipped since v0.12 — §2 and §6.
 
 ---
 
@@ -105,6 +106,29 @@ L U R' U R' U L B' R L' B' l r b
 
 Eleven layer turns — always exactly eleven — followed by zero to four tip turns.
 Measured over 300 scrambles: 11 to 15 tokens, mean 13.6.
+
+### Reason codes
+
+`parsePyraminxScramble(text)`, added in v0.12, walks
+`notation/tokenize-words.ts` and calls `parsePyraminxMove` per token, turning a
+rejection into a `ScrambleSyntaxError` carrying an `offset`, a `length` and a
+stable code. **No new grammar was needed**: `parsePyraminxMove`'s
+`/^([ULRBulrb])(')?$/` already reads the lowercase tip branch, so the tail of
+tip moves an official scramble ends with parses like anything else.
+
+| Code | Example | Carries |
+|---|---|---|
+| `pyraminx-not-a-vertex` | `Z`, `f` | `token`, `char` |
+| `pyraminx-bad-amount` | `U2`, `U''`, `u2'` | `token` |
+
+The split is where the regex splits: which letter, versus what followed it.
+`U2` is the interesting arm — a Pyraminx turn has **order 3**, so `2` is not a
+half turn and there is no spelling for one; the counterclockwise turn is `'`.
+The letter set comes from `PYRAMINX_VERTICES`, uppercased for the comparison,
+so all four tips stay legal and a lowercase letter that is not a vertex does
+not sneak through.
+
+🔴 No message strings ship for these codes, in any language.
 
 ---
 
@@ -391,6 +415,19 @@ a mis-derived flip rule would reproduce none of it.
 - **Tips already correct.** `tipMoves` skips any tip whose twist already
   matches, so a scramble can legitimately end with fewer than four tip turns —
   or none.
+
+### Public validation, since v0.12
+
+`validateScramble('pyram', text)` dispatches on the event and returns
+`{ valid: true, notation: 'pyraminx' }` or `{ valid: false, error }` without
+throwing. Tests cover a generated scramble (tips asserted present, so a parser
+that only handled the uppercase layer turns would fail), empty input, both
+reason codes with offsets and spans, and a failure in the middle of a scramble
+rather than only at the first token.
+
+**What it does not check.** Only that the string is Pyraminx notation. Not
+Regulation 4b3f's six-move floor, not that the tips are emitted last, and
+nothing about the resulting state — those are §5's business and stay there.
 
 ---
 

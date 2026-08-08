@@ -10,6 +10,109 @@ changes and a patch bump may not.
 
 ---
 
+## 0.12.0
+
+**Every one of the seventeen events can now be validated**, not only the twelve
+written in cube notation — with the same quality of answer the cube path has had
+since `0.11.0`: a stable reason code, an offset, a length, and no English
+sentence to string-match.
+
+This was less "write five parsers" than it sounds. All five bespoke parsers —
+Megaminx, Clock, Pyraminx, Skewb, Square-1 — already existed inside the package,
+tested, and were **re-exported from nowhere**. What they lacked was error parity:
+each threw a bare `Error` carrying an English sentence, no offset, no span and no
+code. Exporting them unchanged would have shipped an API that is localizable for
+twelve events and not for five, undoing the point of the release before it.
+
+**Nothing breaks.** Every change is additive, and the claim was checked rather
+than asserted: the built `dist/index.d.ts` was diffed against `0.11.0`'s. Every
+existing declaration is byte-identical, **no line is a removal or a
+modification**, and the only line that is not a pure addition is the single
+`export { … }` statement, which gains eight names and loses none (37 → 45).
+
+**Bundle size**, measured on both builds with the same command
+(`zlib.gzipSync` on `dist/index.js`):
+
+| | `0.11.0` | `0.12.0` | Delta |
+|---|---|---|---|
+| Raw | 210,783 B | 219,870 B | +9,087 B (+4.31%) |
+| Gzip | 46,187 B | 48,327 B | +2,140 B (+4.63%) |
+
+The package has one entry point, so this ships to every consumer whether they
+validate anything or not. That is the honest framing, and it is why the new
+surface is as small as it is.
+
+### Added
+
+- **`validateScramble(event, text)`** — one door onto all six grammars, keyed on
+  a `WcaEventId`. Returns `{ valid: true, notation }` or `{ valid: false,
+  notation, error }` and never throws for bad input. Twelve events dispatch to
+  `parseAlgorithm`; the other five to their own parser. The event → notation map
+  is **derived** from a five-row table rather than a hand-maintained
+  seventeen-row one, and `corpus.test.ts` now imports the same table instead of
+  keeping its own copy.
+- **`ScrambleSyntaxError`** — the bespoke-notation sibling of
+  `AlgorithmSyntaxError`, carrying `notation`, `input`, `offset`, `length`,
+  `reason` and whichever of `token`, `char`, `pins`, `hours` the code uses. A
+  `length` of `0` still means text is **missing** rather than wrong.
+- **`ScrambleErrorReason`** — **thirteen** stable codes (twelve real ones plus
+  the documented residual), each prefixed by the grammar that produces it. The
+  count is read off the union by `readme.test.ts`, not written in prose:
+  `megaminx-not-a-move`, `megaminx-bad-direction`, `pyraminx-not-a-vertex`,
+  `pyraminx-bad-amount`, `skewb-not-a-corner`, `skewb-bad-amount`,
+  `clock-not-a-token`, `clock-not-a-pin-set`, `clock-hour-out-of-range`,
+  `clock-pin-not-a-corner`, `square1-stray-character`, `square1-zero-turn`,
+  `unexpected-token`. Every one of the twelve has a test that produces it.
+- **Whole-string parsers for the token-based trio** — `parseMegaminxScramble`,
+  `parsePyraminxScramble`, `parseSkewbScramble`. Internal: they wrap the existing
+  per-token functions, which are on the generation path and are unchanged.
+- **Offsets on the two that already parsed whole strings.**
+  `parseSquare1Scramble` now reports the `match.index` it already had in scope;
+  `parseClockScramble` moved off `text.split(/\s+/)`, which discarded positions,
+  onto a new offset-keeping tokenizer. Both now throw `ScrambleSyntaxError`
+  instead of a bare `Error`; their successful behaviour is unchanged, and their
+  messages keep the `<notation>-notation:` prefix they always printed.
+- **`notationForEvent(event)`**, plus the types `ScrambleValidation`,
+  `ScrambleSyntaxErrorDetail`, `Notation` and `BespokeNotation`.
+
+### Notes
+
+- 🔴 **`ScrambleSyntaxError` is deliberately not a subclass of
+  `AlgorithmSyntaxError`**, and `ScrambleErrorReason` deliberately not new
+  members of `SyntaxErrorReason`. Subclassing would make `error instanceof
+  AlgorithmSyntaxError` true for a Clock failure, so an existing
+  catch-and-classify would silently receive codes its table has never heard of;
+  extending the union would stop a cube-only consumer's exhaustive
+  `Record<SyntaxErrorReason, …>` compiling on upgrade, even though nothing it
+  does had changed. Two grammars, two unions, two classes. Asserted in both
+  directions by a test, because this is exactly what a later "tidy the class
+  hierarchy" refactor would undo.
+- 🔴 **No locale strings ship, and none ever will** — the same rule `0.11.0` set,
+  restated because it is the one most likely to be assumed away for a new set of
+  codes.
+- **The valid arm carries no parsed form.** There is no shared tree to hand back:
+  five notations, five node types, and merging them would be actively wrong — a
+  Pyraminx `2` means *counterclockwise*, not a half turn. Publishing all five
+  internal ASTs would freeze five shapes written for a solver's convenience, so
+  they stay private. Adding a payload later is additive; removing one would not
+  be, which is why the door is left open rather than nailed shut.
+- **The five ASTs stay unmerged, and `parseAlgorithm` stays intolerant.**
+  `corpus.test.ts` still asserts it **throws** on generated `minx`, `clock` and
+  `sq1` scrambles, unchanged. `validateScramble('minx', …)` routing to the
+  Megaminx grammar is the point; `parseAlgorithm` learning Pochmann notation
+  would have broken the thing this release exists to serve.
+- **This is syntax only.** Whether a scramble is WCA-legal — Regulation 4b3
+  floors, orientation suffixes, shape distributions — is `scramble-shape.ts`'s
+  business and is not asked here, and whether `(13, 0)` is reachable on a real
+  Square-1 is a question about a puzzle. Empty input is valid for every notation,
+  agreeing with `validateAlgorithm`.
+- **No throwing sibling ships.** The five parsers already throw; a consumer who
+  wants that shape writes a two-line wrapper whose behaviour they choose.
+  Doubling the public surface, the docs and the README's executed examples for a
+  wrapper was not worth it. Revisit if asked for.
+
+---
+
 ## 0.11.0
 
 A notation syntax error is now **machine-readable and localizable**, and there

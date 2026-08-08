@@ -555,3 +555,71 @@ describe('@cubesmith/scrambler public entry point', () => {
     }
   });
 });
+
+/**
+ * The exported surface, asserted rather than assumed.
+ *
+ * v0.12 added a second notation door and a second error class, and "this
+ * release is purely additive" is the kind of claim that is easy to make and
+ * easy to get wrong. Types are erased at run time, so this covers the values
+ * only — the type exports are pinned by `dist/index.d.ts`, which the release
+ * diffs against the previous version.
+ */
+describe('the exported surface', () => {
+  it('is exactly these values, so an accidental export fails here', async () => {
+    const surface = await import('./index');
+    expect(Object.keys(surface).sort()).toEqual([
+      'AMOUNTS',
+      'AlgorithmSyntaxError',
+      'FACES',
+      'InvalidScrambleCountError',
+      'MAX_SCRAMBLE_COUNT',
+      'ScrambleSyntaxError',
+      'UnimplementedEventError',
+      'createRandomSource',
+      'generateScramble',
+      'inverseMove',
+      'inverseMoves',
+      'invertAlgorithm',
+      'isImplementedEvent',
+      'moveToString',
+      'movesToString',
+      'notationForEvent',
+      'parseAlgorithm',
+      'parseMove',
+      'serializeAlgorithm',
+      'validateAlgorithm',
+      'validateScramble',
+    ]);
+  });
+
+  /**
+   * 🔴 The five bespoke ASTs stay private. Exporting a type freezes it, and
+   * `Square1Move`, `ClockToken` and friends were written for a solver's
+   * convenience — every future refactor of one would become a breaking change
+   * of this package. `validateScramble` answers a validity question and
+   * reserves the payload for a consumer who turns up with a real need for it.
+   */
+  it('does not export the five bespoke move types or their parsers', async () => {
+    const surface = await import('./index');
+    for (const name of [
+      'parseMegaminxScramble',
+      'parsePyraminxScramble',
+      'parseSkewbScramble',
+      'parseClockScramble',
+      'parseSquare1Scramble',
+      'parseMegaminxMove',
+      'parseSkewbMove',
+    ]) {
+      expect(Object.keys(surface), name).not.toContain(name);
+    }
+  });
+
+  it('reaches all six notations from the public entry point', async () => {
+    const { validateScramble, notationForEvent } = await import('./index');
+    expect(notationForEvent('minx')).toBe('megaminx');
+    expect(validateScramble('minx', 'R++ D-- U')).toEqual({ valid: true, notation: 'megaminx' });
+    expect(validateScramble('sq1', '(1, 0) /')).toEqual({ valid: true, notation: 'square1' });
+    expect(validateScramble('333', "R U R'")).toEqual({ valid: true, notation: 'cube' });
+  });
+});

@@ -4,8 +4,10 @@ import {
   AlgorithmSyntaxError,
   invertAlgorithm,
   parseAlgorithm,
+  ScrambleSyntaxError,
   serializeAlgorithm,
   validateAlgorithm,
+  validateScramble,
 } from './index';
 
 /**
@@ -30,6 +32,8 @@ import README from '../README.md?raw';
 // The same trick, for the same reason, on a source file: `SyntaxErrorReason` is
 // a type and leaves nothing behind at runtime to count.
 import TYPES_SOURCE from './notation/alg/types.ts?raw';
+// And on the second reason union, which is a separate type on purpose.
+import SCRAMBLE_ERRORS_SOURCE from './core/scramble-errors.ts?raw';
 
 const readmeLines = (): string[] => README.split(/\r?\n/);
 
@@ -173,5 +177,89 @@ describe('the README notation examples', () => {
   it('documents the non-throwing entry point it now exports', () => {
     expect(README).toContain('validateAlgorithm');
     expect(README).toContain('`SyntaxErrorReason`');
+  });
+});
+
+/**
+ * The `validateScramble` examples, run for the same reason as the ones above.
+ *
+ * This section is the whole of what 0.12 adds to the public surface, and every
+ * value commented in it is asserted here. A wrong output comment is a failing
+ * build.
+ */
+describe('the README validateScramble examples', () => {
+  it('validates the three events the first snippet names', () => {
+    expect(validateScramble('minx', 'R++ D-- U').valid).toBe(true);
+    expect(validateScramble('sq1', '(1, 0) / (0, -2) /').valid).toBe(true);
+    expect(validateScramble('333', "R U R' U'").valid).toBe(true);
+  });
+
+  it('rejects the Clock example with exactly the reason, offset, span and hour it claims', () => {
+    const bad = validateScramble('clock', 'UR4+ UR9+');
+    expect(bad.valid).toBe(false);
+    if (bad.valid || bad.notation === 'cube') {
+      expect.fail('expected a Clock failure');
+    }
+    expect(bad.error.reason).toBe('clock-hour-out-of-range');
+    expect(bad.error.offset).toBe(5);
+    expect(bad.error.length).toBe(4);
+    expect(bad.error.hours).toBe(9);
+  });
+
+  /** 🔴 The `instanceof` the README shows returning `false`, run rather than described. */
+  it('keeps the two error classes apart, in both directions', () => {
+    const clock = validateScramble('clock', 'UR9+');
+    expect(clock.valid).toBe(false);
+    if (!clock.valid) {
+      expect(clock.error instanceof AlgorithmSyntaxError).toBe(false);
+      expect(clock.error).toBeInstanceOf(ScrambleSyntaxError);
+    }
+
+    const cube = validateScramble('333', 'R U Q');
+    expect(cube.valid).toBe(false);
+    if (!cube.valid) {
+      expect(cube.error instanceof ScrambleSyntaxError).toBe(false);
+      expect(cube.error).toBeInstanceOf(AlgorithmSyntaxError);
+    }
+  });
+
+  it('returns a valid arm carrying the notation and no parsed form, as it says', () => {
+    expect(validateScramble('minx', 'R++')).toEqual({ valid: true, notation: 'megaminx' });
+    expect(validateScramble('333', '')).toEqual({ valid: true, notation: 'cube' });
+  });
+
+  /**
+   * "one of thirteen documented string codes" is another number written in
+   * prose. `ScrambleErrorReason` is a type and erased at run time, so the
+   * declaration is read as text and counted — the same standard the cube
+   * union's count is held to.
+   *
+   * The character class differs from the cube one: these codes carry digits
+   * (`square1-zero-turn`), which `[a-z-]+` would silently skip.
+   */
+  it('states the number of scramble reason codes the union actually declares', () => {
+    const union =
+      SCRAMBLE_ERRORS_SOURCE.split('export type ScrambleErrorReason =')[1]?.split(';')[0] ?? '';
+    const codes = [...union.matchAll(/'([a-z0-9-]+)'/g)].map(([, code]) => code!);
+    expect(codes.length, 'no codes parsed out of the union').toBeGreaterThan(0);
+    expect(new Set(codes).size, 'duplicate reason code').toBe(codes.length);
+
+    // Every code but the shared residual names the grammar that produces it.
+    for (const code of codes) {
+      if (code === 'unexpected-token') continue;
+      expect(code, code).toMatch(/^(megaminx|clock|pyraminx|skewb|square1)-/);
+    }
+
+    const word = NUMBER_WORDS[codes.length];
+    expect(word, `no word for ${codes.length} — extend NUMBER_WORDS`).toBeDefined();
+    expect(README).toContain(`one of ${word!.toLowerCase()} documented string codes`);
+  });
+
+  it('documents the event-keyed entry point and the second error class it now exports', () => {
+    expect(README).toContain('validateScramble');
+    expect(README).toContain('`ScrambleErrorReason`');
+    expect(README).toContain('ScrambleSyntaxError');
+    // The boundary, stated in the same breath as the feature.
+    expect(README).toContain('is this valid notation for this event');
   });
 });

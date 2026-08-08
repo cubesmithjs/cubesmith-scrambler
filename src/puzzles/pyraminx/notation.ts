@@ -13,6 +13,12 @@
  * of just that tip.
  */
 
+import {
+  ScrambleSyntaxError,
+  type ScrambleSyntaxErrorDetail,
+} from '../../core/scramble-errors';
+import { tokenizeWords } from '../../notation/tokenize-words';
+
 export type PyraminxVertex = 'U' | 'L' | 'R' | 'B';
 
 /**
@@ -54,6 +60,55 @@ export function parsePyraminxMove(token: string): PyraminxMove {
     amount: match[2] === "'" ? 2 : 1,
     tip,
   };
+}
+
+/**
+ * Parses a whole Pyraminx scramble, reporting **where** and **why** it failed.
+ *
+ * A wrapper around `parsePyraminxMove` rather than a replacement — see
+ * `parseMegaminxScramble` for why the per-token function is left alone.
+ *
+ * **Tips need no extra grammar.** `parsePyraminxMove`'s regex already accepts
+ * the lowercase branch and sets `tip: true`, so `U' R u l'` is one splitter
+ * plus that function, and the tail of tip moves an official scramble ends with
+ * parses like anything else.
+ *
+ * Empty input is an empty scramble, agreeing with `parseAlgorithm('')`.
+ *
+ * @throws {ScrambleSyntaxError} on the first token that is not a Pyraminx move.
+ */
+export function parsePyraminxScramble(text: string): PyraminxMove[] {
+  return tokenizeWords(text).map(({ text: token, offset }) => {
+    try {
+      return parsePyraminxMove(token);
+    } catch {
+      throw new ScrambleSyntaxError(
+        'pyraminx',
+        text,
+        offset,
+        `"${token}" is not a valid Pyraminx move token`,
+        describePyraminxFailure(token),
+      );
+    }
+  });
+}
+
+/**
+ * Which half of `parsePyraminxMove`'s regex rejected the token: the vertex
+ * letter, or what followed it.
+ *
+ * `Z` names no vertex; `U2` names one and then writes an amount this puzzle
+ * does not have — a Pyraminx turn has order 3, so `2` would mean
+ * counterclockwise and is spelled `'`. The letter set is derived from
+ * `PYRAMINX_VERTICES` rather than re-spelled, both cases included.
+ */
+function describePyraminxFailure(token: string): ScrambleSyntaxErrorDetail {
+  const first = token.charAt(0);
+  const namesAVertex = (PYRAMINX_VERTICES as readonly string[]).includes(first.toUpperCase());
+  if (namesAVertex) {
+    return { reason: 'pyraminx-bad-amount', length: token.length, token };
+  }
+  return { reason: 'pyraminx-not-a-vertex', length: token.length, token, char: first };
 }
 
 /** `U` ↔ `U'`. With only two amounts on an order-3 turn, `3 - amount` is the whole story. */

@@ -4,7 +4,8 @@ Written *after* the implementation, to record what `src/puzzles/skewb/` actually
 does. Every count is computed by the code and cross-checked against a figure
 published independently of it.
 
-Target: `generateScramble('skewb')`, shipped since v0.5.
+Target: `generateScramble('skewb')`, shipped since v0.5. Public notation
+validation (`validateScramble('skewb', …)`) shipped since v0.12 — §2 and §6.
 
 ---
 
@@ -102,6 +103,25 @@ A real generated scramble from the shipped build:
 ```
 U B U L' U R' B U' B' R B
 ```
+
+### Reason codes
+
+`parseSkewbScramble(text)`, added in v0.12, walks
+`notation/tokenize-words.ts` and calls `parseSkewbMove` per token, turning a
+rejection into a `ScrambleSyntaxError` carrying an `offset`, a `length` and a
+stable code.
+
+| Code | Example | Carries |
+|---|---|---|
+| `skewb-not-a-corner` | `F`, `r` | `token`, `char` |
+| `skewb-bad-amount` | `R2`, `B''` | `token` |
+
+The corner check is **case-sensitive**, where the Pyraminx's is not: Fixed
+Corner Notation has no lowercase form, so `r` names no corner at all rather
+than naming one badly. `R2` is the other arm — a Skewb turn has order 3, so
+there is no half turn to spell. The letter set comes from `SKEWB_CORNERS`.
+
+🔴 No message strings ship for these codes, in any language.
 
 ---
 
@@ -353,6 +373,18 @@ constraint linking the two.
   best-exercised floor.
 - **Padding never needs to step past 11.** The maximum distance *is* 11, and a
   solution of exactly 11 is always found; `solveAtLeastLength` never reaches 12.
+
+### Public validation, since v0.12
+
+`validateScramble('skewb', text)` dispatches on the event and returns
+`{ valid: true, notation: 'skewb' }` or `{ valid: false, error }` without
+throwing. Tests cover a generated scramble, empty input, both reason codes with
+offsets and spans, the lowercase case specifically, and a failure in the middle
+of a scramble.
+
+**What it does not check.** Only that the string is Skewb notation. Not
+Regulation 4b3c's seven-move floor, not the eleven-token length of §5's output,
+and nothing about the resulting state.
 
 ---
 

@@ -4,7 +4,10 @@ Written before any implementation, to make the modelling decisions explicit and
 reviewable. Every claim here is either sourced or flagged as an open question
 to be settled by computation rather than by assumption.
 
-Target: `generateScramble('sq1')`, WCA-conforming, for v0.9.x.
+Target: `generateScramble('sq1')`, WCA-conforming, for v0.9.x. Public notation
+validation (`validateScramble('sq1', …)`) shipped since v0.12 — §1 and §10.
+(This document numbers its sections differently from the other four: notation is
+§1 and validation strategy is §10.)
 
 ---
 
@@ -67,6 +70,37 @@ Match the attested official form, including the **trailing slash**:
 Space after the comma, spaces around each slash. The parser is deliberately
 tolerant of spacing and of a missing trailing slash so that scrambles copied
 from other tools round-trip.
+
+### Reason codes (v0.12)
+
+`parseSquare1Scramble` needed no wrapper and almost no work: it drives a
+`g`-flagged `RegExp` in a loop, so **`match.index` was already in scope** at
+both of its throw sites. Since v0.12 it throws a `ScrambleSyntaxError` carrying
+that offset, a `length`, and a stable code.
+
+| Code | Example | Carries |
+|---|---|---|
+| `square1-stray-character` | `(1, 0) x`, `(1 0)`, `(1, 0`, `(1, 0, 2)` | `char` |
+| `square1-zero-turn` | `(0, 0)`, `(12, -12)` | `token` |
+
+**Two codes, which is what the grammar actually distinguishes** rather than
+what one might expect. A missing comma, a third number and an unbalanced
+parenthesis all fail the pair alternative, so the `(` itself is what is left
+over and gets reported as a stray — at the offset of the parenthesis, which is
+where a reader needs to look. There is no "amount out of range" code because
+there is no such condition: any integer is reduced mod 12 (§1's tolerance
+above), which is what lets `(-6, 0)` from another generator parse.
+
+`parseSquare1Amount`'s and `normalizeUnits`' own throws are unreachable from
+this path — the text they receive is what `[+-]?\d+` already matched — so the
+one reachable second throw is `layerTurn`'s refusal of `(0,0)`: a spelling
+rather than a move, which would still cost a move under §1's metric.
+
+The `\s*` tolerance inside a pair is load-bearing and now has its own test: the
+official layout is `(6, 2) / (-2, 4)`, with a space after the comma, and that
+is exactly what a consumer will paste.
+
+🔴 No message strings ship for these codes, in any language.
 
 ---
 
@@ -351,6 +385,23 @@ Per the project's existing standards, plus the checkpoint the plan calls for.
   (scramble → apply → solve → solved); and the same **independent validator**
   treatment the other events get, with rules rewritten from the notation docs
   rather than reusing the package's own parser.
+
+### Public notation validation, since v0.12
+
+`validateScramble('sq1', text)` dispatches on the event and returns
+`{ valid: true, notation: 'square1' }` or `{ valid: false, error }` without
+throwing. It is the **notation** half of validation only, and sits beside — not
+instead of — everything above: the exact 4b3d distance check of §9, the shape
+enumeration of §6, and the solver verification of §12.
+
+Tests cover a generated `sq1` scramble (in `core/validate-scramble.test.ts`
+rather than in the notation tests, because generating one builds the pruning
+tables and Vitest isolates by file), the real official scramble verbatim, all
+143 layer turns, both reason codes with offsets and spans, the spaces-inside-
+pairs tolerance, and a failure in the middle of a scramble.
+
+**What it does not check.** Whether `(13, 0)` is reachable on a real puzzle is
+a question about a puzzle, not about notation, and is not asked here.
 
 ---
 

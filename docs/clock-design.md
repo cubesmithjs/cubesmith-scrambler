@@ -4,7 +4,8 @@ Written *after* the implementation, to record what `src/puzzles/clock/` actually
 does. The Clock is the outlier of this package: no cube geometry, no search, no
 pruning table, no state-space BFS. It is linear algebra.
 
-Target: `generateScramble('clock')`, shipped since v0.6.
+Target: `generateScramble('clock')`, shipped since v0.6. Public notation
+validation (`validateScramble('clock', …)`) shipped since v0.12 — §2 and §6.
 
 ---
 
@@ -112,6 +113,36 @@ Nine dial tokens, `y2`, five more dial tokens, then the closing pin declaration.
 Always exactly that shape; the only variation is the amounts and how many
 corners the declaration names (zero to four). Measured over 300 scrambles: 15 to
 19 tokens.
+
+### Reason codes
+
+`parseClockScramble` did not need a wrapper — it already parsed whole strings.
+What it needed was **positions**: it iterated `text.split(/\s+/)`, which throws
+them away, so it could say a token was wrong and never point at it. Since v0.12
+it walks `notation/tokenize-words.ts` instead and throws a
+`ScrambleSyntaxError`. The successful path is unchanged.
+
+| Code | Example | Carries |
+|---|---|---|
+| `clock-not-a-token` | `5+`, `UR3`, `z2` | `token` |
+| `clock-not-a-pin-set` | `XY1+` | `token`, `pins` |
+| `clock-hour-out-of-range` | `UR9+`, `UR7+` | `token`, `pins`, `hours` |
+| `clock-pin-not-a-corner` | `ALL1+ U`, `… ALL` | `token`, `pins` |
+
+The first two used to share one `||` and one message, and they are different
+mistakes: `5+` is not shaped like a Clock token at all, while `XY1+` is — and
+names a pin set that does not exist. The hour code comes from
+`parseClockAmount`, whose *other* throw is unreachable from here: the `\d+[+-]`
+the token regex already matched satisfies its shape check, so the range is
+always the complaint.
+
+`clock-pin-not-a-corner` is the interesting one, and the one that most needed a
+position. It is a **positional** rule: `U` and `ALL` are perfectly legal pin
+sets to *turn* and illegal ones to *end with*, so the same word gets a
+different verdict depending on where it sits. `y2` is legal mid-scramble and is
+matched before any of this.
+
+🔴 No message strings ship for these codes, in any language.
 
 ---
 
@@ -387,6 +418,19 @@ Six test files, `src/puzzles/clock/*.test.ts`.
 - **The 4b3 rejection.** Fires for fewer than 330 states in `1.28 × 10^15` — it
   will never be observed in practice, but the one-turn set is enumerated exactly
   and tested against all fifteen configurations on both sides.
+
+### Public validation, since v0.12
+
+`validateScramble('clock', text)` dispatches on the event and returns
+`{ valid: true, notation: 'clock' }` or `{ valid: false, error }` without
+throwing. Tests cover a generated scramble (asserting the mid-scramble `y2` and
+the trailing pin block are both present — the tail is where a hand-rolled
+validator gets Clock wrong), empty input, all four reason codes with offsets
+and spans, and a failure in the middle of a fourteen-token scramble.
+
+**What it does not check.** Only that the string is Clock notation. Not that it
+is the fourteen-token official template of §5, not Regulation 4b3's floor, and
+nothing about the resulting state. `ALL1+ ALL1+` is valid notation.
 
 ---
 

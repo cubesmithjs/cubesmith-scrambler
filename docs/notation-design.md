@@ -7,6 +7,8 @@ Covers the parser, the serializer and the inverter — the layer that lets the
 package read notation rather than only print it. Targets: `parseAlgorithm`,
 `serializeAlgorithm` and `invertAlgorithm`, shipped since v0.10; and
 `validateAlgorithm` with the `SyntaxErrorReason` codes, shipped since v0.11.
+Since v0.12 this parser is also the `'cube'` arm of `validateScramble`, the
+event-keyed door onto all six notations — see §2.
 
 ---
 
@@ -96,6 +98,18 @@ so the refusal is tested rather than assumed.
 
 Unknown letters are a syntax error too. A validator that tolerates `Q` is not
 validating.
+
+Since v0.12 those five **are** reachable, through a different door:
+`validateScramble(event, text)` dispatches on a `WcaEventId` to whichever of
+the six grammars applies, and `parseAlgorithm` is one of the six. That changes
+nothing here. The trees stay separate — deliberately, not by omission — which
+is why `validateScramble`'s valid arm returns `{ valid: true, notation }` and
+**no parsed form**: there is no shared type to return, and publishing all five
+internal ASTs would freeze five shapes written for a solver's convenience. Its
+errors are a sibling class, `ScrambleSyntaxError`, with its own
+`ScrambleErrorReason` union, for the same reason: so that a cube consumer's
+exhaustive code table keeps compiling and never receives a Clock code it has
+never heard of. See each puzzle's `docs/*-design.md` §2 for its codes.
 
 ### Parsing rules
 

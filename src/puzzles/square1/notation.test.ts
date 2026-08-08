@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ScrambleSyntaxError } from '../../core/scramble-errors';
 import {
   allLayerTurns,
   CANONICAL_MAX,
@@ -236,3 +237,86 @@ describe('inversion', () => {
     ).toBe('(-3, 0) / (-1, -2)');
   });
 });
+
+describe('parseSquare1Scramble error reporting', () => {
+  /**
+   * A **generated** `sq1` scramble is validated in
+   * `core/validate-scramble.test.ts` rather than here. Generating one solves a
+   * random state, which builds the Square-1 pruning tables — around 14 s in
+   * this file, and Vitest isolates by file, so paying it in two places buys
+   * nothing. What this file covers instead is the real official scramble
+   * (`OFFICIAL`, verbatim from a tutorial) and all 143 layer turns, above.
+   */
+
+  /**
+   * The official layout puts a space after the comma — `(6, 2) / (-2, 4)` — and
+   * a consumer will paste exactly that, so the existing `\s*` tolerance is
+   * pinned rather than left to be rediscovered.
+   */
+  it('keeps the spaces-inside-pairs tolerance a pasted scramble depends on', () => {
+    expect(parseSquare1Scramble('(6, 2) / (-2, 4)')).toEqual([
+      layerTurn(6, 2),
+      SLICE,
+      layerTurn(-2, 4),
+    ]);
+    expect(parseSquare1Scramble('( 6 , 2 )')).toEqual([layerTurn(6, 2)]);
+  });
+
+  it('reports square1-stray-character at the offset match.index already knew', () => {
+    const error = expectSquare1Failure('(1, 0) / x');
+    expect(error.reason).toBe('square1-stray-character');
+    expect(error.offset).toBe(9);
+    expect(error.length).toBe(1);
+    expect(error.char).toBe('x');
+    expect(error.notation).toBe('square1');
+  });
+
+  /**
+   * A missing comma, a third number and an unbalanced parenthesis all fail the
+   * pair alternative, so the `(` is what is left over — reported as a stray at
+   * the offset of the parenthesis, which is where a reader needs to look.
+   */
+  it('points at the parenthesis when the pair itself is malformed', () => {
+    for (const [bad, offset] of [
+      ['(1 0)', 0],
+      ['(1, 0', 0],
+      ['(1, 0, 2)', 0],
+      ['(1, x)', 0],
+      ['(1, 0) / (2 3)', 9],
+    ] as const) {
+      const error = expectSquare1Failure(bad);
+      expect(error.reason, bad).toBe('square1-stray-character');
+      expect(error.offset, bad).toBe(offset);
+      expect(error.char, bad).toBe('(');
+    }
+  });
+
+  /** `(0,0)` turns nothing: a spelling rather than a move, and it would still cost one. */
+  it('reports square1-zero-turn spanning the whole pair', () => {
+    const error = expectSquare1Failure('(1, 0) / (0, 0) / (2, 0)');
+    expect(error.reason).toBe('square1-zero-turn');
+    expect(error.offset).toBe(9);
+    expect(error.length).toBe(6);
+    expect(error.token).toBe('(0, 0)');
+
+    // However spelled — the amounts are reduced before the check.
+    expect(expectSquare1Failure('(12, -12)').reason).toBe('square1-zero-turn');
+  });
+
+  it('reports the offset of the offending token, not of the first one', () => {
+    const scramble = '(6, 2) / (-2, 4) / (-1, -4) / % / (0, -3)';
+    const error = expectSquare1Failure(scramble);
+    expect(error.offset).toBe(scramble.indexOf('%'));
+    expect(error.char).toBe('%');
+  });
+});
+
+function expectSquare1Failure(text: string): ScrambleSyntaxError {
+  try {
+    parseSquare1Scramble(text);
+  } catch (error) {
+    expect(error).toBeInstanceOf(ScrambleSyntaxError);
+    return error as ScrambleSyntaxError;
+  }
+  throw new Error(`expected "${text}" to be rejected`);
+}

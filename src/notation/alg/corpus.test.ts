@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 // Imported for its registration side effects: the registry is populated by the
 // package entry point, not by the core module.
 import { generateScramble } from '../../index';
+import { NON_CUBE_EVENTS } from '../../core/event-notation';
 import { implementedEvents } from '../../core/scrambler-registry';
 import { CFOP_CORPUS } from './cfop-corpus';
 import { collectMoves } from './equality';
@@ -26,9 +27,12 @@ import { AlgorithmSyntaxError } from './types';
  * different notations that happen to be written with letters, and folding them
  * into this AST would be actively wrong — a Pyraminx `2` means
  * *counterclockwise*, not a half turn.
+ *
+ * The five used to be a literal here. Since v0.12 `validateScramble` needs the
+ * same split to dispatch on, so it lives in `core/event-notation.ts` and both
+ * import it — a second copy is the drift this package designs against. Every
+ * assertion below is unchanged.
  */
-const NON_CUBE_EVENTS = new Set(['minx', 'clock', 'pyram', 'skewb', 'sq1']);
-
 const CUBE_EVENTS = [...implementedEvents()].filter((event) => !NON_CUBE_EVENTS.has(event));
 
 describe('the package can read its own output', () => {

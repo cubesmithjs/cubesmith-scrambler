@@ -10,6 +10,7 @@ export {
   megaminxMovesToString,
   megaminxMoveToString,
   parseMegaminxMove,
+  parseMegaminxScramble,
   type MegaminxDirection,
   type MegaminxMove,
   type MegaminxMoveKind,

@@ -8,6 +8,7 @@ export {
   inverseSkewbMove,
   inverseSkewbMoves,
   parseSkewbMove,
+  parseSkewbScramble,
   skewbMovesToString,
   skewbMoveToString,
   SKEWB_AMOUNTS,

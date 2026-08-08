@@ -23,6 +23,12 @@
  * order 3.
  */
 
+import {
+  ScrambleSyntaxError,
+  type ScrambleSyntaxErrorDetail,
+} from '../../core/scramble-errors';
+import { tokenizeWords } from '../../notation/tokenize-words';
+
 export type SkewbCorner = 'U' | 'R' | 'L' | 'B';
 
 /** Order fixes the move indexing used by the coordinate tables. */
@@ -52,6 +58,48 @@ export function parseSkewbMove(token: string): SkewbMove {
     throw new Error(`skewb-notation: "${token}" is not a valid Skewb move token`);
   }
   return { corner: match[1] as SkewbCorner, amount: match[2] === "'" ? 2 : 1 };
+}
+
+/**
+ * Parses a whole Skewb scramble, reporting **where** and **why** it failed.
+ *
+ * A wrapper around `parseSkewbMove` rather than a replacement — see
+ * `parseMegaminxScramble` for why the per-token function is left alone.
+ *
+ * Empty input is an empty scramble, agreeing with `parseAlgorithm('')`.
+ *
+ * @throws {ScrambleSyntaxError} on the first token that is not a Skewb move.
+ */
+export function parseSkewbScramble(text: string): SkewbMove[] {
+  return tokenizeWords(text).map(({ text: token, offset }) => {
+    try {
+      return parseSkewbMove(token);
+    } catch {
+      throw new ScrambleSyntaxError(
+        'skewb',
+        text,
+        offset,
+        `"${token}" is not a valid Skewb move token`,
+        describeSkewbFailure(token),
+      );
+    }
+  });
+}
+
+/**
+ * Which half of `parseSkewbMove`'s regex rejected the token.
+ *
+ * The corner set is **case-sensitive** here where the Pyraminx's is not: FCN
+ * has no lowercase form, so `r` is not a corner at all rather than a corner
+ * with a bad amount. `R2` is the other arm — a cube-style half turn on a turn
+ * of order 3.
+ */
+function describeSkewbFailure(token: string): ScrambleSyntaxErrorDetail {
+  const first = token.charAt(0);
+  if ((SKEWB_CORNERS as readonly string[]).includes(first)) {
+    return { reason: 'skewb-bad-amount', length: token.length, token };
+  }
+  return { reason: 'skewb-not-a-corner', length: token.length, token, char: first };
 }
 
 export function inverseSkewbMove(move: SkewbMove): SkewbMove {

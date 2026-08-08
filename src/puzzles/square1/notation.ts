@@ -32,6 +32,8 @@
  * what makes generated scrambles comparable to official ones.
  */
 
+import { ScrambleSyntaxError } from '../../core/scramble-errors';
+
 /** How many 30° units make a full layer. Turn amounts live in `Z12`. */
 export const SQUARE1_UNITS = 12;
 
@@ -139,6 +141,19 @@ export function parseSquare1Amount(text: string): number {
  * `(-6, 0)` and `(6, 0)` are the same move and both parse — but strict about
  * structure: an unbalanced parenthesis, a missing comma, a third number or a
  * `(0,0)` is an error rather than something quietly ignored.
+ *
+ * Since v0.12 a rejection carries an `offset`, a `length` and a
+ * {@link ScrambleErrorReason}. That was nearly free here: this loop drives a
+ * `g`-flagged `RegExp`, so `match.index` is **already in scope** at both throw
+ * sites and nothing had to be re-scanned to find out where it was.
+ *
+ * It produces exactly **two** codes, which is what the grammar actually
+ * distinguishes rather than what one might expect. A missing comma, a third
+ * number and an unbalanced parenthesis all fail the pair alternative, so the
+ * `(` itself is left over as a stray character and that is what gets reported
+ * — at the right offset, which is the useful part.
+ *
+ * @throws {ScrambleSyntaxError}
  */
 export function parseSquare1Scramble(text: string): Square1Move[] {
   const moves: Square1Move[] = [];
@@ -147,13 +162,31 @@ export function parseSquare1Scramble(text: string): Square1Move[] {
   for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
     const [whole, top, bottom, stray] = match;
     if (stray !== undefined) {
-      throw new Error(`square1-notation: unexpected "${stray}" in "${text}"`);
+      throw new ScrambleSyntaxError('square1', text, match.index, `unexpected "${stray}"`, {
+        reason: 'square1-stray-character',
+        length: 1,
+        char: stray,
+      });
     }
     if (whole === '/') {
       moves.push(SLICE);
       continue;
     }
-    moves.push(layerTurn(parseSquare1Amount(top!), parseSquare1Amount(bottom!)));
+    try {
+      moves.push(layerTurn(parseSquare1Amount(top!), parseSquare1Amount(bottom!)));
+    } catch {
+      // The one reachable throw on this path. `parseSquare1Amount` cannot
+      // complain — its `[+-]?\d+` is what the pattern above already matched —
+      // and `normalizeUnits` cannot either, since that text is always an
+      // integer. What is left is `layerTurn`'s refusal of `(0,0)`: a spelling
+      // rather than a move, which would otherwise cost a move under the metric
+      // while turning nothing.
+      throw new ScrambleSyntaxError('square1', text, match.index, `${whole} is not a move`, {
+        reason: 'square1-zero-turn',
+        length: whole!.length,
+        token: whole!,
+      });
+    }
   }
 
   return moves;
