@@ -166,7 +166,10 @@ function amountValue(input: string, from: number, to: number): number {
   if (digits === '') return inverted ? -1 : 1;
   const magnitude = Number(digits);
   if (magnitude === 0) {
-    throw new AlgorithmSyntaxError(input, from, 'an amount of 0 does nothing');
+    throw new AlgorithmSyntaxError(input, from, 'an amount of 0 does nothing', {
+      reason: 'amount-zero',
+      length: to - from,
+    });
   }
   return inverted ? -magnitude : magnitude;
 }
@@ -194,7 +197,12 @@ function readMove(input: string, from: number): [MoveNode, number] {
       const secondStart = i;
       while (i < input.length && isDigit(input[i]!)) i += 1;
       if (secondStart === i) {
-        throw new AlgorithmSyntaxError(input, secondStart, 'a layer range needs a second number');
+        throw new AlgorithmSyntaxError(input, secondStart, 'a layer range needs a second number', {
+          reason: 'layer-range-incomplete',
+          // Nothing to underline — the number was never written. The offset is
+          // where it should have gone.
+          length: 0,
+        });
       }
       const second = Number(input.slice(secondStart, i));
       if (first < 1 || second <= first) {
@@ -202,6 +210,12 @@ function readMove(input: string, from: number): [MoveNode, number] {
           input,
           firstStart,
           `layer range ${first}-${second} must count outwards-in, starting at 1 or more`,
+          {
+            reason: 'layer-range-not-ascending',
+            length: i - firstStart,
+            outer: first,
+            inner: second,
+          },
         );
       }
       outerLayer = first;
@@ -212,6 +226,7 @@ function readMove(input: string, from: number): [MoveNode, number] {
           input,
           firstStart,
           `a block of ${first} layer(s) is not a wide move`,
+          { reason: 'layer-count-too-small', length: i - firstStart, count: first },
         );
       }
       innerLayer = first;
@@ -223,7 +238,10 @@ function readMove(input: string, from: number): [MoveNode, number] {
     // Reported at the start of the token, not at the end of the input: for
     // `Rw'2` the digit is the mistake, and pointing past it would send a
     // reader looking at nothing.
-    throw new AlgorithmSyntaxError(input, from, 'expected a move after a layer prefix');
+    throw new AlgorithmSyntaxError(input, from, 'expected a move after a layer prefix', {
+      reason: 'layer-prefix-without-move',
+      length: i - from,
+    });
   }
 
   const lowercaseFamily = FAMILY_BY_LOWERCASE[familyChar];
@@ -242,7 +260,11 @@ function readMove(input: string, from: number): [MoveNode, number] {
       i += 1;
     }
   } else {
-    throw new AlgorithmSyntaxError(input, i, `"${familyChar}" is not a move`);
+    throw new AlgorithmSyntaxError(input, i, `"${familyChar}" is not a move`, {
+      reason: 'not-a-move',
+      length: 1,
+      char: familyChar,
+    });
   }
 
   const isFace = (FACE_FAMILIES as readonly string[]).includes(family);
@@ -251,10 +273,15 @@ function readMove(input: string, from: number): [MoveNode, number] {
       input,
       from,
       `"${family}" turns a fixed set of layers, so it takes no width`,
+      { reason: 'family-takes-no-width', length: i - from, family },
     );
   }
   if (!wide && innerLayer !== null) {
-    throw new AlgorithmSyntaxError(input, from, 'a layer count without a "w" is not a wide move');
+    throw new AlgorithmSyntaxError(input, from, 'a layer count without a "w" is not a wide move', {
+      reason: 'layer-count-without-w',
+      length: i - from,
+      count: innerLayer,
+    });
   }
   if (wide && innerLayer === null) innerLayer = 2;
 
@@ -266,7 +293,11 @@ function readMove(input: string, from: number): [MoveNode, number] {
   // starting a new token there would turn `R''` into `R'` plus an error much
   // further along. Catch it where it is.
   if (input[i] === "'") {
-    throw new AlgorithmSyntaxError(input, i, 'a move takes at most one "\'"');
+    throw new AlgorithmSyntaxError(input, i, 'a move takes at most one "\'"', {
+      reason: 'repeated-prime',
+      length: 1,
+      char: "'",
+    });
   }
 
   return [{ type: 'move', family, outerLayer, innerLayer, amount }, i];

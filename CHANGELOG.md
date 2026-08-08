@@ -10,6 +10,75 @@ changes and a patch bump may not.
 
 ---
 
+## 0.11.0
+
+A notation syntax error is now **machine-readable and localizable**, and there
+is a **non-throwing** way to ask whether a string is valid notation.
+
+**Nothing breaks.** Every change in this release is additive, and that claim was
+checked rather than asserted: the built `dist/index.d.ts` was diffed against
+`0.10.0`'s, and the only line that is not a pure addition is
+`AlgorithmSyntaxError`'s constructor gaining an **optional** fourth parameter,
+which every existing call still satisfies. `.name`, `.message`, `.input` and
+`.offset` are byte-for-byte what `0.10.0` produced, and a test now pins the
+message format so a later refactor cannot quietly change it.
+
+### Added
+
+- **`reason` on `AlgorithmSyntaxError`** — a stable `SyntaxErrorReason` string
+  code, one of twenty, covering all eighteen conditions the parser and
+  tokenizer distinguish. Before this, classifying an error meant string-matching
+  an English sentence, which made every wording change a silent breakage for the
+  consumer; the parser knew the difference between `Mw` and `3R` and `R''` and
+  reported one opaque string for all of them.
+- **The data a message needs to interpolate**, beside the code: `char`,
+  `family`, `outer`/`inner`, `count` — whichever the code carries.
+- **`length` on `AlgorithmSyntaxError`** — how many characters at `offset` the
+  problem covers, so a caller can underline the offending *token* (`Q2`,
+  `2-3Rw`) rather than only pointing at its first character. It is free at throw
+  time and cannot be reconstructed afterwards without re-tokenizing. A `length`
+  of `0` means the text is **missing** rather than wrong (`2-Rw` has no second
+  number to underline) — render a caret there, not a zero-width selection.
+- **`validateAlgorithm(input)`**, returning
+  `{ valid: true, algorithm } | { valid: false, error }`. `parseAlgorithm` still
+  throws, unchanged, and is still the right call when invalid input is
+  exceptional. This is for the other calling context — a text field validated on
+  every keystroke, where invalid-while-typing is the normal state and an
+  exception per keypress is control flow. It agrees with `parseAlgorithm` that
+  empty input is the empty algorithm, returns the tree on the valid arm so you
+  do not tokenize twice, and **re-throws anything that is not a syntax error**:
+  a bug in this package must not be reported to your user as their typo.
+- **`SyntaxErrorReason`, `AlgorithmSyntaxErrorDetail` and `AlgorithmValidation`**
+  are exported types.
+
+### Notes
+
+- 🔴 **No locale strings ship, and none ever will** — not even an English table
+  keyed by code. The package returns a code and its data; the sentence belongs
+  to the consumer, in the consumer's language. `.message` remains the English
+  one and remains the right thing to log.
+- **`stray-comma` and `stray-colon` are enumerated** rather than folded into the
+  catch-all they used to share. `unexpected-token` survives as the documented
+  residual — nothing the parser currently produces reaches it, and an
+  `AlgorithmSyntaxError` constructed without a detail reports it rather than
+  claiming a precision it does not have.
+- **One error per parse, still.** `parseAlgorithm` stops at the first problem and
+  this release keeps it that way. Multi-error reporting needs error recovery,
+  which is a substantially larger parser.
+- Bundle: `dist/index.js` grows from 207,943 B raw / 45,432 B gzip to
+  **210,783 B raw / 46,187 B gzip** — `+2,840 B` raw (`+1.4 %`), `+755 B` gzip
+  (`+1.7 %`). Measured with the same command on both builds, which is why the
+  `0.10.0` gzip figure here differs by 35 B from the one recorded in that
+  release's notes. The package has a single entry point, so this ships to every
+  consumer whether it parses notation or not.
+- `docs/notation-design.md` §2 carries the full code table and the four design
+  decisions behind it (why `layer-count-too-small` and `layer-count-without-w`
+  stayed separate, why `unclosed-bracket` is one code down two paths, why the
+  residual is documented rather than removed, and why the error class uses flat
+  optional fields while the validation result uses a discriminated union).
+
+---
+
 ## 0.10.0
 
 Event coverage reaches **17 of 17**, two events' scrambles change, and the

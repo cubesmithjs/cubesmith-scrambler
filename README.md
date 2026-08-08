@@ -123,15 +123,50 @@ serializeAlgorithm(invertAlgorithm(alg)); // "U R U' R'"
 serializeAlgorithm(invertAlgorithm(parseAlgorithm("[R: (U Rw U')2]"))); // "[R: (U Rw' U')2]"
 ```
 
-Parse errors carry the offset, which is what makes this usable as a validator:
+Parse errors carry the offset, which is what makes this usable as a validator —
+and, since 0.11, a **stable reason code** plus the data a message needs, so the
+sentence a user reads is yours to write:
 
 ```ts
 try {
   parseAlgorithm('R U Q');
 } catch (error) {
-  (error as AlgorithmSyntaxError).offset; // 4
+  const syntax = error as AlgorithmSyntaxError;
+  syntax.offset; // 4
+  syntax.length; // 1        — how much to underline
+  syntax.reason; // 'not-a-move'
+  syntax.char;   // 'Q'
 }
 ```
+
+`reason` is a `SyntaxErrorReason`: one of twenty documented string codes, each
+carrying whatever a message would interpolate (`char`, `family`, `outer` and
+`inner`, `count`). **The package ships no message strings beyond the English
+`.message`, and it never will** — switch on the code and write the sentence in
+whatever language you need. A `length` of `0` means text is *missing* rather
+than wrong, so render a caret there rather than a zero-width selection.
+
+Validating a text field on every keystroke does not want an exception —
+invalid-while-typing is the normal state — so there is a non-throwing sibling:
+
+```ts
+import { validateAlgorithm } from '@cubesmith/scrambler';
+
+const ok = validateAlgorithm("R U R' U'");
+ok.valid; // true
+if (ok.valid) ok.algorithm.nodes.length; // 4 — the same tree parseAlgorithm returns
+
+const bad = validateAlgorithm('R U Q');
+bad.valid; // false
+if (!bad.valid) bad.error.reason; // 'not-a-move'
+```
+
+`validateAlgorithm` agrees with `parseAlgorithm` that empty input is an empty
+algorithm rather than an error, returns the parsed tree on the valid arm so you
+do not tokenize twice, and **re-throws anything that is not a syntax error** —
+a bug in this package should not be reported to your user as their typo.
+`parseAlgorithm` is unchanged and still throws; use it when invalid input really
+is exceptional.
 
 This layer is **syntax only**. There is no puzzle behind it, so there is no
 `simplify()` and no move cancellation: `R2` inverts to `R2'`, not to `R2`, and

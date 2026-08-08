@@ -69,18 +69,32 @@ export {
  * nothing here supersedes them. This layer is syntax only — there is no puzzle
  * behind it, so no `simplify()` and no move cancellation. See
  * `docs/notation-design.md`.
+ *
+ * `validateAlgorithm` is the non-throwing sibling of `parseAlgorithm`, for the
+ * calling context where invalid input is normal rather than exceptional — a
+ * text field being typed into. Either way, a rejection carries a stable
+ * `SyntaxErrorReason` code and the data to interpolate, so the sentence shown
+ * to a user is the consumer's to write, in the consumer's language.
  */
-export { parseAlgorithm, serializeAlgorithm, invertAlgorithm } from './notation/alg';
+export {
+  parseAlgorithm,
+  serializeAlgorithm,
+  invertAlgorithm,
+  validateAlgorithm,
+} from './notation/alg';
 export { AlgorithmSyntaxError } from './notation/alg';
 export type {
   Algorithm,
   AlgorithmNode,
+  AlgorithmSyntaxErrorDetail,
+  AlgorithmValidation,
   CommutatorNode,
   ConjugateNode,
   GroupNode,
   MoveFamily,
   MoveNode,
   PauseNode,
+  SyntaxErrorReason,
 } from './notation/alg';
 
 export { createRandomSource, type RandomSource } from './random/random-source';

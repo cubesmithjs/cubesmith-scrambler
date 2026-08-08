@@ -106,18 +106,160 @@ export interface Algorithm {
 }
 
 /**
+ * Every distinct way notation can be malformed, as a **stable string code**.
+ *
+ * These are public API. `.message` is an English sentence and will always be
+ * one; a consumer that wants to say anything else — a different wording, a
+ * different language, a caret in a form field — needs something it can switch
+ * on that is not prose. Before v0.11 the only options were string-matching the
+ * message, which makes every wording change a silent breakage, or
+ * reimplementing the classification.
+ *
+ * A string-literal union rather than an enum: an enum ships runtime code in a
+ * package with a single entry point that bundles everything to every consumer,
+ * and it forces a consumer to import a *value* to compare against one. Codes
+ * are strings on the wire.
+ *
+ * 🔴 **Renaming one of these is a breaking change.** Adding one is not, so a
+ * consumer switching on them should keep a default arm.
+ *
+ * | Code | Example input |
+ * |---|---|
+ * | `amount-zero` | `R0` |
+ * | `layer-range-incomplete` | `2-Rw` |
+ * | `layer-range-not-ascending` | `4-2Rw` |
+ * | `layer-count-too-small` | `1Rw` |
+ * | `layer-prefix-without-move` | `3` |
+ * | `not-a-move` | `R U Q2 R` |
+ * | `family-takes-no-width` | `Mw` |
+ * | `layer-count-without-w` | `3R` |
+ * | `repeated-prime` | `R''` |
+ * | `unclosed-group` | `(R U` |
+ * | `empty-group` | `()` |
+ * | `bracket-missing-separator` | `[R U]` |
+ * | `unclosed-bracket` | `[R, U` |
+ * | `bracket-extra-separator` | `[R, U: F]` |
+ * | `bracket-empty-half` | `[R: ]` |
+ * | `unmatched-close-group` | `R U)` |
+ * | `unmatched-close-bracket` | `R U]` |
+ * | `stray-comma` | `R , U` |
+ * | `stray-colon` | `R : U` |
+ * | `unexpected-token` | — the residual; see below |
+ *
+ * `unexpected-token` is the **deliberate residual**, documented rather than
+ * pretended away: it is the classification for a token the parser cannot
+ * describe more precisely, and for any `AlgorithmSyntaxError` constructed
+ * without a detail. Nothing this parser currently produces reaches it — the two
+ * strays that used to share it, `,` and `:`, have their own codes — but a
+ * default arm that cannot be reached today is cheaper than a code invented
+ * under pressure later.
+ */
+export type SyntaxErrorReason =
+  | 'amount-zero'
+  | 'layer-range-incomplete'
+  | 'layer-range-not-ascending'
+  | 'layer-count-too-small'
+  | 'layer-prefix-without-move'
+  | 'not-a-move'
+  | 'family-takes-no-width'
+  | 'layer-count-without-w'
+  | 'repeated-prime'
+  | 'unclosed-group'
+  | 'empty-group'
+  | 'bracket-missing-separator'
+  | 'unclosed-bracket'
+  | 'bracket-extra-separator'
+  | 'bracket-empty-half'
+  | 'unmatched-close-group'
+  | 'unmatched-close-bracket'
+  | 'stray-comma'
+  | 'stray-colon'
+  | 'unexpected-token';
+
+/**
+ * What a thrown error carries beyond its offset — the code, the span, and
+ * whatever a message would need to interpolate.
+ *
+ * Flat and optional rather than a discriminated union keyed on `reason`. A
+ * union is the better *type* — a consumer would get `char` exactly where it
+ * exists — but the worse *error class*: the discriminant would live on an
+ * `Error` instance, so every consumer would narrow through a property on a
+ * subclass rather than through a type guard, and adding a field to one arm
+ * later would be breaking. The union does appear, at the level where it reads
+ * naturally: `AlgorithmValidation`'s two arms.
+ */
+export interface AlgorithmSyntaxErrorDetail {
+  readonly reason: SyntaxErrorReason;
+  /**
+   * How many characters at `offset` the problem covers, so a caller can
+   * underline the offending *token* (`Q2`, `2-3Rw`) and not just point at its
+   * first character.
+   *
+   * **`0` means the text is missing rather than wrong** — `2-Rw` has no second
+   * layer number to underline, and the offset is the position it should have
+   * been written at. Render that as a caret, not as a zero-width selection.
+   */
+  readonly length: number;
+  /** The offending character. `not-a-move`, the strays, the unmatched closers. */
+  readonly char?: string;
+  /** The family that refused the width. `family-takes-no-width`. */
+  readonly family?: MoveFamily;
+  /** The outer end of a rejected layer range. `layer-range-not-ascending`. */
+  readonly outer?: number;
+  /** The inner end of a rejected layer range. `layer-range-not-ascending`. */
+  readonly inner?: number;
+  /** The rejected layer count. `layer-count-too-small`, `layer-count-without-w`. */
+  readonly count?: number;
+}
+
+/**
  * A syntax error with the **offset** it occurred at, because the main use for
  * a parser like this is validating somebody else's algorithm library — and a
  * validator that says only "invalid" is barely worth running.
+ *
+ * Since v0.11 it also carries a machine-readable {@link SyntaxErrorReason} and
+ * the data a localized message needs. That addition is strictly additive:
+ * `.name`, `.message`, `.input` and `.offset` are byte-for-byte what 0.10.0
+ * produced, and `detail` is optional so the 3-argument constructor still
+ * type-checks. An error built without one reports the documented residual
+ * `'unexpected-token'` rather than claiming a precision it does not have.
+ *
+ * 🔴 **No locale strings ship with this package, and none ever will.** It
+ * exports a code and the data to interpolate; the sentence belongs to the
+ * consumer. Shipping even an English message table keyed by code would invite
+ * consumers to expect `fr`/`ar` next, and a scramble library is the wrong home
+ * for a translation catalogue.
  */
 export class AlgorithmSyntaxError extends Error {
   readonly input: string;
   readonly offset: number;
+  readonly reason: SyntaxErrorReason;
+  readonly length: number;
+  readonly char?: string;
+  readonly family?: MoveFamily;
+  readonly outer?: number;
+  readonly inner?: number;
+  readonly count?: number;
 
-  constructor(input: string, offset: number, message: string) {
+  constructor(
+    input: string,
+    offset: number,
+    message: string,
+    detail?: AlgorithmSyntaxErrorDetail,
+  ) {
     super(`notation: ${message} at offset ${offset} in "${input}"`);
     this.name = 'AlgorithmSyntaxError';
     this.input = input;
     this.offset = offset;
+    this.reason = detail?.reason ?? 'unexpected-token';
+    this.length = detail?.length ?? 0;
+    // Assigned one by one rather than spread: the package compiles with
+    // `exactOptionalPropertyTypes`, under which writing `undefined` into an
+    // optional property is a different type from leaving it absent.
+    if (detail?.char !== undefined) this.char = detail.char;
+    if (detail?.family !== undefined) this.family = detail.family;
+    if (detail?.outer !== undefined) this.outer = detail.outer;
+    if (detail?.inner !== undefined) this.inner = detail.inner;
+    if (detail?.count !== undefined) this.count = detail.count;
   }
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { implementedEvents, isImplementedEvent } from './core/scrambler-registry';
-import './index';
+import {
+  AlgorithmSyntaxError,
+  invertAlgorithm,
+  parseAlgorithm,
+  serializeAlgorithm,
+  validateAlgorithm,
+} from './index';
 
 /**
  * The README, checked against the code.
@@ -21,6 +27,9 @@ import './index';
 // and touches no filesystem, deliberately, so that it runs in a browser as
 // readily as in Node. Vite's `?raw` hands the file over as a string instead.
 import README from '../README.md?raw';
+// The same trick, for the same reason, on a source file: `SyntaxErrorReason` is
+// a type and leaves nothing behind at runtime to count.
+import TYPES_SOURCE from './notation/alg/types.ts?raw';
 
 const readmeLines = (): string[] => README.split(/\r?\n/);
 
@@ -32,6 +41,11 @@ const NUMBER_WORDS: Readonly<Record<number, string>> = {
   15: 'Fifteen',
   16: 'Sixteen',
   17: 'Seventeen',
+  18: 'Eighteen',
+  19: 'Nineteen',
+  20: 'Twenty',
+  21: 'Twenty-one',
+  22: 'Twenty-two',
 };
 
 const EVENT_TOTAL = 17;
@@ -87,5 +101,77 @@ describe('the README status claims', () => {
     expect(README).toContain('](./docs/)');
     expect(README).toContain('docs/444-design.md');
     expect(README).toContain('docs/blindfolded-review.md');
+  });
+});
+
+/**
+ * The notation examples, **run** rather than read.
+ *
+ * The tests above check claims the README makes *about* the package; these run
+ * the code the README tells a reader to write and assert it produces the
+ * commented answer. The two halves are complementary and the second is the one
+ * that matters for an API doc: a README example that silently stopped
+ * compiling is worse than a missing one, because a reader trusts it.
+ *
+ * Every value asserted here is a `//` comment in the README's "Reading and
+ * inverting notation" section. Change one there, change it here.
+ */
+describe('the README notation examples', () => {
+  it('inverts and re-serializes exactly as the first two examples claim', () => {
+    const alg = parseAlgorithm("R U R' U' // sexy move");
+    expect(serializeAlgorithm(invertAlgorithm(alg))).toBe("U R U' R'");
+    expect(serializeAlgorithm(invertAlgorithm(parseAlgorithm("[R: (U Rw U')2]")))).toBe(
+      "[R: (U Rw' U')2]",
+    );
+  });
+
+  it('throws an error carrying the offset, span, reason and character it advertises', () => {
+    let thrown: unknown;
+    try {
+      parseAlgorithm('R U Q');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(AlgorithmSyntaxError);
+    const syntax = thrown as AlgorithmSyntaxError;
+    expect(syntax.offset).toBe(4);
+    expect(syntax.length).toBe(1);
+    expect(syntax.reason).toBe('not-a-move');
+    expect(syntax.char).toBe('Q');
+  });
+
+  it('validates without throwing, in both arms, as the non-throwing example claims', () => {
+    const ok = validateAlgorithm("R U R' U'");
+    expect(ok.valid).toBe(true);
+    if (ok.valid) expect(ok.algorithm.nodes).toHaveLength(4);
+
+    const bad = validateAlgorithm('R U Q');
+    expect(bad.valid).toBe(false);
+    if (!bad.valid) expect(bad.error.reason).toBe('not-a-move');
+  });
+
+  /**
+   * "one of twenty documented string codes" is a number written in prose, which
+   * is precisely the kind of claim this file exists to stop going stale — the
+   * original failure was a README counting events differently from the
+   * registry.
+   *
+   * `SyntaxErrorReason` is a type and therefore erased at runtime, so there is
+   * nothing to count at run time; the declaration is read as text instead. Read
+   * rather than recalled is the same standard the rest of this file holds to.
+   */
+  it('states the number of reason codes the union actually declares', () => {
+    const union = TYPES_SOURCE.split('export type SyntaxErrorReason =')[1]?.split(';')[0] ?? '';
+    const codes = [...union.matchAll(/'([a-z-]+)'/g)].map(([, code]) => code!);
+    expect(new Set(codes).size, 'duplicate reason code').toBe(codes.length);
+
+    const word = NUMBER_WORDS[codes.length];
+    expect(word, `no word for ${codes.length} — extend NUMBER_WORDS`).toBeDefined();
+    expect(README).toContain(`one of ${word!.toLowerCase()} documented string codes`);
+  });
+
+  it('documents the non-throwing entry point it now exports', () => {
+    expect(README).toContain('validateAlgorithm');
+    expect(README).toContain('`SyntaxErrorReason`');
   });
 });
