@@ -50,9 +50,18 @@ stated in that document's §8 rather than smoothed over.
 Recorded here so they are visible in one place rather than only inside the
 document that found them:
 
+Every one of these is now **pinned by a test**: `src/core/move-count.test.ts` holds a
+per-event band against TNoodle-WCA-1.2.3's own token counts, and an event that deviates
+carries its band as a *recorded defect* naming the task that closes it — rather than
+having the band widened until the suite passes. Until 2026-08-12 no test anywhere in the
+package bounded a generated scramble's length, which is why the `444` row below reached a
+printed scramble sheet.
+
 | Gap | Where | Severity |
 |---|---|---|
-| A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20; the printed sequence merges one move shorter. Fixing it changes `333` output for every seed |
+| 🔴 A `444`/`444bf` scramble runs **94–205 tokens** against TNoodle's 42–46 | [444-design.md](./444-design.md) §12 | usability: a scrambler cannot practically apply 156 moves. Measured split over 8 states — centres 16.4, pairing 51.6, **parity 96.5**, 3x3x3 hand-off 22.8. The *state* is uniformly random and unaffected (χ² 5.32 against df 5); the scrambles are long, not wrong |
+| 🔴 A `clock` scramble appends **bare pin names** (`… ALL5+ DL UL`) after the fifteenth token | [clock-design.md](./clock-design.md) §5 | format: TNoodle-WCA-1.2.3 emits exactly 15 tokens and ends on the second `ALLn±`, so the string differs *in kind* from the official one and a consumer parsing both handles two grammars |
+| A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20; the printed sequence merges one move shorter. Fixing it changes `333` output for every seed. It is also most of why the five 3x3x3-family events run +3 to +5 moves over TNoodle |
 | The `minx` 4b3e floor is measured against the identity state, not "solved up to whole-puzzle rotation" | [megaminx-design.md](./megaminx-design.md) §8 | ~`10^-66`; the floor itself is enforced, this is the residual the piece model cannot yet express |
 | Same-face seam at a blindfolded orientation suffix | [nxn-design.md](./nxn-design.md) §8 | cosmetic; deliberately deferred |
 | Pruning tables are built in memory on first use, not shipped serialized | every random-state document §8 | 0.2 s–7.6 s cold start depending on the event |
