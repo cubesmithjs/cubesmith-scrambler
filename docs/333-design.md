@@ -649,15 +649,37 @@ same face. The scramble is the inverse of the solution, so it surfaces mid-strin
 
 ### Rough edges, stated plainly
 
-1. **The solve is not optimal.** Each phase is optimal in itself, but the split
-   gives up global optimality: measured solutions run 20–26 moves against a
-   diameter of 20. Official scramblers accept the same trade, and for a
-   *scramble* the length only has to be long enough not to leak difficulty.
-2. **No phase-boundary sweep.** The phase-1 solution is taken as found rather
-   than trying several `G1` entries and keeping the best total — which is the
-   standard way two-phase solvers close most of the gap above, and which
-   `puzzles/square1/` does do. Adding it would cost time per scramble and buy
-   length that no requirement asks for.
+1. **The solve is not optimal, and runs +3 to +5 moves over TNoodle.** Each phase
+   is optimal in itself, but the split gives up global optimality. Measured over
+   30 random states (2026-08-13): **21–26 moves, mean 23.33**, of which phase 1 is
+   9.47 (max 11) and phase 2 is 13.87 (max 15), against a diameter of 20 and
+   against **TNoodle-WCA-1.2.3's 19–20**. Official scramblers accept the same kind
+   of trade, and for a *scramble* the length only has to be long enough not to
+   leak difficulty.
+2. 🔴 **No phase-boundary sweep — declined on a measurement, not on taste.** The
+   phase-1 solution is taken as found rather than trying several `G1` entries and
+   keeping the best total, which is the standard way two-phase solvers close most
+   of the gap above and which `puzzles/square1/` does do. It was prototyped and
+   measured over the same 30 states (2026-08-13), against a control that solves
+   the same way the shipped code does:
+
+   | phase-1 solutions tried | mean length | time per solve |
+   |---|---|---|
+   | 1 — shipped | 23.33 | baseline |
+   | up to 30, depth +3 | 22.03 | **≥10×** |
+   | up to 200, depth +4 | 21.23 | **≥73×** |
+
+   So the sweep buys 1.3 moves for an order of magnitude, 2.1 moves for two — and
+   even at 200 solutions it lands at 21.2, still outside TNoodle's 19–20. A 3x3x3
+   scramble is on the consuming app's practice-timer hot path, generated once per
+   solve while a user waits, so a solver that is two moves shorter and 73× slower
+   is a regression wearing a fix's clothes. The gap is **accepted**, and
+   `src/core/move-count.test.ts` pins it with the numbers above so it cannot drift
+   further without a test failing.
+
+   ("≥" because the control loop also ran an extra solve per state, so the true
+   slowdown is larger than the ratio quoted. The conservative figure is the one
+   recorded.)
 3. **A ~7.6 s cold start**, for the same reason as every other table-driven
    puzzle here: tables are built lazily in memory rather than shipped
    serialized.
@@ -671,9 +693,18 @@ same face. The scramble is the inverse of the solution, so it surfaces mid-strin
 
 ### Planned improvements
 
-- Close the phase-boundary same-face pair (above), with a release note.
+- Close the phase-boundary same-face pair (above), with a release note. Measured
+  again 2026-08-13 while the length gap was being looked at: a post-hoc merge
+  (`puzzles/nxn/cancel.ts` now exists and does exactly this for the 4x4x4)
+  shortened **4 of 30** solutions by one move. It was **not** applied here, because
+  the 3x3x3 solver is reached by seven events and the `333fm` axis restriction of
+  §5a is stated on the solution's first and last move — a merge that emptied a
+  trailing same-axis run could move which axis those land on. Worth doing with that
+  interaction thought through, not as a rider on something else.
 - Ship serialized pruning tables.
-- Consider a phase-boundary sweep if solution length ever becomes a goal.
+- ~~Consider a phase-boundary sweep if solution length ever becomes a goal.~~ It
+  became a goal, was prototyped, was measured, and was **declined** — see rough
+  edge 2 for the numbers.
 
 ---
 

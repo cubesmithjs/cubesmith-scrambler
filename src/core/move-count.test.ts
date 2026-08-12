@@ -32,7 +32,7 @@ import { FEWEST_MOVES_PREFIX, FEWEST_MOVES_SUFFIX } from '../puzzles/333/fewest-
  * |---|---|
  * | `exact` | `band` **is** TNoodle's, to the token |
  * | `in-range` | `band` is wider, and the width is a property of the event rather than a defect — a suffix that is sometimes empty, a separator count that varies |
- * | `gap` | 🔴 `band` admits lengths TNoodle would never print. A **recorded defect**, named with the task that closes it |
+ * | `gap` | 🔴 `band` admits lengths TNoodle would never print. A **recorded defect**, named with the task that closes it — or, where the deviation was measured and deliberately **accepted**, with the decision that accepted it |
  *
  * 🔴 **A `gap` band is a record of the defect, not a gate.** Widening a band to
  * make a suite pass is how this shipped in the first place, so the deviating
@@ -69,7 +69,12 @@ interface EventBand {
   readonly verdict: Verdict;
   /** How many scrambles to draw. Budgeted — see the note on runtime above. */
   readonly draws: number;
-  /** The plan task that closes this deviation. Required on a `gap`, absent otherwise. */
+  /**
+   * The plan task that closes this deviation — or, where it was measured and
+   * accepted rather than fixed, the decision that accepted it. Required on a
+   * `gap`, absent otherwise. Either way the point is the same: a deviation must
+   * name something, so that no band here is a number nobody owns.
+   */
   readonly closedBy?: string;
   /** What the package actually emitted when the gap was recorded, so the size of the defect is not lost. */
   readonly measured?: string;
@@ -132,6 +137,14 @@ const BANDS: readonly EventBand[] = [
   // wherever that lands, rather than trying several phase-1 solutions and keeping
   // the best total. Ceilings are the structural bound — phase 1 is optimal within
   // 12 and phase 2 within 18 — not a sampled maximum.
+  //
+  // 🔴 **This gap is accepted, not outstanding.** Task 04 prototyped the sweep and
+  // measured it over 30 states: trying up to 30 phase-1 solutions buys 1.3 moves
+  // for at least 10x the time, up to 200 buys 2.1 for at least 73x — and even then
+  // lands at 21.2, still outside TNoodle's 19-20. A 3x3x3 scramble is on the
+  // consuming app's practice-timer hot path. These bands are therefore the number
+  // this package intends to produce, and they are pinned so it cannot drift
+  // further; see `docs/333-design.md` §8 rough edge 2 for the table.
   {
     event: '333',
     tnoodle: [19, 20],
@@ -140,8 +153,8 @@ const BANDS: readonly EventBand[] = [
     draws: 3,
     size: 3,
     maxRedundant: 1,
-    closedBy: 'wca_conformance_plan task 04',
-    measured: '21–25 over 12 draws',
+    closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
+    measured: '21–26 over 30 draws, mean 23.33 — phase 1 9.47, phase 2 13.87',
   },
   {
     event: '333oh',
@@ -151,8 +164,8 @@ const BANDS: readonly EventBand[] = [
     draws: 3,
     size: 3,
     maxRedundant: 1,
-    closedBy: 'wca_conformance_plan task 04',
-    measured: '20–25 over 12 draws',
+    closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
+    measured: '20–25 over 12 draws — the same solver as 333, with a wider TNoodle band to sit under',
   },
   {
     event: '333bf',
@@ -162,8 +175,8 @@ const BANDS: readonly EventBand[] = [
     draws: 3,
     size: 3,
     maxRedundant: 1,
-    closedBy: 'wca_conformance_plan task 04',
-    measured: '23–26 over 12 draws',
+    closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
+    measured: '23–26 over 12 draws — 333 plus a 0..2-token orientation suffix',
   },
   {
     event: '333mbf',
@@ -173,8 +186,8 @@ const BANDS: readonly EventBand[] = [
     draws: 3,
     size: 3,
     maxRedundant: 1,
-    closedBy: 'wca_conformance_plan task 04',
-    measured: '22–26 over 12 draws',
+    closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
+    measured: '22–26 over 12 draws — the same scramble as 333bf, drawn count times',
   },
   {
     event: '333fm',
@@ -184,8 +197,8 @@ const BANDS: readonly EventBand[] = [
     draws: 3,
     size: 3,
     maxRedundant: 1,
-    closedBy: 'wca_conformance_plan task 04',
-    measured: '27–31 over 12 draws (the six wrapper tokens included, and correct)',
+    closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
+    measured: '27–31 over 12 draws — the six wrapper tokens included, and correct',
   },
   // 🔴 The headline, and still a gap after task 03 shortened it by a quarter.
   //
