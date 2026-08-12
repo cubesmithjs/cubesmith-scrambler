@@ -187,35 +187,46 @@ const BANDS: readonly EventBand[] = [
     closedBy: 'wca_conformance_plan task 04',
     measured: '27–31 over 12 draws (the six wrapper tokens included, and correct)',
   },
-  // 🔴 The headline. `solve444` is reduction → parity passes → 3x3x3 hand-off,
-  // and the parity loop is the dominant term: measured over 8 states, centres
-  // 16.4 moves, pairing 51.6, **parity 96.5**, hand-off 22.8. A pass costs a
-  // ~20-move gadget plus a whole fresh pairing, and 1.75 passes were needed on
-  // average. The ceiling is not a sampled maximum: 205 was the worst of 8 draws
-  // and 260 leaves room for one further parity pass, which is enough to catch a
-  // regression without failing on a tail draw. The real gate on this event is
-  // the floor and `closedBy`.
+  // 🔴 The headline, and still a gap after task 03 shortened it by a quarter.
+  //
+  // `solve444` is reduction → parity passes → 3x3x3 hand-off. Task 03 removed the
+  // redundancy the phase joins left behind, made the solver choose among several
+  // equally-valid reductions of the same drawn state (the parity case is a
+  // property of the **route**, not the state), took its gadgets shortest-first,
+  // and gave the `permutation` case the two gadgets it provably needs in one pass
+  // instead of two. Mean 154 → 119.
+  //
+  // What is left is the architecture rather than a defect: the reduction is
+  // centres-then-centre-neutral-pairing, and a centre-neutral pairing generator is
+  // about ten moves where a human's slice-flip-slice is four. Reaching 42–46 needs
+  // a pruning-table search over the reduced state, which is `444-design.md` §12's
+  // own next step and a piece of work in its own right — see the plan's PROGRESS.md
+  // for why it was not started here rather than started badly.
+  //
+  // The ceiling is derived, not sampled: 172 was the worst of 16, and the room
+  // above it is one failed doubled pass — a 0.8% event on the ~29% of states that
+  // land `permutation`.
   {
     event: '444',
     tnoodle: [42, 46],
-    band: [42, 260],
+    band: [42, 230],
     verdict: 'gap',
     draws: 2,
     size: 4,
-    maxRedundant: 20,
-    closedBy: 'wca_conformance_plan task 03',
-    measured: '94–205 over 8 draws, mean 137.5',
+    maxRedundant: 0,
+    closedBy: 'a follow-up to wca_conformance_plan task 03',
+    measured: '74–172 over 16 draws, mean 119.4 (was 94–205, mean 137.5)',
   },
   {
     event: '444bf',
     tnoodle: [42, 46],
-    band: [42, 265],
+    band: [42, 235],
     verdict: 'gap',
     draws: 2,
     size: 4,
-    maxRedundant: 22,
-    closedBy: 'wca_conformance_plan task 03',
-    measured: '87–212 over 8 draws, mean 145.5 — the same solver plus a whole-cube rotation',
+    maxRedundant: 0,
+    closedBy: 'a follow-up to wca_conformance_plan task 03',
+    measured: 'the same solver plus a whole-cube rotation, so 444 + 0..2 tokens',
   },
 ];
 

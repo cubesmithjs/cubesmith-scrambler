@@ -8,6 +8,8 @@ import { areCentresSolved, areWingsPaired } from './orbits';
 import { oddWingGadget, wingParityOf } from './parity';
 import { reduce444 } from './reduce';
 import { solve444 } from './solve';
+import { inverseWideMoves } from '../nxn/notation';
+import { isRedundantMove } from '../nxn/random-moves';
 import { apply444Moves, is444Solved, move444Tables, SOLVED_444_STATE } from './state';
 
 const outerIndexOf = (face: string, amount: number): number =>
@@ -74,6 +76,25 @@ describe('the parity gadget', () => {
   it('gives a different sequence per index, which is what breaks the cycle', () => {
     expect(oddWingGadget(0)).not.toEqual(oddWingGadget(1));
   });
+
+  /**
+   * The pool is sorted, and that is worth a move or three a pass: measured over 48
+   * gadgets (2026-08-12) the search finds them at a mean of 19.0 moves and the
+   * shortest twelve average 15.9. Every gadget the solver commits is one it prints.
+   */
+  it('hands them out shortest first', () => {
+    const lengths = Array.from({ length: 12 }, (_, index) => oddWingGadget(index).length);
+    expect([...lengths].sort((a, b) => a - b)).toEqual(lengths);
+  });
+
+  it('holds enough of them for the solver never to reuse one', () => {
+    // A reused gadget lands the dedges exactly where the previous candidate already
+    // tried, so a pass would waste a candidate. 8 passes x 6 candidates.
+    const distinct = new Set(
+      Array.from({ length: 48 }, (_, index) => oddWingGadget(index).join(',')),
+    );
+    expect(distinct.size).toBe(48);
+  });
 });
 
 describe('solving a 4x4x4', () => {
@@ -89,5 +110,28 @@ describe('solving a 4x4x4', () => {
 
   it('solves the solved cube without going wrong', () => {
     expect(is444Solved(apply444Moves(SOLVED_444_STATE, solve444(SOLVED_444_STATE)))).toBe(true);
+  });
+
+  /**
+   * 🔴 The solution is merged across its phase joins, so nothing `isRedundantMove`
+   * would refuse to emit survives into it. Before that existed the concatenation left
+   * 30 redundant moves across four scrambles.
+   *
+   * Checked here on the *solution* as well as in `move-count.test.ts` on the emitted
+   * scramble, because this is where the merge lives and the two can drift: the scramble
+   * is the inverse, and an inversion could in principle expose something the forward
+   * pass did not.
+   */
+  it('emits no redundant move, at either end of the inversion', () => {
+    const random = createRandomSource('444 no redundancy');
+    const tables = move444Tables();
+    for (let trial = 0; trial < 2; trial += 1) {
+      const solution = solve444(randomCube444State(random)).map((index) => tables[index]!.move);
+      for (const sequence of [solution, inverseWideMoves(solution)]) {
+        for (let index = 0; index < sequence.length; index += 1) {
+          expect(isRedundantMove(sequence.slice(0, index), sequence[index]!)).toBe(false);
+        }
+      }
+    }
   });
 });

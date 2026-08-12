@@ -5,12 +5,13 @@ import { prepare333Tables, solve333 } from '../333/solve';
 import { centreTable } from './centres';
 import { centrePairTable, AXIS_PAIRS } from './phase1';
 import { singleEdgeTable } from './wing-pairs';
-import { inverseWideMoves, wideMovesToString } from '../nxn/notation';
+import { mergeWideMoves } from '../nxn/cancel';
+import { inverseWideMoves, wideMovesToString, type WideMove } from '../nxn/notation';
 import { randomCube444State } from './coordinates';
 import { is333Reachable, parityOf444Handoff, to333State } from './handoff';
 import { pairWings444 } from './pairing';
-import { oddWingGadget } from './parity';
-import { reduce444 } from './reduce';
+import { oddWingGadget, prepareOddWingGadgets } from './parity';
+import { reduce444BestRoute } from './reduce';
 import { apply444Moves, is444Solved, move444Tables, type Cube444State } from './state';
 
 /**
@@ -43,6 +44,18 @@ const MAX_PARITY_PASSES = 8;
 /** How many gadgets to try within one pass before settling for the first. */
 const PARITY_CANDIDATES = 6;
 
+/**
+ * The gadget paired with `index` when a pass has to carry two of them.
+ *
+ * A stride coprime with the pool size, so the partner is always a *different*
+ * gadget and every `index` gets a different pair — two copies of one gadget would
+ * compose to something wing-even, which is precisely what the doubled pass exists
+ * to avoid.
+ */
+function partnerGadget(index: number): number {
+  return (index + 17) % (MAX_PARITY_PASSES * PARITY_CANDIDATES);
+}
+
 export class Solve444Error extends Error {
   constructor(message: string) {
     super(`@cubesmith/scrambler: ${message}`);
@@ -60,21 +73,80 @@ function outerIndex(face: string, amount: number): number {
   return index;
 }
 
+let indexByMove: Map<string, number> | undefined;
+
+/** The move-table index of a `WideMove`, for translating a merged sequence back. */
+function moveIndexOf(move: WideMove): number {
+  indexByMove ??= new Map(
+    move444Tables().map((table, index) => [
+      `${table.move.face}${table.move.depth}${table.move.amount}`,
+      index,
+    ]),
+  );
+  const index = indexByMove.get(`${move.face}${move.depth}${move.amount}`);
+  if (index === undefined) {
+    throw new Solve444Error(`no 4x4x4 move for ${move.face} depth ${move.depth} x${move.amount}`);
+  }
+  return index;
+}
+
+/**
+ * The concatenated phases, with the redundancy the joins leave behind removed.
+ *
+ * Each phase hands back a sub-solution that is canonical on its own, and nothing
+ * looks across a join — so one phase's last move lands against the next phase's
+ * first and the two frequently compose. Measured before this existed: **30
+ * redundant moves across four scrambles**, up to 13 in one.
+ *
+ * `mergeWideMoves` only rewrites identities, so the merged sequence lands in
+ * exactly the same state — and `solve444` runs its `is444Solved` check on the
+ * merged sequence rather than the raw one, so that is verified on every solve
+ * rather than argued.
+ */
+function mergeMoveIndices(moves: readonly number[]): number[] {
+  const tables = move444Tables();
+  const merged = mergeWideMoves(moves.map((index) => tables[index]!.move));
+  return merged.map(moveIndexOf);
+}
+
 /**
  * A sequence of move indices carrying `state` to solved.
  *
- * Not optimal and not near it — roughly a hundred and forty moves where an optimal
- * solution runs under forty. That is the documented compromise of the first
- * implementation, and it costs length only.
+ * Not optimal and not near it: **74 to 172 moves, mean 119**, measured over 16 states
+ * (2026-08-12), where TNoodle-WCA-1.2.3 prints 42 to 46. It costs length only — the
+ * state is drawn before any of this runs, and the χ² check over the sticker
+ * distribution reads 5.02 against df 5 after these changes as it did before them.
+ *
+ * That is down from a mean of 154 raw, and four things did it, each measured:
+ *
+ * 1. **Cancelling across the phase joins** (`mergeMoveIndices`) — 154 → 137. Free.
+ * 2. **Choosing the reduction route** (`reduce444BestRoute`) — 137 → 127. Which parity
+ *    case the reduction lands in is a property of the route rather than of the state,
+ *    and 6 states in 10 have a route needing no parity work at all. This is where the
+ *    solve's extra time goes.
+ * 3. **Gadgets shortest-first** (`oddWingGadget`) — the pool averages 19 moves in
+ *    discovery order and 15.9 taken shortest-first.
+ * 4. **The doubled pass** for a `permutation` landing, which provably cannot finish in
+ *    one gadget.
+ *
+ * What is left is the architecture, not a defect: a centre-neutral pairing generator
+ * runs about ten moves where a human's slice-flip-slice runs four, and that is the
+ * price of reducing in stages. Closing to TNoodle's band needs a pruning-table search
+ * over the reduced state — §12 of `docs/444-design.md`.
  */
 export function solve444(state: Cube444State): number[] {
-  const reduction = reduce444(state);
+  const reduction = reduce444BestRoute(state);
   const moves = [...reduction.moves];
   let current = reduction.state;
 
   // Each pass flips the flip-parity and lands the dedges on a fresh paired arrangement,
   // so reachability is reached by iterating rather than by a targeted fix -- see
-  // `parity.ts` on why the targeted fix for the permutation mismatch does not exist.
+  // `parity.ts` on why the targeted fix for the permutation mismatch does not exist,
+  // and on why a wing-**even** disturber cannot stand in for the gadget either.
+  //
+  // Reaching this loop at all is now the exception rather than the rule: `reduce444BestRoute`
+  // picks the route whose landing costs the fewest passes, and most states have one that
+  // costs none.
   //
   // Within a pass, several gadgets are tried and the first that lands *reachable* is
   // the one committed. Taking the pass-indexed gadget blindly worked but cost dearly:
@@ -88,9 +160,21 @@ export function solve444(state: Cube444State): number[] {
       );
     }
 
+    // 🔴 A `permutation` landing needs an **even** number of odd gadgets, so a pass
+    // carrying one can never finish it. Measured over 6 such states x 24 gadgets: all
+    // 144 attempts landed in `both` or `flip`, never `none`. Rather than pay a whole
+    // second pairing to discover that again, such a pass carries two gadgets at once —
+    // which resolved 66 of 120 attempts at a mean 86.6 moves against the 114 two full
+    // passes cost. Six candidates make a failure a 0.8% event, and the loop still
+    // catches it.
+    const doubled = parityOf444Handoff(to333State(current)) === 'permutation';
+
     let chosen: { moves: number[]; state: Cube444State } | undefined;
     for (let candidate = 0; candidate < PARITY_CANDIDATES; candidate += 1) {
-      const gadget = oddWingGadget(pass * PARITY_CANDIDATES + candidate);
+      const at = pass * PARITY_CANDIDATES + candidate;
+      const gadget = doubled
+        ? [...oddWingGadget(at), ...oddWingGadget(partnerGadget(at))]
+        : oddWingGadget(at);
       const disturbed = apply444Moves(current, gadget);
       const repaired = pairWings444(disturbed);
       const landed = apply444Moves(disturbed, repaired.moves);
@@ -118,13 +202,15 @@ export function solve444(state: Cube444State): number[] {
     moves.push(outerIndex(move.face, move.amount));
   }
 
-  if (!is444Solved(apply444Moves(state, moves))) {
+  const solution = mergeMoveIndices(moves);
+  if (!is444Solved(apply444Moves(state, solution))) {
     // The hand-off is a homomorphism over outer turns and outer turns preserve
     // reduction, so a solved abstraction on a reduced cube is a solved cube. If this
-    // fires, one of those two facts has stopped holding.
+    // fires, one of those two facts has stopped holding — or the merge did, which is
+    // exactly why the check runs on the merged sequence rather than the raw one.
     throw new Solve444Error('4x4x4 solution does not solve the cube');
   }
-  return moves;
+  return solution;
 }
 
 /**
@@ -172,6 +258,15 @@ export function generate444Scramble(random: RandomSource): string {
  * difference is these tables. Every builder is memoised, so calling this twice is
  * cheap.
  *
+ * **Re-measured 2026-08-12**, after task 03 changed what a solve does: this call costs
+ * **15.6 s**, the first solve after it **14.8 s**, and a warm solve **4.6 s** (16 states,
+ * same machine). The warm figure is up from 2.5 s and that is the deliberate price of
+ * `reduce444BestRoute` trying several reduction routes — see `solve444`, which records
+ * what the length bought. The first-solve figure is up for the same reason compounded:
+ * every extra route touches more of the per-group wing-pair tables that are left lazy
+ * below, so the event that already did not fully prepare now under-prepares a little
+ * more.
+ *
  * 🔴 **Two things are deliberately left lazy, and `444` is therefore the one event
  * where preparing does not make the first scramble as fast as the tenth.** Both were
  * measured rather than assumed (2026-08-11):
@@ -184,13 +279,18 @@ export function generate444Scramble(random: RandomSource): string {
  * - **The centre-generator library.** `generatorLibrary()` is a search, not a table,
  *   and pre-building it costs far more than a first scramble does.
  *
- * So the honest claim for `444`: this front-loads the **shared table** cost — 11.6 s
- * of a 15.4 s cold scramble — and leaves about 4.5 s of per-state search and
- * lazily-built per-group tables to the first draw. Every other event's preparer leaves
- * its first scramble within a few milliseconds of a warm one.
+ * So the honest claim for `444`: this front-loads the **shared table** cost and leaves
+ * per-state search and lazily-built per-group tables to the first draw. Every other
+ * event's preparer leaves its first scramble within a few milliseconds of a warm one;
+ * this one leaves about ten seconds of it.
+ *
+ * It also builds the **odd-wing gadget pool** (`prepareOddWingGadgets`), which is a
+ * search rather than a table and is shared by every solve in the process, so charging
+ * it to whichever scramble happened to be first would be the same mistake in miniature.
  */
 export function prepare444Tables(): void {
   move444Tables();
+  prepareOddWingGadgets();
   centreTable();
   for (let index = 0; index < AXIS_PAIRS.length; index += 1) centrePairTable(index);
   singleEdgeTable();

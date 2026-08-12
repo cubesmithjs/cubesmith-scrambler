@@ -59,7 +59,7 @@ printed scramble sheet.
 
 | Gap | Where | Severity |
 |---|---|---|
-| 🔴 A `444`/`444bf` scramble runs **94–205 tokens** against TNoodle's 42–46 | [444-design.md](./444-design.md) §12 | usability: a scrambler cannot practically apply 156 moves. Measured split over 8 states — centres 16.4, pairing 51.6, **parity 96.5**, 3x3x3 hand-off 22.8. The *state* is uniformly random and unaffected (χ² 5.32 against df 5); the scrambles are long, not wrong |
+| ⚠️ A `444`/`444bf` scramble runs **74–172 tokens, mean 119** against TNoodle's 42–46 | [444-design.md](./444-design.md) §12.8 | down from 94–205 / mean 137.5 on 2026-08-12, and what is left is the architecture rather than a defect: a centre-neutral pairing generator is ~10 moves where a human's slice-flip-slice is 4. Closing it needs the PDB-guided search over the reduced state that §8 assumed. The *state* is uniformly random and unaffected — χ² re-measured at **5.02** against df 5 |
 | A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20; the printed sequence merges one move shorter. Fixing it changes `333` output for every seed. It is also most of why the five 3x3x3-family events run +3 to +5 moves over TNoodle |
 | The `minx` 4b3e floor is measured against the identity state, not "solved up to whole-puzzle rotation" | [megaminx-design.md](./megaminx-design.md) §8 | ~`10^-66`; the floor itself is enforced, this is the residual the piece model cannot yet express |
 | Same-face seam at a blindfolded orientation suffix | [nxn-design.md](./nxn-design.md) §8 | cosmetic; deliberately deferred |

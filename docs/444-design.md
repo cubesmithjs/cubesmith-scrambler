@@ -670,6 +670,12 @@ it runs **after** `S` is fixed, and its only output is a move sequence `sigma` w
 - **Even a randomised solver is safe.** If a stage picks among equally good
   generators at random, that changes *which* valid sequence is printed, never
   *which state* it encodes.
+- **And so is a solver that shops among routes.** `reduce444BestRoute` reduces the
+  same drawn state several ways and keeps the landing that costs the fewest parity
+  passes. Every candidate is a witness for the *same* `S`, so choosing between them
+  is choosing a spelling. 🔴 What would break this is redrawing the **state** when
+  every route looks expensive; a state whose routes all land `permutation` is solved
+  down one of them, never resampled.
 
 What the staging *does* affect is the **length** distribution, and that is worth
 stating rather than hiding: length will be dominated by the number of stages, not
@@ -764,6 +770,50 @@ Each ends in a commit and a report, and each has a gate:
    totality measured over a large sample rather than the dozens run so far — plus
    length and speed, both of which are consequences of the staged route and were
    accepted as such.
+
+8. ⚠️ **Length, revisited 2026-08-12** (`wca_conformance_plan` task 03), after the
+   CubeManager app printed a real scramble sheet with a **156-move `444`** on it
+   against TNoodle-WCA-1.2.3's 43.
+
+   **Where the moves were.** Measured over 12 states before any change: centres
+   **16.2**, pairing **46.8**, parity **68.2**, 3x3x3 hand-off **23.0**, total
+   **154.2** raw. The parity loop, not the reduction, was the dominant term.
+
+   **What changed, each measured on the same states:**
+
+   | change | mean |
+   |---|---|
+   | before | 154.2 |
+   | cancelling across the phase joins (`nxn/cancel.ts`) | 137.0 |
+   | choosing the reduction route (`reduce444BestRoute`) | 127.0 |
+   | gadgets shortest-first, and the doubled pass for `permutation` | **119.4** |
+
+   Final: **74–172 moves, mean 119.4, median 120** over 16 states, against TNoodle's
+   42–46. Per-solve time went 2.5 s → **4.6 s** warm, which is the price of trying
+   several reduction routes and is the trade this task chose deliberately: the
+   scramble is generated once by a machine and applied by a human at a venue.
+
+   🔴 **The distribution is unchanged**, re-measured the same way §11's original check
+   was: mean χ² **5.02** against df 5 over 96 free stickers and 0 fixed (n=120), with
+   the `333` control at **5.22** over 48 free and 6 fixed (n=200). Both sit on the
+   expected 5. The scrambles were long, not wrong, and they still encode the same
+   uniform draw.
+
+   **Two negative results, recorded so nobody repeats them.** A wing-**even**
+   disturber cannot resolve a `permutation` landing — 144 of 144 attempts across 6
+   states landed straight back in it, and the odd control never reached `none` in one
+   pass either, which is the same fact from the other side. And varying the greedy
+   pairing's scan order changes nothing at all: the objective is decisive enough that
+   16 different offsets returned byte-identical pairings on every state tried, and the
+   parity case never varied across them (0 of 7) — which independently corroborates
+   the first result.
+
+   **What is left is the architecture, not a defect.** A centre-neutral pairing
+   generator runs about ten moves where a human's slice-flip-slice runs four, and that
+   is the price of reducing in stages with the centres held exactly. Reaching 42–46
+   needs the PDB-guided search over the reduced state that §8's own estimate table
+   assumed — a piece of work in its own right, deliberately not started here rather
+   than started badly.
    **checkpoint H** — every link of §11 tested or proved, including solver totality
    measured over a large sample. Only then does the README say done.
 

@@ -119,10 +119,19 @@ describe('prepareEvent', () => {
       // scramble rather than as an absolute, since the machine is unknown — and with
       // wide margin, because 🔴 `444` is the one event `prepareEvent` does not fully
       // cover (see `puzzles/444/solve.ts`'s `prepare444Tables`).
+      //
+      // 🔴 The absolute term was 20 s and flaked once at 43,273 ms against a 38,330 ms
+      // ceiling — under full-suite parallel load, while passing in isolation. A timing
+      // assertion competing with eight other workers for a CPU is measuring the machine,
+      // not the helper, so the term is now 60 s: still an order of magnitude below a
+      // genuinely unprepared `444` (which is the whole cold table build, minutes under
+      // coverage), and far enough above contention to stop costing a re-run. Widening it
+      // is the right move only because the claim being made is "the table build already
+      // happened" — a claim a 3x margin proves just as well as a 1.1x one.
       await prepareEvent('444');
       const first = await millis(() => generateScramble('444'));
       const second = await millis(() => generateScramble('444'));
-      expect(first).toBeLessThan(second * 20 + 20_000);
+      expect(first).toBeLessThan(second * 20 + 60_000);
     },
     TABLE_BUILD_TIMEOUT,
   );
