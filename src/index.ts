@@ -38,10 +38,23 @@ register444Scrambler();
 registerVariantScramblers();
 
 export { generateScramble } from './core/generate-scramble';
+/**
+ * `generateScrambles` is the batch draw, and it is not sugar over a loop: it
+ * creates **one** `RandomSource` for the whole batch, which is what makes a
+ * seeded batch reproducible *and* its members distinct. A caller-side loop over
+ * `generateScramble({ seed })` reseeds every iteration and therefore returns the
+ * same scramble N times.
+ *
+ * `prepareEvent` pays a puzzle's table-build cost on purpose — 7 s for a cold
+ * `444` — rather than charging it to the first scramble a user waits for.
+ */
+export { generateScrambles } from './core/generate-scrambles';
+export { prepareEvent } from './core/prepare-event';
 export { InvalidScrambleCountError, UnimplementedEventError } from './core/errors';
-export { MAX_SCRAMBLE_COUNT } from './core/types';
+export { MAX_BATCH_COUNT, MAX_SCRAMBLE_COUNT } from './core/types';
 export type {
   GenerateScrambleOptions,
+  GenerateScramblesOptions,
   ScrambleQuality,
   ScrambleResult,
   WcaEventId,

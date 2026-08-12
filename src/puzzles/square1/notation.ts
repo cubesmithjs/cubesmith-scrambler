@@ -111,15 +111,35 @@ export function allLayerTurns(): readonly Square1LayerTurn[] {
 
 export const LAYER_TURN_COUNT = SQUARE1_UNITS * SQUARE1_UNITS - 1; // 143
 
+/**
+ * 🔴 **No space after the comma** — `(-3,-4)`, not `(-3, -4)`. That is TNoodle's
+ * spelling, verbatim from `SquareOnePuzzle.java`:
+ *
+ * ```java
+ * String turn = "(" + top + "," + bottom + ")";
+ * ```
+ *
+ * Cosmetic, and cosmetics are the entire function of a scramble sheet: a
+ * competitor who has read a thousand TNoodle sheets notices, and a line-by-line
+ * comparison between the two programs otherwise reports every single row as
+ * different.
+ *
+ * The **parser stays tolerant of both spellings** — see `parseSquare1Scramble`.
+ * A scramble already stored in a consumer's database was written the old way and
+ * must not stop validating because the serializer changed.
+ */
 export function square1MoveToString(move: Square1Move): string {
   if (move.kind === 'slice') return '/';
-  return `(${toCanonicalUnits(move.top)}, ${toCanonicalUnits(move.bottom)})`;
+  return `(${toCanonicalUnits(move.top)},${toCanonicalUnits(move.bottom)})`;
 }
 
 /**
- * Renders a whole sequence in the attested official layout: `(x, y) / ` per
- * pair, spaces around each slash, trailing slash kept when the sequence ends
- * with one.
+ * Renders a whole sequence in TNoodle's layout: `(x,y) / ` per pair, spaces
+ * around each slash, trailing slash kept when the sequence ends with one.
+ *
+ * The single space between tokens is TNoodle's too — its `AlgorithmBuilder`
+ * joins moves with one, and the slice is the move `"/"` — so the only thing this
+ * module changed for parity was the comma.
  */
 export function square1MovesToString(moves: readonly Square1Move[]): string {
   return moves.map(square1MoveToString).join(' ');

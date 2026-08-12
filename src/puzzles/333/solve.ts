@@ -12,6 +12,10 @@ import {
   type EndAxisRestrictions,
 } from './search-restrictions';
 import { applyMoves, type CubeState } from './state';
+import { buildPhase1Tables } from './phase1-tables';
+import { buildPhase1PruningTables } from './phase1-pruning';
+import { buildPhase2Tables } from './phase2-tables';
+import { buildPhase2PruningTables } from './phase2-pruning';
 import type { FaceMove } from './move-tables';
 
 /**
@@ -108,5 +112,32 @@ export function generate333ScrambleWithFloor(random: RandomSource): string {
  * see the note in `src/index.ts` for why that distinction matters.
  */
 export function register333Scrambler(): void {
-  registerScrambler('333', (random) => generate333ScrambleWithFloor(random));
+  registerScrambler(
+    '333',
+    (random) => generate333ScrambleWithFloor(random),
+    'random-state',
+    prepare333Tables,
+  );
+}
+
+/**
+ * Builds both search phases' move **and** pruning tables now.
+ *
+ * Shared by every event that reaches this solver — `333`, `333oh`, `333fm`, the
+ * blindfolded events, and `444`, whose reduction hands off to `solve333`. The
+ * builders are memoised, so preparing one of those events has already prepared the
+ * others' shared cost.
+ *
+ * 🔴 **The pruning tables are the expensive half, and they live in their own
+ * modules.** `buildPhase1Tables`/`buildPhase2Tables` build the *move* tables only.
+ * Measured (2026-08-11): with just those two, `prepareEvent('333')` cost 624 ms and
+ * the first scramble after it still cost **7719 ms** — so the helper looked like it
+ * worked and did almost nothing. `prepare-event.test.ts` asserts the first scramble
+ * after preparing is a small fraction of a cold one, which is what catches this.
+ */
+export function prepare333Tables(): void {
+  buildPhase1Tables();
+  buildPhase1PruningTables();
+  buildPhase2Tables();
+  buildPhase2PruningTables();
 }

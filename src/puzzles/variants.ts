@@ -1,8 +1,17 @@
 import { registerMultiScrambler, registerScrambler } from '../core/scrambler-registry';
 import type { RandomSource } from '../random/random-source';
-import { CUBE_333_SIZE, generate333Scramble, generate333ScrambleWithFloor } from './333/solve';
-import { generate444Scramble } from './444/solve';
-import { generateCubeNxNScramble, RANDOM_MOVE_CUBES } from './nxn/solve';
+import {
+  CUBE_333_SIZE,
+  generate333Scramble,
+  generate333ScrambleWithFloor,
+  prepare333Tables,
+} from './333/solve';
+import { generate444Scramble, prepare444Tables } from './444/solve';
+import {
+  generateCubeNxNScramble,
+  prepareCubeNxNModel,
+  RANDOM_MOVE_CUBES,
+} from './nxn/solve';
 import { withMinimumDistance } from './nxn/minimum';
 import { withRandomOrientation } from './nxn/orientation';
 
@@ -139,16 +148,34 @@ function generate555BlindfoldedScramble(random: RandomSource): string {
 export function registerVariantScramblers(): void {
   // Same puzzle, same scramble — only the human constraint differs. `333fm`
   // is deliberately not here; it is a puzzle of its own now.
-  registerScrambler('333oh', (random) => generate333ScrambleWithFloor(random));
+  registerScrambler('333oh', (random) => generate333ScrambleWithFloor(random), 'random-state', prepare333);
 
-  // Same puzzle, plus a random orientation (Regulation 4b3a).
-  registerScrambler('333bf', generate333BlindfoldedScramble);
-  registerScrambler('444bf', generate444BlindfoldedScramble);
-  registerScrambler('555bf', generate555BlindfoldedScramble, 'random-moves');
+  // Same puzzle, plus a random orientation (Regulation 4b3a). Each carries the
+  // *same* preparer as the event it is a variant of, plus the facelet model the
+  // orientation suffix and the 4b3 floor check need at that size — the variant's
+  // cold cost is the base event's cold cost, and pretending otherwise would make
+  // `prepareEvent('444bf')` a partial promise.
+  registerScrambler('333bf', generate333BlindfoldedScramble, 'random-state', prepare333);
+  registerScrambler('444bf', generate444BlindfoldedScramble, 'random-state', prepare444);
+  registerScrambler('555bf', generate555BlindfoldedScramble, 'random-moves', prepare555);
 
   // Same scramble as `333bf`, drawn `options.count` times — the only event
   // where one attempt covers many cubes.
-  registerMultiScrambler('333mbf', generate333BlindfoldedScramble);
+  registerMultiScrambler('333mbf', generate333BlindfoldedScramble, 'random-state', prepare333);
+}
+
+function prepare333(): void {
+  prepare333Tables();
+  prepareCubeNxNModel(CUBE_333_SIZE);
+}
+
+function prepare444(): void {
+  prepare444Tables();
+  prepareCubeNxNModel(CUBE_444_SIZE);
+}
+
+function prepare555(): void {
+  prepareCubeNxNModel(CUBE_555.size);
 }
 
 export { generate333BlindfoldedScramble, generate555BlindfoldedScramble };

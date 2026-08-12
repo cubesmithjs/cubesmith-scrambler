@@ -262,6 +262,116 @@ Three things worth knowing:
   cube is a full random-state 3x3x3 solve, around 100 ms once the pruning
   tables are warm, and this package has no Worker to hide that in.
 
+### Generating a whole set: `generateScrambles` and `prepareEvent`
+
+A competition needs *N* scrambles for one event, and a caller-side loop is the
+wrong way to get them — 🔴 **because a seeded loop returns the same scramble N
+times.** `generateScramble` builds its random source from the seed on every call,
+so the loop reseeds itself each iteration. `generateScrambles` creates **one**
+source for the whole batch, which is what makes a seeded batch both reproducible
+and made of different scrambles.
+
+```ts
+import { generateScrambles, prepareEvent, MAX_BATCH_COUNT } from '@cubesmith/scrambler';
+
+// Pay the table build on purpose, rather than charging it to the first scramble
+// somebody is waiting for. A cold 444 costs seven seconds; a warm one, 412 ms.
+await prepareEvent('444');
+
+const round = await generateScrambles('333', 20, {
+  seed: 'comp-42-round-1',
+  onProgress: (done, total) => {
+    // Awaited. See the note below — this is the only real yield point.
+  },
+});
+round.length;                 // 20
+round[0].moves;               // the first draw; `result[i]` is the i-th, always
+```
+
+`prepareEvent` resolves immediately for an event with nothing to precompute
+(`clock` is linear algebra over `Z12`; `minx` is random-moves), and 🔴 it is **not**
+implemented as "generate a scramble and throw it away" — a discarded draw would
+consume entropy and shift every later scramble under a seed.
+
+`333mbf` composes rather than special-casing: `count` is how many attempts,
+`cubesPerAttempt` is how many cubes in one attempt, and the two never borrow each
+other's meaning.
+
+```ts
+const attempts = await generateScrambles('333mbf', 3, { cubesPerAttempt: 12 });
+attempts.length;              // 3 attempts
+attempts[0].scrambles.length; // 12 cubes in the first one
+```
+
+`count` must be an integer in `1..MAX_BATCH_COUNT` (500). Like
+`MAX_SCRAMBLE_COUNT`, that is a runaway guard rather than a regulation — and it is
+deliberately a *different* number, because one bounds a batch and the other bounds
+cubes per multi-blind attempt.
+
+#### 🔴 `onProgress` is the yield point, and `await generateScramble` is not
+
+A whole competition's set is minutes of computation, and this package creates no
+Worker. `onProgress` is **awaited**, so what the caller returns decides whether the
+batch blocks:
+
+| The callback returns | What happens |
+|---|---|
+| nothing | the tightest loop — right in a Worker, in Node, in a CLI |
+| `scheduler.yield()` | the browser gets a real macrotask boundary and can paint |
+| `new Promise(r => setTimeout(r, 0))` | the same, on every engine |
+| a `postMessage` ack | a Worker streams results out as they land |
+
+An `await` on the promise `generateScramble` returns is **not** such a seam. That
+continuation is a *microtask*, and a microtask cannot interleave with rendering —
+which is why a per-item `await` loop leaves a progress bar frozen at zero until the
+whole batch is done, even though it looks like it yields.
+
+The hook's contract is narrow on purpose: `(done, total)`, called **after** each
+scramble, never before the first, always exactly `count` times, and a throw from it
+aborts the batch. That throw is the cancel path, so there is no `AbortSignal` and no
+DOM type in the package's types.
+
+### Drawing a scramble: `@cubesmith/scrambler/draw`
+
+The flat sticker picture that appears beside every scramble on an official WCA
+scramble sheet, for all seventeen events, as **data** — plus a thin SVG serializer.
+No DOM, no canvas, no WebGL: 2D is in scope precisely because it is geometry.
+
+```ts
+import { drawScramble, scrambleImageToSvg, defaultColorScheme } from '@cubesmith/scrambler/draw';
+
+const image = drawScramble('333', "R U R' U' F2 D");
+image.width;            // 130  — TNoodle's getPreferredSize()
+image.height;           // 98
+image.shapes.length;    // 54   — one per sticker
+image.shapes[0].kind;   // 'rect'
+
+scrambleImageToSvg(image);           // a standalone <svg> string
+defaultColorScheme('skewb').R;       // '#0000ff' — blue here, red on a cube
+```
+
+Four things worth knowing:
+
+- **A separate entry point on purpose.** The drawing layer is not re-exported from
+  the main entry, so a consumer that only scrambles — a practice timer, a results
+  page — never bundles it.
+- **It draws from *text*.** A hand-typed, pasted or database-stored scramble draws
+  exactly as a generated one does, because there is only one path. A malformed
+  scramble throws the same `AlgorithmSyntaxError` / `ScrambleSyntaxError`
+  `validateScramble` reports, unwrapped.
+- **Data, not a string.** A React consumer maps `shapes` to elements and keeps
+  per-sticker keys and click targets; a print pipeline calls
+  `scrambleImageToSvg`. Handing out only a string would force
+  `dangerouslySetInnerHTML` on everyone.
+- 🔴 **The colour schemes are not interchangeable between puzzles.** Three of them
+  disagree about what colour `R` is, and the Clock's twelve keys are not faces at
+  all. Read `defaultColorScheme(event)` before overriding a key.
+
+The geometry, the layout constants and the colours are TNoodle's, read from
+`tnoodle-lib` source. What is **not** claimed is pixel-exact equality with a real
+TNoodle SVG — that would need TNoodle built and its output committed as a fixture.
+See `docs/drawing-design.md`.
+
 ## Scramble shape — what the WCA Regulations require beyond "random state"
 
 A scramble is not just the inverse of a random state's solution. Four extra

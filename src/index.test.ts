@@ -564,6 +564,11 @@ describe('@cubesmith/scrambler public entry point', () => {
  * easy to get wrong. Types are erased at run time, so this covers the values
  * only — the type exports are pinned by `dist/index.d.ts`, which the release
  * diffs against the previous version.
+ *
+ * v0.13 added three values here — and 🔴 exactly three, which is the point. The
+ * drawing layer is a **second entry point** and must not appear in this list at all;
+ * `src/draw/bundle.test.ts` checks the built artefact for the same thing, and this
+ * test is the source-level half of that pair.
  */
 describe('the exported surface', () => {
   it('is exactly these values, so an accidental export fails here', async () => {
@@ -573,11 +578,15 @@ describe('the exported surface', () => {
       'AlgorithmSyntaxError',
       'FACES',
       'InvalidScrambleCountError',
+      // v0.13 — the batch cap, a different number from `MAX_SCRAMBLE_COUNT` on purpose.
+      'MAX_BATCH_COUNT',
       'MAX_SCRAMBLE_COUNT',
       'ScrambleSyntaxError',
       'UnimplementedEventError',
       'createRandomSource',
       'generateScramble',
+      // v0.13 — the batch draw, and the table-build helper.
+      'generateScrambles',
       'inverseMove',
       'inverseMoves',
       'invertAlgorithm',
@@ -587,10 +596,32 @@ describe('the exported surface', () => {
       'notationForEvent',
       'parseAlgorithm',
       'parseMove',
+      'prepareEvent',
       'serializeAlgorithm',
       'validateAlgorithm',
       'validateScramble',
     ]);
+  });
+
+  /**
+   * 🔴 And nothing from the drawing layer, stated as its own assertion rather than
+   * left implicit in the list above — a reader scanning twenty-four names will not
+   * notice an absence, and this is the absence the second entry point exists for.
+   */
+  it('exports nothing from the drawing layer', async () => {
+    const surface = await import('./index');
+    for (const name of [
+      'drawScramble',
+      'scrambleImageToSvg',
+      'defaultColorScheme',
+      'drawableEvents',
+      'isDrawableEvent',
+      'UnimplementedDrawingError',
+      'UnsupportedScrambleError',
+      'InvalidColorError',
+    ]) {
+      expect(Object.keys(surface), name).not.toContain(name);
+    }
   });
 
   /**

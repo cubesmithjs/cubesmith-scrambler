@@ -6,7 +6,7 @@ export type EventScrambler = (
   options: GenerateScrambleOptions,
 ) => string;
 
-interface Registration {
+export interface Registration {
   readonly scramble: EventScrambler;
   readonly quality: ScrambleQuality;
   /**
@@ -20,6 +20,18 @@ interface Registration {
    * from the source being stateful, not from anything the event has to know.
    */
   readonly multiScramble: boolean;
+  /**
+   * Builds this event's lookup/pruning tables now, so the one-off cost is not
+   * charged to the first user-visible scramble. Supplied only by the puzzles
+   * that *have* tables; `prepareEvent` treats its absence as "nothing left to
+   * precompute", not as an error.
+   *
+   * 🔴 It must not generate and discard a scramble. A discarded draw consumes
+   * entropy, so under a seed it would shift every subsequent scramble — turning
+   * a performance helper into a correctness hazard. Every implementation here
+   * calls the solvers' own memoised builders directly.
+   */
+  readonly prepare?: (() => void) | undefined;
 }
 
 const registry = new Map<WcaEventId, Registration>();
@@ -38,8 +50,9 @@ export function registerScrambler(
   event: WcaEventId,
   scramble: EventScrambler,
   quality: ScrambleQuality = 'random-state',
+  prepare?: () => void,
 ): void {
-  registry.set(event, { scramble, quality, multiScramble: false });
+  registry.set(event, { scramble, quality, multiScramble: false, prepare });
 }
 
 /**
@@ -54,8 +67,9 @@ export function registerMultiScrambler(
   event: WcaEventId,
   scramble: EventScrambler,
   quality: ScrambleQuality = 'random-state',
+  prepare?: () => void,
 ): void {
-  registry.set(event, { scramble, quality, multiScramble: true });
+  registry.set(event, { scramble, quality, multiScramble: true, prepare });
 }
 
 export function getScrambler(event: WcaEventId): Registration | undefined {

@@ -1,7 +1,10 @@
 import { isAtLeastTwoMovesFromSolved } from '../../core/scramble-shape';
 import { registerScrambler } from '../../core/scrambler-registry';
 import type { RandomSource } from '../../random/random-source';
-import { solve333 } from '../333/solve';
+import { prepare333Tables, solve333 } from '../333/solve';
+import { centreTable } from './centres';
+import { centrePairTable, AXIS_PAIRS } from './phase1';
+import { singleEdgeTable } from './wing-pairs';
 import { inverseWideMoves, wideMovesToString } from '../nxn/notation';
 import { randomCube444State } from './coordinates';
 import { is333Reachable, parityOf444Handoff, to333State } from './handoff';
@@ -159,7 +162,44 @@ export function generate444Scramble(random: RandomSource): string {
   throw new Solve444Error('4x4x4 draw never cleared the two-move floor');
 }
 
+/**
+ * Builds the shared tables the 4x4x4 pipeline consults — the move tables, the centre
+ * and centre-pair tables, the single-edge table, and the 3x3x3 phase tables the
+ * hand-off reaches.
+ *
+ * This is the event the helper exists for: a cold `444` scramble measured
+ * **15,382 ms** in a fresh process against 241 ms warm (2026-08-11), and most of that
+ * difference is these tables. Every builder is memoised, so calling this twice is
+ * cheap.
+ *
+ * 🔴 **Two things are deliberately left lazy, and `444` is therefore the one event
+ * where preparing does not make the first scramble as fast as the tenth.** Both were
+ * measured rather than assumed (2026-08-11):
+ *
+ * - **The per-group wing-pair tables.** `wingPairTable` is memoised per group and one
+ *   reduction touches a subset, so building all six costs about **8.5 s** of work a
+ *   single scramble does not need — and measurably makes the *total* worse (prepare
+ *   18.5 s + first scramble 4.9 s, against 11.6 s + 4.5 s without). `prepareEvent`
+ *   moving cost around is the point; making there be more of it is not.
+ * - **The centre-generator library.** `generatorLibrary()` is a search, not a table,
+ *   and pre-building it costs far more than a first scramble does.
+ *
+ * So the honest claim for `444`: this front-loads the **shared table** cost — 11.6 s
+ * of a 15.4 s cold scramble — and leaves about 4.5 s of per-state search and
+ * lazily-built per-group tables to the first draw. Every other event's preparer leaves
+ * its first scramble within a few milliseconds of a warm one.
+ */
+export function prepare444Tables(): void {
+  move444Tables();
+  centreTable();
+  for (let index = 0; index < AXIS_PAIRS.length; index += 1) centrePairTable(index);
+  singleEdgeTable();
+  // The reduction hands off to `solve333`, so its tables are part of a 4x4x4
+  // scramble's cost whether or not anyone asked for a 3x3x3.
+  prepare333Tables();
+}
+
 /** Registers `'444'` with the core scrambler registry. */
 export function register444Scrambler(): void {
-  registerScrambler('444', (random) => generate444Scramble(random));
+  registerScrambler('444', (random) => generate444Scramble(random), 'random-state', prepare444Tables);
 }

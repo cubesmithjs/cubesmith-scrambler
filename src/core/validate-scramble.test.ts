@@ -129,6 +129,20 @@ describe('validateScramble', () => {
   });
 
   /**
+   * 🔴 Both Square-1 comma spellings validate, and both are pinned as
+   * deliberate. 0.13.0 changed what the package *emits* to TNoodle's `(a,b)`; it
+   * deliberately did **not** narrow what it accepts, because a scramble already
+   * stored in a consumer's database was written `(a, b)` and must not stop
+   * validating because a serializer changed.
+   */
+  it('accepts a Square-1 scramble in either comma spelling', () => {
+    expect(validateScramble('sq1', '(-3,-4) / (6,3) / (-5,-2) / (-1,-1)').valid).toBe(true);
+    expect(validateScramble('sq1', '(-3, -4) / (6, 3) / (-5, -2) / (-1, -1)').valid).toBe(true);
+    // Mixed, because a human pasting two scrambles together produces exactly this.
+    expect(validateScramble('sq1', '(-3,-4) / (6, 3) /').valid).toBe(true);
+  });
+
+  /**
    * 🔴 The two error classes stay apart, which is the point of shipping a
    * second one. A cube failure carries `AlgorithmSyntaxError` and a
    * `SyntaxErrorReason`; a bespoke failure carries `ScrambleSyntaxError` and a

@@ -121,7 +121,14 @@ function orientationCycle(position: Vec3): readonly [Vec3, Vec3, Vec3] {
   return [first, second, third];
 }
 
-const CORNER_ORIENTATION_CYCLES: readonly (readonly [Vec3, Vec3, Vec3])[] =
+/**
+ * Each corner's three sticker normals, in the cyclic order orientation counts in.
+ *
+ * Exported because it is the only thing that turns a piece-level state back into
+ * *stickers*, which is what `draw/skewb.ts` needs: orientation `o` at slot `s`
+ * means the piece's sticker `k` shows on the face `CORNER_ORIENTATION_CYCLES[s][(k + o) % 3]`.
+ */
+export const CORNER_ORIENTATION_CYCLES: readonly (readonly [Vec3, Vec3, Vec3])[] =
   CORNER_POSITIONS_SKEWB.map(orientationCycle);
 
 export interface SkewbTurnTable {

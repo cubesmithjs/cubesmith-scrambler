@@ -82,3 +82,55 @@ export interface GenerateScrambleOptions {
    */
   readonly count?: number;
 }
+
+/**
+ * How many scrambles one `generateScrambles()` call may draw.
+ *
+ * A guard, not a regulation — the same framing `MAX_SCRAMBLE_COUNT` uses, and
+ * deliberately a *different number* from it. `MAX_SCRAMBLE_COUNT` bounds how
+ * many cubes one multi-blind attempt covers; reusing it here would conflate two
+ * unrelated protections and cap `555` (about 1 ms a scramble) at the same 100 as
+ * `444bf` (833 ms warm, measured 2026-08-11).
+ *
+ * 500 × that worst measured warm cost is roughly seven minutes of computation,
+ * which is a long time but is the deliberate act of a caller that passed 500
+ * rather than an accident. A consumer's real limit is its own; this one only
+ * stops an unbounded number arriving from user input.
+ */
+export const MAX_BATCH_COUNT = 500;
+
+export interface GenerateScramblesOptions {
+  /**
+   * Deterministic when provided. **One** random source feeds the whole batch,
+   * so a seed makes the batch reproducible *and* its members distinct — unlike
+   * a caller-side loop over `generateScramble({ seed })`, which reseeds every
+   * iteration and therefore returns the same scramble `count` times.
+   */
+  readonly seed?: string | number;
+  /**
+   * Called after each scramble lands, and **awaited**.
+   *
+   * Awaiting it is the package's entire answer to a long batch blocking a
+   * thread, and what the caller returns decides the behaviour: nothing keeps
+   * the tightest loop (right in a Worker, in Node, in a CLI), while
+   * `scheduler.yield()` or `new Promise(r => setTimeout(r, 0))` gives the
+   * browser a real macrotask boundary so it can paint between scrambles.
+   *
+   * Called exactly `count` times, never before the first draw, always with
+   * `(done, total)`. A throw from it propagates and stops further draws — which
+   * is the cancel path, so no `AbortSignal` and no DOM type is needed.
+   */
+  readonly onProgress?: (done: number, total: number) => void | Promise<void>;
+  /**
+   * For a **multi-scramble event** (`333mbf`) only: how many cubes each of the
+   * `count` attempts covers. The two axes stay orthogonal — `count` is how many
+   * attempts, this is how many cubes in one attempt — and this one maps onto
+   * `GenerateScrambleOptions.count`, so `MAX_SCRAMBLE_COUNT` keeps governing it
+   * exactly as it does today.
+   *
+   * Passing it for any other event throws `InvalidScrambleCountError`, for the
+   * same reason `count` does: a caller who asks for something and silently
+   * receives something else has been misled.
+   */
+  readonly cubesPerAttempt?: number;
+}

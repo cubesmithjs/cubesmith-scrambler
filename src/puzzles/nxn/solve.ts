@@ -4,6 +4,7 @@ import type { RandomSource } from '../../random/random-source';
 import { wideMovesToString } from './notation';
 import { withMinimumDistance } from './minimum';
 import { randomMoveSequence } from './random-moves';
+import { modelForSize } from './state';
 
 /**
  * The random-moves cube events and how long their scrambles are.
@@ -46,6 +47,19 @@ export function registerRandomMoveCubeScramblers(): void {
       event,
       (random) => generateCubeNxNScramble(random, size, length),
       'random-moves',
+      () => prepareCubeNxNModel(size),
     );
   }
+}
+
+/**
+ * Builds the facelet model and move permutations for one cube size.
+ *
+ * These events have no solver, so there are no pruning tables — but there *is* a
+ * one-off cost, and for 7x7x7 it is not small: 294 facelets against 54 scramble
+ * moves plus the deeper orientation blocks, each permutation derived
+ * geometrically. `modelForSize` memoises per size.
+ */
+export function prepareCubeNxNModel(size: number): void {
+  modelForSize(size);
 }

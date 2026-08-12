@@ -86,20 +86,27 @@ describe('allLayerTurns', () => {
 });
 
 describe('rendering', () => {
-  it('prints a pair with a space after the comma, and a slice as /', () => {
-    expect(square1MoveToString(layerTurn(-2, 0))).toBe('(-2, 0)');
-    expect(square1MoveToString(layerTurn(1, 2))).toBe('(1, 2)');
+  /**
+   * 🔴 **No space after the comma**, which is TNoodle's spelling verbatim
+   * (`"(" + top + "," + bottom + ")"`). This assertion inverted in 0.13.0: the
+   * package used to print `(-2, 0)`, so every row of a side-by-side comparison
+   * with an official sheet reported as different. Pinned here rather than left to
+   * the golden scrambles, because it is the whole point of the change.
+   */
+  it('prints a pair with no space after the comma, and a slice as /', () => {
+    expect(square1MoveToString(layerTurn(-2, 0))).toBe('(-2,0)');
+    expect(square1MoveToString(layerTurn(1, 2))).toBe('(1,2)');
     expect(square1MoveToString(SLICE)).toBe('/');
   });
 
-  it('joins a sequence in the official layout, trailing slash included', () => {
+  it('joins a sequence in TNoodle layout, trailing slash included', () => {
     expect(
       square1MovesToString([layerTurn(-2, 0), SLICE, layerTurn(-3, -3), SLICE]),
-    ).toBe('(-2, 0) / (-3, -3) /');
+    ).toBe('(-2,0) / (-3,-3) /');
   });
 
   it('normalises a non-canonical amount on output', () => {
-    expect(square1MoveToString(layerTurn(-6, 7))).toBe('(6, -5)');
+    expect(square1MoveToString(layerTurn(-6, 7))).toBe('(6,-5)');
   });
 });
 
@@ -182,9 +189,13 @@ describe('round trip: parse -> render -> parse', () => {
   });
 
   it('renders the official scramble back to itself, up to canonical spelling', () => {
-    // The only difference is `(-6, 0)` normalising to `(6, 0)`.
+    // Two differences now, both deliberate: `(-6, 0)` normalises to `(6,0)`
+    // (twelve residues, twelve spellings), and the comma loses its space
+    // because 0.13.0 emits TNoodle's `(a,b)`. `OFFICIAL` keeps the spelling it
+    // was quoted in — it is a real pasted scramble, and its whole job here is to
+    // prove that spelling still parses.
     expect(square1MovesToString(parseSquare1Scramble(OFFICIAL))).toBe(
-      OFFICIAL.replace('(-6, 0)', '(6, 0)').replace(/ \/$/, ' /'),
+      OFFICIAL.replace('(-6, 0)', '(6, 0)').replaceAll(', ', ','),
     );
   });
 
@@ -234,7 +245,7 @@ describe('inversion', () => {
   it('reverses a sequence as well as each move', () => {
     expect(
       square1MovesToString(inverseSquare1Moves([layerTurn(1, 2), SLICE, layerTurn(3, 0)])),
-    ).toBe('(-3, 0) / (-1, -2)');
+    ).toBe('(-3,0) / (-1,-2)');
   });
 });
 

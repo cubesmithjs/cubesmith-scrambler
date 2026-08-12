@@ -8,8 +8,16 @@ import {
   type Square1Move,
 } from './notation';
 import { square1DistanceCappedAt } from './distance';
-import { randomSquare1State } from './random-state';
+import { randomSquare1State, twistableShapeKeys } from './random-state';
+import { square1ShapeSpace } from './shapes';
 import { phase1Solutions } from './phase1-search';
+import { phase1Table } from './phase1-tables';
+import {
+  phase2BackwardTable,
+  phase2CornerPruning,
+  phase2MoveTables,
+  phase2ReachableClasses,
+} from './phase2-tables';
 import { Phase2BudgetExceededError, phase2LowerBound, phase2Search } from './phase2-search';
 import { applySquare1Moves, hasSquareLayers, isSquare1Solved, type Square1State } from './state';
 
@@ -182,7 +190,34 @@ export function generateSquare1Scramble(random: RandomSource): string {
  * the note in `src/index.ts` for why that distinction matters.
  */
 export function registerSquare1Scrambler(): void {
-  registerScrambler('sq1', (random) => generateSquare1Scramble(random));
+  registerScrambler(
+    'sq1',
+    (random) => generateSquare1Scramble(random),
+    'random-state',
+    prepareSquare1Tables,
+  );
+}
+
+/**
+ * Builds every table a Square-1 scramble consults: the shape space and the twistable
+ * shape list the draw samples from, the phase-1 shape table, the phase-2 move
+ * tables, the phase-2 pruning table, the reachable-class set and the backward table.
+ *
+ * Measured cold cost for `sq1` is **3988 ms** against 161 ms warm (2026-08-11), so
+ * this is nearly all of a first Square-1 scramble. Every builder is memoised.
+ *
+ * `square1ShapeSpace()` and `twistableShapeKeys()` are here because they are the
+ * *draw's* tables rather than the solver's, and leaving them out left 1861 ms lazy —
+ * a helper that looked like it worked. They build no randomness and consume none.
+ */
+export function prepareSquare1Tables(): void {
+  square1ShapeSpace();
+  twistableShapeKeys();
+  phase1Table();
+  phase2MoveTables();
+  phase2CornerPruning();
+  phase2ReachableClasses();
+  phase2BackwardTable();
 }
 
 /** Whether a sequence really solves a state — the check every test ends with. */

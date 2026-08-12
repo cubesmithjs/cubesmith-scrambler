@@ -3,7 +3,7 @@ import { axisOf, inverseMoves, movesToString, parseMove } from '../../notation/m
 import type { RandomSource } from '../../random/random-source';
 import { withMinimumDistance } from '../nxn/minimum';
 import { randomState } from './random-state';
-import { CUBE_333_SIZE, solve333 } from './solve';
+import { CUBE_333_SIZE, prepare333Tables, solve333 } from './solve';
 
 /**
  * `333fm` — 3x3x3 Fewest Moves. **Not** the same scramble as `333`, which is
@@ -110,5 +110,10 @@ export function generate333FewestMovesScramble(random: RandomSource): string {
 
 /** Registers `'333fm'`. Called explicitly from `src/index.ts`, like every other puzzle. */
 export function register333FewestMovesScrambler(): void {
-  registerScrambler('333fm', (random) => generate333FewestMovesScramble(random));
+  registerScrambler(
+    '333fm',
+    (random) => generate333FewestMovesScramble(random),
+    'random-state',
+    prepare333Tables,
+  );
 }

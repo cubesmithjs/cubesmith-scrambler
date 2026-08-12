@@ -10,6 +10,155 @@ changes and a patch bump may not.
 
 ---
 
+## 0.13.0
+
+Two capabilities a **competition scramble set** needs and `0.12.0` did not have: a
+**batch draw** and **2D scramble drawing for all seventeen events**. Plus a
+`prepareEvent` helper, and one cosmetic correction to Square-1's emit format.
+
+`0.13.0` rather than `0.12.1` because there are two new public surfaces and a
+**second entry point**. Not `1.0.0` — the package stays pre-1.0.
+
+**The batch API closes a measured bug rather than saving a loop.**
+`generateScramble` builds its `RandomSource` from the seed on *every* call, so the
+only batch idiom available before this — a caller-side loop — returned the **same
+scramble N times** whenever a seed was passed. `generateScrambles` creates one source
+for the whole batch, which is what makes a seeded batch both reproducible and made of
+different scrambles. The trap is asserted next to the fix in
+`core/generate-scrambles.test.ts` so the two cannot drift apart.
+
+**Nothing breaks.** Every change to the main entry is additive. `generateScramble`,
+its options and its result type are untouched; its existing tests pass unmodified.
+The one behaviour change anywhere is Square-1's comma spacing, which affects what the
+package **emits** and deliberately not what it **accepts** — see *Changed*.
+
+**Bundle size**, both entries measured with `zlib.gzipSync`:
+
+| | `0.12.0` | `0.13.0` | Delta |
+|---|---|---|---|
+| Main entry, raw | 219,870 B | 226,735 B | +6,865 B (+3.12%) |
+| Main entry, gzip | 48,319 B | 49,559 B | +1,240 B (+2.57%) |
+| `./draw` entry, raw | — | 97,059 B | new |
+| `./draw` entry, gzip | — | 23,592 B | new |
+
+🔴 **The main entry grew, and here is why** — because the whole point of `./draw` was
+that it must not. The growth is `generateScrambles`, `prepareEvent`, `MAX_BATCH_COUNT`,
+the per-puzzle `prepare` functions and the shared `scramble-draw.ts` helper. **None of
+it is drawing code**: `src/draw/bundle.test.ts` reads the built `dist/index.js` and
+asserts that seven drawing-only symbols — including a Megaminx colour value that
+appears nowhere else in the package — are absent, so the split is verified on the
+artefact rather than trusted.
+
+A `.d.ts` note for the main entry, held to the same standard `0.12.0` set: additions
+only. The `export { … }` list gains `generateScrambles`, `prepareEvent` and
+`MAX_BATCH_COUNT`, plus the `GenerateScramblesOptions` type. No declaration is removed
+or modified.
+
+### Added
+
+- **`generateScrambles(event, count, options)`** — *N* scrambles for one event from
+  **one** random source. Returns them in draw order, and `result[i]` being the *i*-th
+  draw is part of the contract, because a consumer mapping a batch onto (group,
+  attempt) slots relies on it. Duplicates are **not** removed: each draw is its own
+  uniform draw, so a repeat is a legitimate outcome and filtering would bias the
+  distribution.
+- **`options.onProgress(done, total)`** — **awaited**, and that is the package's entire
+  answer to a long batch blocking a thread. Called after each scramble, never before
+  the first, exactly `count` times; a throw from it propagates and stops further draws,
+  which is the cancel path (so no `AbortSignal`, and no DOM type in the package's
+  types). 🔴 The README states the distinction that matters: an `await` on the promise
+  `generateScramble` returns is **not** a yield point — that continuation is a
+  microtask, and a microtask cannot interleave with rendering, which is why a naive
+  per-item `await` loop leaves a progress bar frozen at zero.
+- **`options.cubesPerAttempt`** — for `333mbf` only. `count` is how many attempts,
+  `cubesPerAttempt` is how many cubes in one attempt, and neither borrows the other's
+  meaning. It maps onto the existing per-call `count`, so `MAX_SCRAMBLE_COUNT` keeps
+  governing cubes-per-attempt exactly as before. Passing it for any other event throws
+  `InvalidScrambleCountError`.
+- **`MAX_BATCH_COUNT` (500)** — a runaway guard, not a regulation, and deliberately a
+  *different* number from `MAX_SCRAMBLE_COUNT`: one bounds a batch and the other bounds
+  cubes per multi-blind attempt, and reusing one would cap `555` (about 1 ms a
+  scramble) at the same 100 as `444bf`.
+- **`prepareEvent(event)`** — builds a puzzle's lookup and pruning tables on purpose,
+  rather than charging them to the first scramble a user is waiting for. Resolves
+  immediately for an event with nothing to precompute (`clock` is linear algebra over
+  `Z12`; `minx` is random-moves), which is not an error. 🔴 It is **not** implemented as
+  "generate a scramble and throw it away": a discarded draw consumes entropy and would
+  shift every later scramble under a seed, turning a performance helper into a
+  correctness hazard. A test asserts a seeded batch is byte-identical with and without
+  a preceding `prepareEvent`.
+- **A second entry point, `@cubesmith/scrambler/draw`** — 2D scramble drawing for all
+  **seventeen** events, as data (`ScrambleImage` / `ImageShape`) plus a thin
+  `scrambleImageToSvg` serializer, with `drawScramble`, `defaultColorScheme`,
+  `isDrawableEvent` and `drawableEvents`. Geometry, layout constants and colour values
+  read from `thewca/tnoodle-lib` source. Pure computation: no DOM, no canvas, no WebGL.
+  Three new error types — `UnimplementedDrawingError` (no picture, deliberately not
+  `UnimplementedEventError`, which means no *scrambler*), `UnsupportedScrambleError`
+  (valid cube notation a scramble never contains: a slice move, a layer range, a
+  commutator) and `InvalidColorError`. A malformed scramble throws the package's
+  existing `AlgorithmSyntaxError` / `ScrambleSyntaxError` **unwrapped**, so a consumer
+  already handling those keeps its handling. Full design, and what is *not* claimed, in
+  `docs/drawing-design.md`.
+
+### Changed
+
+- **Square-1 emits `(-3,-4)`, not `(-3, -4)`** — no space after the comma, which is
+  TNoodle's spelling verbatim (`"(" + top + "," + bottom + ")"`). Cosmetic, and
+  cosmetics are the entire function of a scramble sheet: a competitor who has read a
+  thousand TNoodle sheets notices, and any line-by-line comparison between the two
+  programs previously reported *every* row as different. The single space between
+  tokens and the trailing slash were checked against TNoodle's `AlgorithmBuilder` join
+  and are unchanged; the comma was the only difference.
+
+  🔴 **A scramble stored in the old spelling remains valid.** The parser was not
+  narrowed: `(-3,-4)`, `(-3, -4)`, `( -3 , -4 )` and a string mixing them all still
+  parse, with or without the trailing slash. The emitted set and the accepted set are
+  deliberately different, and `core/validate-scramble.test.ts` pins each spelling as
+  intentional rather than incidental.
+
+### Measured
+
+Per-event cost on the development machine (Windows 11, Node 22, 2026-08-11), each
+figure from a **fresh process** so a shared table cannot make a later event look cheap:
+
+| Event | cold (ms) | warm (ms) | Event | cold (ms) | warm (ms) |
+|---|---:|---:|---|---:|---:|
+| `222` | 4857 | 0 | `333mbf` | 8657 | 233 |
+| `333` | 8850 | 103 | `444bf` | 15,324 | 1123 |
+| `444` | **15,382** | 241 | `555bf` | 20 | 0 |
+| `555` | 14 | 1 | `minx` | 5 | 1 |
+| `666` | 19 | 1 | `pyram` | 208 | 0 |
+| `777` | 25 | 2 | `clock` | 11 | 0 |
+| `333bf` | 8062 | 246 | `skewb` | 739 | 0 |
+| `333fm` | 8381 | 109 | `sq1` | 4239 | 740 |
+| `333oh` | 8251 | 212 | | | |
+
+What `prepareEvent` moves, same conditions:
+
+| Event | `prepareEvent` | first scramble after | warm |
+|---|---:|---:|---:|
+| `222` | 4803 | **5** | 0 |
+| `333` | 8184 | **110** | 46 |
+| `444` | 11,550 | 4462 | 1137 |
+| `sq1` | 3242 | 1553 | 51 |
+| `skewb` | 746 | **10** | 0 |
+| `pyram` | 218 | **5** | 0 |
+
+🔴 **`444` is the one event where preparing does not make the first scramble as fast as
+the tenth**, and saying so is more useful than a claim that reads better. Two things are
+left lazy on purpose: the per-group wing-pair tables (building all six costs about 8.5 s
+that one scramble does not need, and measurably makes the *total* worse) and the
+centre-generator library (a search, not a table, and more expensive to pre-build than a
+first scramble is). `sq1` leaves about 1.5 s for the same reason.
+
+Two gaps in this helper were found by measuring rather than by reading, and both had
+already been written and doc-commented as if they worked: `prepare333Tables` built the
+phase **move** tables and not the phase **pruning** tables, which live in their own
+modules — `prepareEvent('333')` cost 624 ms and the first scramble after it still cost
+7719 ms — and `prepareSquare1Tables` built the solver's tables and not the *draw's*.
+`core/prepare-event.test.ts` now times the scramble that comes **after** a prepare,
+which is the only arrangement that can see either.
+
 ## 0.12.0
 
 **Every one of the seventeen events can now be validated**, not only the twelve

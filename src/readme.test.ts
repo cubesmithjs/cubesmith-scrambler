@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { implementedEvents, isImplementedEvent } from './core/scrambler-registry';
 import {
   AlgorithmSyntaxError,
+  generateScramble,
+  generateScrambles,
   invertAlgorithm,
+  MAX_BATCH_COUNT,
   parseAlgorithm,
+  prepareEvent,
   ScrambleSyntaxError,
   serializeAlgorithm,
   validateAlgorithm,
   validateScramble,
 } from './index';
+import { defaultColorScheme, drawScramble, scrambleImageToSvg } from './draw/index';
 
 /**
  * The README, checked against the code.
@@ -34,6 +39,9 @@ import README from '../README.md?raw';
 import TYPES_SOURCE from './notation/alg/types.ts?raw';
 // And on the second reason union, which is a separate type on purpose.
 import SCRAMBLE_ERRORS_SOURCE from './core/scramble-errors.ts?raw';
+// The `./draw` export path is a fact about the manifest, not about prose, and the
+// README now tells a consumer to import it — so the manifest is read the same way.
+import PACKAGE_JSON_SOURCE from '../package.json?raw';
 
 const readmeLines = (): string[] => README.split(/\r?\n/);
 
@@ -261,5 +269,74 @@ describe('the README validateScramble examples', () => {
     expect(README).toContain('ScrambleSyntaxError');
     // The boundary, stated in the same breath as the feature.
     expect(README).toContain('is this valid notation for this event');
+  });
+});
+
+/**
+ * The 0.13.0 sections, run rather than described.
+ *
+ * The batch section makes a claim a reader will act on — "a caller-side loop is
+ * silently wrong under a seed" — and a claim that is easy to get backwards, about
+ * which of two `await`s is a real yield point. Both are asserted here, on the
+ * README's own example code.
+ */
+describe('the README batch and drawing examples', () => {
+  it('runs the batch example, and `result[i]` really is the i-th draw', async () => {
+    await prepareEvent('222');
+    const seen: [number, number][] = [];
+    const round = await generateScrambles('222', 20, {
+      seed: 'comp-42-round-1',
+      onProgress: (done, total) => {
+        seen.push([done, total]);
+      },
+    });
+    expect(round).toHaveLength(20);
+    expect(seen[0]).toEqual([1, 20]);
+    expect(seen).toHaveLength(20);
+    // The same seed gives the same twenty, and they are twenty different scrambles.
+    const again = await generateScrambles('222', 20, { seed: 'comp-42-round-1' });
+    expect(again.map((r) => r.moves)).toEqual(round.map((r) => r.moves));
+    expect(new Set(round.map((r) => r.moves)).size).toBe(20);
+  });
+
+  it('🔴 demonstrates the trap the README warns about, so the warning stays true', async () => {
+    const loop = await Promise.all([
+      generateScramble('222', { seed: 'trap' }),
+      generateScramble('222', { seed: 'trap' }),
+    ]);
+    expect(loop[0]!.moves).toBe(loop[1]!.moves);
+    // Whitespace-normalised, because the sentence wraps in the source and a reader
+    // editing the wrap should not be able to break a test about the claim.
+    expect(README.replace(/\s+/g, ' ')).toContain(
+      'a seeded loop returns the same scramble N times',
+    );
+  });
+
+  it('runs the multi-blind composition example', async () => {
+    const attempts = await generateScrambles('333mbf', 3, { cubesPerAttempt: 12 });
+    expect(attempts).toHaveLength(3);
+    expect(attempts[0]!.scrambles).toHaveLength(12);
+  });
+
+  it('states MAX_BATCH_COUNT as the number the code actually exports', () => {
+    expect(README).toContain(`\`1..MAX_BATCH_COUNT\` (${MAX_BATCH_COUNT})`);
+  });
+
+  it('runs the drawing example, with the exact numbers the README prints', () => {
+    const image = drawScramble('333', "R U R' U' F2 D");
+    expect(image.width).toBe(130);
+    expect(image.height).toBe(98);
+    expect(image.shapes).toHaveLength(54);
+    expect(image.shapes[0]!.kind).toBe('rect');
+    expect(scrambleImageToSvg(image).startsWith('<svg')).toBe(true);
+    // 🔴 The claim that the schemes are not interchangeable, as a value.
+    expect(defaultColorScheme('skewb').R).toBe('#0000ff');
+    expect(defaultColorScheme('333').R).toBe('#ff0000');
+  });
+
+  it('documents the second entry point by the path a consumer imports', () => {
+    expect(README).toContain('@cubesmith/scrambler/draw');
+    // …and that path resolves, which is a fact about `package.json`, not prose.
+    expect(PACKAGE_JSON_SOURCE).toContain('"./draw"');
   });
 });

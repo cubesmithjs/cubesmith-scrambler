@@ -24,7 +24,8 @@ import {
   VERTEX_COUNT_PYRAMINX,
   type PyraminxState,
 } from './state';
-import { ALL_LAYER_MOVES_PYRAMINX } from './tables';
+import { buildPruningTablePyraminx } from './pruning';
+import { ALL_LAYER_MOVES_PYRAMINX, buildTablesPyraminx } from './tables';
 
 /**
  * The tip moves that carry each tip from `from` to `to`, in
@@ -108,7 +109,18 @@ export function generatePyraminxScramble(random: RandomSource): string {
   ]);
 }
 
+/** Builds the layer-move and pruning tables now; both are memoised, so a second call is cheap. */
+export function preparePyraminxTables(): void {
+  buildTablesPyraminx();
+  buildPruningTablePyraminx();
+}
+
 /** Registers `'pyram'` — called explicitly from `src/index.ts`, same reasoning as every other puzzle here. */
 export function registerPyraminxScrambler(): void {
-  registerScrambler('pyram', (random) => generatePyraminxScramble(random));
+  registerScrambler(
+    'pyram',
+    (random) => generatePyraminxScramble(random),
+    'random-state',
+    preparePyraminxTables,
+  );
 }

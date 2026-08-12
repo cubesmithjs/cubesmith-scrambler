@@ -7,6 +7,7 @@ import type { RandomSource } from '../../random/random-source';
 import { randomPermutation } from '../../utils/permutation';
 import { MOVE_COUNT_SKEWB } from './coordinates';
 import { inverseSkewbMoves, skewbMovesToString } from './notation';
+import { buildPruningTableSkewb } from './pruning';
 import { randomSkewbState } from './random-state';
 import { skewbSolveDistance, solveSkewbInExactly } from './search';
 
@@ -45,7 +46,17 @@ export function generateSkewbScramble(random: RandomSource): string {
   return skewbMovesToString(inverseSkewbMoves(solution));
 }
 
+/** Builds the pruning table now; memoised, so a second call is cheap. */
+export function prepareSkewbTables(): void {
+  buildPruningTableSkewb();
+}
+
 /** Registers `'skewb'` — called explicitly from `src/index.ts`. */
 export function registerSkewbScrambler(): void {
-  registerScrambler('skewb', (random) => generateSkewbScramble(random));
+  registerScrambler(
+    'skewb',
+    (random) => generateSkewbScramble(random),
+    'random-state',
+    prepareSkewbTables,
+  );
 }

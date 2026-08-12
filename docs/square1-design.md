@@ -59,17 +59,43 @@ Sources disagree slightly on the canonical range, because `x` and `y` live in
 gives exactly one spelling per residue and no `6`/`-6` ambiguity. `(0,0)` is
 rejected as a move, since it is a no-op that only exists as a spelling.
 
-### Rendering (decided)
+### Rendering (decided; comma spacing corrected in v0.13)
 
-Match the attested official form, including the **trailing slash**:
+Match **TNoodle's** form, including the **trailing slash**:
 
 ```
-(-2, 0) / (-3, -3) / (2, 5) / …  / (-6, 0) /
+(-2,0) / (-3,-3) / (2,5) / …  / (6,0) /
 ```
 
-Space after the comma, spaces around each slash. The parser is deliberately
-tolerant of spacing and of a missing trailing slash so that scrambles copied
-from other tools round-trip.
+**No space after the comma**, one space around each slash.
+
+That spacing is TNoodle's, verbatim from `SquareOnePuzzle.java`:
+
+```java
+String turn = "(" + top + "," + bottom + ")";
+```
+
+and the single space between tokens is its `AlgorithmBuilder`'s join. Up to and
+including **v0.12 this package emitted `(-2, 0)`** — a space after the comma,
+taken from a tutorial's typography rather than from the official program. It is
+purely cosmetic, and cosmetics are the entire function of a scramble sheet: a
+competitor who has read a thousand TNoodle sheets notices, and any line-by-line
+comparison between the two programs reported *every* row as different. Corrected
+in **v0.13.0**; the comma was the only thing that changed.
+
+🔴 **The emitted set and the accepted set are deliberately different**, and the
+parser was **not** narrowed:
+
+| | Spelling |
+|---|---|
+| Emitted | `(-3,-4) / (6,3) /` — one form, TNoodle's |
+| Accepted | `(-3,-4)`, `(-3, -4)`, `( -3 , -4 )`, mixed within one string, with or without the trailing slash |
+
+A scramble already stored in a consumer's database was written the old way, and a
+scramble pasted from TNoodle the new way. Both must validate, and
+`core/validate-scramble.test.ts` pins each one as deliberate rather than
+incidental. The parser stays tolerant of spacing and of a missing trailing slash
+for the same reason.
 
 ### Reason codes (v0.12)
 

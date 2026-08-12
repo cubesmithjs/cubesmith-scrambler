@@ -40,14 +40,20 @@ function validateWithFreshRules(scramble: string): {
       index += 1;
       continue;
     }
-    // A pair is written "(x," then "y)" once split on whitespace.
-    const opening = /^\((-?\d+),$/.exec(word);
-    const closing = index + 1 < words.length ? /^(-?\d+)\)$/.exec(words[index + 1]!) : null;
-    if (!opening || !closing) {
+    // A pair is one word, `(x,y)` — TNoodle's spelling, and since 0.13.0 the one
+    // this package emits. It is also accepted split as "(x," then "y)", which is
+    // how the space-after-comma spelling falls out of a whitespace split; both
+    // are real Square-1 scrambles and a validator written from the notation
+    // rather than from a serializer has to take both.
+    const together = /^\((-?\d+),(-?\d+)\)$/.exec(word);
+    const opening = together ? null : /^\((-?\d+),$/.exec(word);
+    const closing =
+      opening && index + 1 < words.length ? /^(-?\d+)\)$/.exec(words[index + 1]!) : null;
+    if (!together && !(opening && closing)) {
       throw new Error(`independent validator: unexpected "${word}"`);
     }
-    const top = Number(opening[1]);
-    const bottom = Number(closing[1]);
+    const top = Number(together ? together[1] : opening![1]);
+    const bottom = Number(together ? together[2] : closing![1]);
     if (!Number.isInteger(top) || !Number.isInteger(bottom)) {
       throw new Error(`independent validator: non-integer amount in "${word}"`);
     }
@@ -59,7 +65,7 @@ function validateWithFreshRules(scramble: string): {
     }
     pairs.push([top, bottom]);
     tokens += 1;
-    index += 2;
+    index += together ? 1 : 2;
   }
 
   return { pairs, slices, tokens };
@@ -74,6 +80,19 @@ describe('the independent validator', () => {
     expect(parsed.slices).toBe(12);
 
     for (const bad of ['(1, 0) x', '(0, 0) /', '(7, 0) /', '(1, 0', '1, 0 /']) {
+      expect(() => validateWithFreshRules(bad), bad).toThrow();
+    }
+  });
+
+  /** The same scramble in TNoodle's spelling — what 0.13.0 emits — reads identically. */
+  it('accepts the same scramble with no space after the comma', () => {
+    const tnoodle =
+      '(-2,0) / (-3,-3) / (2,5) / (0,3) / (-3,0) / (-5,-2) / (-4,0) / (-3,3) / (3,0) / (1,2) / (0,2) / (6,0) /';
+    const parsed = validateWithFreshRules(tnoodle);
+    expect(parsed.pairs).toHaveLength(12);
+    expect(parsed.slices).toBe(12);
+
+    for (const bad of ['(1,0) x', '(0,0) /', '(7,0) /', '(1,0', '1,0 /']) {
       expect(() => validateWithFreshRules(bad), bad).toThrow();
     }
   });
