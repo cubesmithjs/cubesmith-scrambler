@@ -66,7 +66,7 @@ how far to turn a wheel.
 | dial | `UR4+` | raise only the upper-right pin, turn that wheel 4 hours clockwise |
 | dial | `ALL2-` | raise all four pins, turn 2 hours counterclockwise |
 | flip | `y2` | turn the whole puzzle over; everything after is performed from the back |
-| pin declaration | `DL UL` | a bare letter group at the very end — which pins are left up |
+| pin declaration | `DL UL` | a bare letter group at the very end — which pins are left up. **Accepted, never emitted** since 0.14; see §5 |
 
 Nine pin-set names exist: the four single corners `UR DR DL UL`, the four edge
 pairs `U R D L`, and `ALL`. Note the pairs are the **edges**, never the
@@ -98,21 +98,26 @@ half turn is already `6+` — which is what makes the spelling a bijection rathe
 than merely a surjection.
 
 An empty pin declaration renders as nothing and is filtered out rather than
-leaving a trailing space, so a scramble with all pins down simply ends at its
-last dial token.
+leaving a trailing space. This is more than cosmetic — see §5 on why the
+declaration is no longer emitted at all.
 
 ### Examples
 
 A real generated scramble from the shipped build:
 
 ```
-UR5+ DR5+ DL1+ UL4+ U5- R5+ D2+ L2- ALL0+ y2 U2+ R0+ D5+ L5+ ALL4+ DL UL
+UR3+ DR5+ DL3+ UL6+ U2- R2+ D2- L4- ALL1- y2 U0+ R3+ D4- L2- ALL4+
 ```
 
-Nine dial tokens, `y2`, five more dial tokens, then the closing pin declaration.
-Always exactly that shape; the only variation is the amounts and how many
-corners the declaration names (zero to four). Measured over 300 scrambles: 15 to
-19 tokens.
+Nine dial tokens, `y2`, five more dial tokens. Always exactly that shape and
+**always exactly fifteen tokens** — the only variation is the amounts.
+
+Before 0.14 the scrambler appended the closing pin declaration, which made the
+emitted string 15 to 19 tokens depending on how many pins the draw left raised
+(`… ALL4+ DL UL`). TNoodle-WCA-1.2.3 emits neither, so the string differed from
+the official one *in kind*: a consumer parsing both had two grammars to handle.
+The parser still accepts the old form, so a scramble already stored in a
+consumer's database goes on validating and drawing exactly as it did.
 
 ### Reason codes
 
@@ -278,7 +283,7 @@ for one — because the group is abelian, the scramble for a state is computed
 1. draw fourteen uniform hours and four uniform pin bits
 2. if the state is 0 or 1 turns from solved, discard and draw again   (4b3)
 3. multiply by the template's inverse to get the fourteen amounts
-4. render the template with those amounts, then the closing pin declaration
+4. render the template with those amounts — fifteen tokens, and stop
 ```
 
 There is **no search and no inversion of a solution** anywhere in the chain.
@@ -337,22 +342,52 @@ Fewer than 330 states out of `1.28 × 10^15` fail the check, so it effectively
 never rejects — but it is a real check rather than an appeal to how unlikely that
 is.
 
-### The closing pin declaration
+### The closing pin declaration, and why it is no longer emitted
 
-The subtle piece. A scramble ends with the puzzle turned over, so the declaration
-is read in the flipped frame — and a pin is one piece with two ends, so "up from
-the back" is "down from the front". **Both** inversions have to be applied: the
-corners to name are the *mirrors* of the ones that should end up **down** at the
-front. `closingPinDeclaration` does exactly that and `solve.test.ts` checks all
-sixteen targets land correctly.
+The subtle piece, and as of **0.14 it is not part of the output**.
+
+The subtlety first, because it still governs how an old scramble is *read*. A
+scramble ends with the puzzle turned over, so the declaration is read in the
+flipped frame — and a pin is one piece with two ends, so "up from the back" is
+"down from the front". **Both** inversions have to be applied: the corners to
+name are the *mirrors* of the ones that should end up **down** at the front.
+`closingPinDeclaration` does exactly that and `solve.test.ts` checks all sixteen
+targets land correctly.
+
+Three reasons it went:
+
+1. **TNoodle-WCA-1.2.3 does not emit one.** Its clock scramble is exactly fifteen
+   tokens and ends on the second `ALLn±`, and its own `ClockState` is eighteen
+   dial readings carrying no pin positions at all — a fact `draw/clock.ts` had
+   already recorded while the scrambler went on printing them.
+2. **It was a description, not an instruction.** The final pin position is
+   implied by the scramble: the last token raises all four pins from the back,
+   which is all four down at the front. Declaring it added tokens and no
+   information a competitor did not already have.
+3. 🔴 **One target of the sixteen could not be spelled.** "Leave all four pins
+   up" is named by the *empty* declaration — no corner ends up down — and an
+   empty declaration renders as the empty string and is filtered out. As a token
+   array the intent survived; as **text**, the only form a competitor or a
+   consumer's database ever sees, it did not. One draw in sixteen printed a
+   scramble whose declared pin state was not the one drawn.
+
+The pins are still **drawn** into the state, because `ClockState` models them and
+a state with them pinned would be less faithful — and because leaving the draw
+alone makes the change purely subtractive, so a seeded scramble keeps every one
+of its fourteen dial amounts and simply loses its tail.
+
+Emit narrow, accept wide: `parseClockScramble` goes on accepting the trailing
+form, `applyClockTokens` goes on applying it, and `solve.test.ts` proves an
+old-format scramble still parses, re-prints byte-identically, and reaches exactly
+the state it always did.
 
 ### No padding
 
 Unlike the 2x2x2, Pyraminx, Skewb and Square-1, no minimum sequence length is
-applied. The template is a fixed fourteen tokens regardless of the state, so the
+applied. The template is a fixed fourteen amounts regardless of the state, so the
 printed length carries **no** information about difficulty — the leak that
-padding exists to prevent cannot occur here. Only the closing declaration varies
-in length, and it says nothing about the dials.
+padding exists to prevent cannot occur here. Since the declaration went, the
+printed length does not vary at all: every clock scramble is fifteen tokens.
 
 ### WCA compliance
 
@@ -361,7 +396,8 @@ in length, and it says nothing about the dials.
 | 4b3 random state, equal probability | fourteen uniform draws over a unimodular basis |
 | 4b3 at least 2 moves to solve | `clockSolveDistanceCappedAtTwo`, exact at the cap |
 | Official token template | `template.ts`, asserted token-for-token |
-| Closing pin declaration | `closingPinDeclaration`, all sixteen targets tested |
+| TNoodle's fifteen-token output shape | `move-count.test.ts` and `solve.test.ts`, anchored at both ends |
+| Old-format scrambles keep parsing | `solve.test.ts`, 500 legacy strings re-parsed and re-printed |
 
 ---
 
@@ -389,7 +425,10 @@ Six test files, `src/puzzles/clock/*.test.ts`.
 | so the number of reachable states is exactly `12^14` | a wrong independent-dial count |
 | `templateAmountsFor` recovers the exact amounts a scramble was built from | a wrong matrix inverse |
 | every one of the fourteen basis states maps back to a single unit amount | a transposition error in the multiply |
-| the scramble reproduces the drawn state exactly, pins included | end to end |
+| the scramble reproduces the drawn state's dials exactly | end to end |
+| the emitted scramble is exactly fifteen tokens, anchored at both ends | the trailing-pin format regression |
+| an old, pins-included scramble still parses, re-prints and applies | turning a cosmetic change into data loss |
+| the drawing is identical with and without the trailing pins | that the format change did not reach the picture |
 | the state reached needs at least 2 moves to solve | the 4b3 floor |
 
 ### Independent verification
@@ -504,6 +543,12 @@ None known.
 4. **Only the official template is supported.** A caller wanting a different
    token order would need a different basis — the code would work (any
    unimodular set would), but nothing exposes that.
+5. **The drawn pin bits reach nothing.** `randomClockState` still draws four
+   uniform pin bits, and since 0.14 stopped emitting the closing declaration
+   nothing renders them. They are kept because `ClockState` models the pins and
+   because keeping the draw is what makes the format change purely subtractive
+   — but a reader should know the scramble's pin state is now fixed by the
+   template (all four down at the front) rather than by the draw.
 
 ### Planned improvements
 

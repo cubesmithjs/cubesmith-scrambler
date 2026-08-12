@@ -53,7 +53,7 @@ the [4x4x4 design](./docs/444-design.md).
 | `222` | random-state | ✅ Single-phase; the whole 3,674,160-state group fits one exact pruning table |
 | `pyram` | random-state | ✅ Tetrahedral geometry on an exact integer lattice; 933,120 states, God's number 11, both reproduced by BFS |
 | `skewb` | random-state | ✅ Corner-turning deep cut; BFS-discovered coordinates reproducing 3,149,280 states and God's number 11 |
-| `clock` | random-state | ✅ Dials and pins; the official 14-token template proved to be a unimodular basis for all 12^14 states |
+| `clock` | random-state | ✅ The official 14-amount template proved to be a unimodular basis for all 12^14 states; 15 tokens out, matching TNoodle |
 | `minx` | random-moves | ✅ Dodecahedral geometry, Pochmann notation, 77 moves (random-moves is what 4b3e *requires* here) |
 | `555` `666` `777` | random-moves | ✅ Shared NxN facelet model; 60 / 80 / 100 moves, no redundant move anywhere |
 | `333oh` | random-state | ✅ Plain alias for `333` — same puzzle, only the human constraint differs |

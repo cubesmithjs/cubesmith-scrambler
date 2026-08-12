@@ -34,6 +34,12 @@ describe('solveClock', () => {
   });
 });
 
+/**
+ * The legacy closing declaration. `generateClockScramble` stopped emitting it
+ * in 0.14 — TNoodle-WCA-1.2.3 does not — but every property below still has to
+ * hold, because the parser goes on accepting a scramble that carries one and
+ * `applyClockTokens` goes on applying it.
+ */
 describe('closingPinDeclaration', () => {
   /**
    * Two inversions stack up here and both are easy to get wrong: the
@@ -97,13 +103,76 @@ describe('end-to-end round trip', () => {
     }
   });
 
-  it('the scramble reproduces the drawn state exactly, pins included', () => {
+  it('the scramble reproduces the drawn state\'s dials exactly', () => {
     const random = createRandomSource('clock-reproduces-state');
     for (let trial = 0; trial < 1_000; trial += 1) {
       const state = randomClockState(random);
       const reached = applyClockTokens(SOLVED_CLOCK_STATE, clockScrambleTokens(state));
-      expect(clockStatesEqual(reached, state)).toBe(true);
+      // Pins deliberately excluded: the emitted scramble no longer declares
+      // them, so it reproduces the dials — which is all a Clock is judged on —
+      // and leaves the pins wherever the closing `ALL` puts them.
+      expect(clockStatesEqual({ ...reached, pinsUp: state.pinsUp }, state)).toBe(true);
     }
+  });
+
+  /**
+   * 🔴 The compatibility half, and the reason `closingPinDeclaration` survives.
+   *
+   * A consumer's database holds scrambles written in the old format. Emitting
+   * narrower must not mean accepting narrower: an old scramble has to keep
+   * parsing, keep applying, and keep reaching exactly the state it always did —
+   * pins included. Turning a cosmetic output change into data loss would be a
+   * far worse bug than the format mismatch it fixes.
+   */
+  it('still parses and applies a scramble written in the old, pins-included format', () => {
+    const random = createRandomSource('clock-legacy-format');
+    let named = 0;
+    for (let trial = 0; trial < 500; trial += 1) {
+      const state = randomClockState(random);
+      const declaration = closingPinDeclaration(state.pinsUp);
+      const legacy = clockTokensToString([...clockScrambleTokens(state), declaration]);
+
+      const tokens = parseClockScramble(legacy);
+      const reached = applyClockTokens(SOLVED_CLOCK_STATE, tokens);
+      // The dials always come back exactly — that is what a Clock is judged on.
+      expect(clockStatesEqual({ ...reached, pinsUp: state.pinsUp }, state)).toBe(true);
+      // And it re-prints byte-identically, so a stored scramble round-trips.
+      expect(clockTokensToString(tokens)).toBe(legacy);
+
+      if (declaration.kind === 'pins' && declaration.up.length > 0) {
+        named += 1;
+        expect(reached.pinsUp).toEqual(state.pinsUp);
+      }
+    }
+    expect(named).toBeGreaterThan(0);
+  });
+
+  /**
+   * 🔴 A limitation of the format that was **removed**, recorded because it is
+   * part of why removing it was right.
+   *
+   * "Leave all four pins up" is the one pin target the declaration cannot spell:
+   * it names the mirrors of the corners that should end up *down*, so the target
+   * with none down produces an empty token, and an empty token renders as the
+   * empty string and is filtered out. As a token array the intent survived —
+   * `setPins` with an empty list, read in the flipped frame, raises all four —
+   * but as **text**, which is the only form a competitor or a consumer's
+   * database ever sees, it did not. One draw in sixteen printed a scramble whose
+   * declared pin state was not the one drawn.
+   */
+  it('could not spell an all-pins-up declaration, which text is the only form that matters', () => {
+    const allUp = { UR: true, DR: true, DL: true, UL: true };
+    const declaration = closingPinDeclaration(allUp);
+    expect(declaration).toEqual({ kind: 'pins', up: [] });
+
+    // Intact as a token: applied after the scramble's `y2`, it raises all four.
+    expect(
+      applyClockTokens(SOLVED_CLOCK_STATE, [{ kind: 'flip' }, declaration]).pinsUp,
+    ).toEqual(allUp);
+    // Gone as text.
+    expect(clockTokensToString([{ kind: 'dial', pins: 'ALL', amount: 1 }, declaration])).toBe(
+      'ALL1+',
+    );
   });
 });
 
@@ -112,11 +181,18 @@ describe('generateClockScramble output shape', () => {
     generateClockScramble(createRandomSource(`clock-shape-${seed}`)),
   );
 
-  it('matches the official token template exactly', () => {
+  /**
+   * 🔴 Anchored at both ends with nothing optional after the second `ALLn±`.
+   * TNoodle-WCA-1.2.3's clock scramble is exactly fifteen tokens, and until
+   * 0.14 this package appended one to four bare pin names after them — which
+   * the old form of this regex permitted with a trailing `{0,4}` group.
+   */
+  it('matches the official token template exactly — fifteen tokens, ending on ALLn±', () => {
     for (const scramble of scrambles) {
       expect(scramble).toMatch(
-        /^UR\d[+-] DR\d[+-] DL\d[+-] UL\d[+-] U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-] y2 U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-]( (UR|DR|DL|UL)){0,4}$/,
+        /^UR\d[+-] DR\d[+-] DL\d[+-] UL\d[+-] U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-] y2 U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-]$/,
       );
+      expect(scramble.trim().split(/\s+/)).toHaveLength(15);
     }
   });
 
@@ -143,18 +219,15 @@ describe('generateClockScramble output shape', () => {
     }
   });
 
-  it('uses every amount spelling and every closing pin count across the sample', () => {
+  it('uses every amount spelling across the sample, and never a pin declaration', () => {
     const amounts = new Set<string>();
-    const declarationSizes = new Set<number>();
     for (const scramble of scrambles) {
       for (const token of parseClockScramble(scramble)) {
         if (token.kind === 'dial') amounts.add(String(token.amount));
-        if (token.kind === 'pins') declarationSizes.add(token.up.length);
+        expect(token.kind, scramble).not.toBe('pins');
       }
-      if (!parseClockScramble(scramble).some((t) => t.kind === 'pins')) declarationSizes.add(0);
     }
     expect(amounts.size).toBe(12);
-    expect([...declarationSizes].sort()).toEqual([0, 1, 2, 3, 4]);
   });
 
   it('is deterministic given a seed and varies without one', () => {

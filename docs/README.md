@@ -60,7 +60,6 @@ printed scramble sheet.
 | Gap | Where | Severity |
 |---|---|---|
 | 🔴 A `444`/`444bf` scramble runs **94–205 tokens** against TNoodle's 42–46 | [444-design.md](./444-design.md) §12 | usability: a scrambler cannot practically apply 156 moves. Measured split over 8 states — centres 16.4, pairing 51.6, **parity 96.5**, 3x3x3 hand-off 22.8. The *state* is uniformly random and unaffected (χ² 5.32 against df 5); the scrambles are long, not wrong |
-| 🔴 A `clock` scramble appends **bare pin names** (`… ALL5+ DL UL`) after the fifteenth token | [clock-design.md](./clock-design.md) §5 | format: TNoodle-WCA-1.2.3 emits exactly 15 tokens and ends on the second `ALLn±`, so the string differs *in kind* from the official one and a consumer parsing both handles two grammars |
 | A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20; the printed sequence merges one move shorter. Fixing it changes `333` output for every seed. It is also most of why the five 3x3x3-family events run +3 to +5 moves over TNoodle |
 | The `minx` 4b3e floor is measured against the identity state, not "solved up to whole-puzzle rotation" | [megaminx-design.md](./megaminx-design.md) §8 | ~`10^-66`; the floor itself is enforced, this is the residual the piece model cannot yet express |
 | Same-face seam at a blindfolded orientation suffix | [nxn-design.md](./nxn-design.md) §8 | cosmetic; deliberately deferred |

@@ -14,8 +14,13 @@ import { CLOCK_DIMENSION } from './template';
  * parity constraint to satisfy, no rejection, and nothing unreachable.
  *
  * Pin positions are drawn uniformly too, over all sixteen combinations.
- * They're not part of solvedness (a Clock is judged on its dials), but the
- * scramble does declare where they're left, so they belong in the state.
+ * They're not part of solvedness (a Clock is judged on its dials), and since
+ * 0.14 they are not part of the **emitted scramble** either — `solve.ts`
+ * stopped appending the closing pin declaration, because TNoodle does not emit
+ * one. The draw is kept anyway, for two reasons: `ClockState` genuinely models
+ * the pins, so a state with them fixed would be a less faithful state; and
+ * keeping it makes the format change purely subtractive, leaving every seeded
+ * scramble's fourteen dial amounts exactly where they were.
  */
 export function randomClockState(random: RandomSource): ClockState {
   const dials = Array.from({ length: CLOCK_DIMENSION }, () => randomInt(random, CLOCK_HOURS));

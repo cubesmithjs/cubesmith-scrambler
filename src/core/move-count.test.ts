@@ -119,21 +119,14 @@ const BANDS: readonly EventBand[] = [
       'a Square-1 scramble is turn pairs interleaved with slices, and how many slices the solution needs is not fixed — TNoodle prints 12 pairs and 11 separators on the sheet read, this package 22..28 across 18 draws',
   },
 
+  // Closed 2026-08-12 by task 02, and this row is what closing it looks like:
+  // the band tightened onto TNoodle's own number and the `gap` removed. Until
+  // then the package appended bare pin names (`… ALL5+ DL UL`) describing the
+  // final pins-up state, which made the count vary 15..19 and made the string
+  // differ from the official one *in kind* rather than in length.
+  { event: 'clock', tnoodle: [15, 15], band: [15, 15], verdict: 'exact', draws: 6 },
+
   // ── 🔴 Recorded gaps. Each names the task that closes it. ──────────────────
-  {
-    event: 'clock',
-    tnoodle: [15, 15],
-    band: [15, 19],
-    verdict: 'gap',
-    draws: 6,
-    closedBy: 'wca_conformance_plan task 02',
-    measured: '15–18 over 12 draws (16–19 in the baseline sample)',
-    // A **format** gap, not a length one. TNoodle's clock scramble is exactly 15
-    // tokens and ends on the second `ALLn±`; this package appends bare pin names
-    // (`… ALL5+ DL UL`) describing the final pins-up state, an older convention
-    // TNoodle-WCA-1.2.3 does not emit. The count varies 15..19 with how many pins
-    // the draw leaves raised — 15 when none are named.
-  },
   // The 3x3x3 family, all five reaching the same two-phase solver. +3 to +5
   // moves: the solver takes the *first* phase-1 solution and solves phase 2 from
   // wherever that lands, rather than trying several phase-1 solutions and keeping
@@ -329,20 +322,17 @@ describe('the emitted scramble shape', () => {
   });
 
   /**
-   * A clock scramble is the fourteen-amount template, `y2` in its place, and
-   * nothing else that carries a turn. Anything after the closing `ALLn±` is a
-   * bare corner name — the trailing pin declaration task 02 removes — never a
-   * fifteenth dial.
+   * A clock scramble is the fourteen-amount template with `y2` in its place,
+   * and **nothing after it**. It used to append bare pin names describing the
+   * final pins-up state; TNoodle-WCA-1.2.3 does not, and since task 02 neither
+   * does this. The parser still accepts the old form — see
+   * `puzzles/clock/solve.test.ts`, which is where that is proved.
    */
-  it('emits the clock template first, and only bare corner names after it', () => {
+  it('emits the clock template and stops on the second ALLn±', () => {
     for (const scramble of drawn.get('clock')!) {
-      const tokens = tokensOf(scramble);
-      expect(tokens.slice(0, 15).join(' ')).toMatch(
+      expect(scramble).toMatch(
         /^UR\d[+-] DR\d[+-] DL\d[+-] UL\d[+-] U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-] y2 U\d[+-] R\d[+-] D\d[+-] L\d[+-] ALL\d[+-]$/,
       );
-      for (const extra of tokens.slice(15)) {
-        expect(['UR', 'DR', 'DL', 'UL'], scramble).toContain(extra);
-      }
     }
   });
 

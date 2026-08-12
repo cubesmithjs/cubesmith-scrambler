@@ -99,6 +99,30 @@ describe('Clock', () => {
       expect(withinBounds(drawScramble('clock', scramble)), scramble).toBe(true);
     }
   });
+
+  /**
+   * 🔴 The drawing is unchanged by the 0.14 format change.
+   *
+   * The corpus was captured while the scrambler still appended trailing pin
+   * names, so every clock entry in it is a scramble in the old format — which
+   * makes it exactly the fixture this needs. Stripping the tail gives the string
+   * the scrambler emits today, and the two must draw the same picture, because
+   * the drawing reads dials and the flip count and nothing else.
+   */
+  it('draws the fifteen-token form identically to the old pins-included one', () => {
+    const withoutTrailingPins = (scramble: string): string =>
+      scramble.replace(/(?: (?:UR|DR|DL|UL))+$/, '');
+
+    const legacy = corpusFor('clock').filter((s) => withoutTrailingPins(s) !== s);
+    expect(legacy.length, 'the clock corpus no longer holds an old-format scramble').toBeGreaterThan(
+      0,
+    );
+    for (const scramble of legacy) {
+      expect(fillSequence(drawScramble('clock', withoutTrailingPins(scramble))), scramble).toBe(
+        fillSequence(drawScramble('clock', scramble)),
+      );
+    }
+  });
 });
 
 describe('Pyraminx', () => {
