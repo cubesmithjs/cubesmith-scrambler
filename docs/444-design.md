@@ -549,10 +549,31 @@ at any price.
 
 **What would actually close it** is a different reduction architecture — one that
 does not hold the centres exact while pairing, and so does not pay for
-centre-neutral sequences. That is what the reference implementations do, and it is a
-rewrite of §6 and §9's phases rather than a tuning of them. It is not scheduled.
+centre-neutral sequences. That is a rewrite of §6 and §9's phases rather than a
+tuning of them, and it is **not scheduled**.
+
+🔴 **And "more phases" is not that architecture — it is the opposite lever.** The
+published multi-phase treatment of this puzzle (Jared Weed, arXiv:1601.05744, 2016,
+already cited in §13 and read in full on 2026-08-13) documents Charles Tsai's
+**eight-phase** scheme with explicit generators, and its worked example runs **67
+moves** — 67 to 79 once the twelve inner-slice moves are written in the outer/wide
+tokens a WCA scramble is printed in, which is consistent with the 79-move upper bound
+the same paper cites from Norskog. **That is longer than this package's median of
+69.** Its §V states the trade in general: more phases shrink each coset space but
+"necessarily increases the average total moves", the evidence being that
+Thistlethwaite's four 3x3x3 phases give 45–52 where Kociemba's two give about 26.
+
+So a phase decomposition and a 42–46 target pull against each other. Reaching 42–46
+means **fewer** phases with stronger tables — Kociemba's direction — and the binding
+constraint there is not table size (a 96,909,120-entry coordinate builds in 23 s under
+symmetry reduction) but **coordinate depth**: nothing tried here has a radius above 8
+against a phase distance near 25. The open question is exactly that, and it is worth
+stating as a question rather than a plan: *which coordinate over a reduced 4x4x4 has a
+radius near 20?*
+
 This package's `444` is honest about what it is: correct, uniformly random (χ² 4.89
-against df 5), and about twice as long as the official program's.
+against df 5), about 1.7× the official program's length — and shorter than the
+published method it was measured against.
 
 ---
 
