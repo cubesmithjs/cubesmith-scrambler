@@ -10,6 +10,113 @@ changes and a patch bump may not.
 
 ---
 
+## 0.14.0
+
+Two events emit a different string than they did in `0.13.0`: **`clock` now matches
+TNoodle's token format exactly**, and **`444`/`444bf` scrambles are roughly 40%
+shorter**.
+
+`0.14.0` rather than `0.13.1` because both are behaviour a consumer can see. Pre-1.0,
+a visible behaviour change belongs in a minor.
+
+🔴 **The random distribution is unchanged, and this is the sentence to read before any
+other.** No scramble this package produced before `0.14.0` was invalid. `444` drew a
+uniformly random state, solved it and printed the inverse then, and does exactly that
+now — the solver got better at finding a short *solution* to the same drawn state. The
+χ² check over the sticker distribution reads **4.89** against df 5 (96 free stickers,
+0 fixed, n=120) after these changes, where it read 5.32 before them; the untouched
+`333` control reads 3.79, 4.66 and 5.22 across the same runs, which is the noise floor.
+**The old scrambles were long, not wrong.**
+
+### `clock` — exactly fifteen tokens
+
+TNoodle-WCA-1.2.3 emits fifteen tokens and ends on the second `ALLn±`. This package
+appended bare pin names describing the final pins-up state — an older convention —
+which made its output 15 to 19 tokens and, more to the point, made the string differ
+from the official one *in kind* rather than in length.
+
+```
+before  UR1- DR5- DL5- UL2+ U5+ R6+ D6+ L0+ ALL1+ y2 U6+ R5- D1- L4+ ALL5+ DL UL
+after   UR1- DR5- DL5- UL2+ U5+ R6+ D6+ L0+ ALL1+ y2 U6+ R5- D1- L4+ ALL5+
+```
+
+🔴 **Emit narrow, accept wide.** `validateScramble('clock', …)` and the `./draw` layer
+still accept a scramble carrying the trailing pins — a scramble already stored in a
+consumer's database was written that way, and rejecting it later would turn a cosmetic
+change into data loss. 500 legacy strings are re-parsed, re-printed byte-identically
+and checked to reach exactly the state they always did.
+
+A defect in the removed format is worth recording, because it is a third reason it had
+to go: "leave all four pins up" is named by the *empty* declaration, which renders as
+the empty string and is filtered out. As a token array the intent survived; as **text**
+— the only form a competitor or a database ever sees — it did not. One draw in sixteen
+printed a scramble whose declared pin state was not the one drawn.
+
+### `444` / `444bf` — 137 moves to 74
+
+| | before | after |
+|---|---|---|
+| `444` | 94–205, mean 137.5 | **56–114, mean 73.8, median 69** |
+| TNoodle-WCA-1.2.3, for reference | 42–46 | 42–46 |
+
+A scramble a delegate could not practically apply is now one they can. It is still
+longer than the official program's, and `docs/444-design.md` §8 states that gap as an
+**accepted, measured ceiling** rather than an open task, with the reasoning.
+
+Five changes did it, each measured on a fixed set of states:
+
+1. **Cancellation across the phase joins.** Each phase returned a sub-solution
+   canonical on its own and nothing looked across a join, leaving 30 redundant moves in
+   four scrambles. 154 → 137.
+2. **Choosing the reduction route.** Which parity case a reduction lands in is a
+   property of the *route*, not the state — 6 states in 10 have a route needing no
+   parity work while their first route does not. 137 → 127.
+3. **Parity gadgets shortest-first**, and a **doubled pass** for the landing that
+   provably cannot finish in one. 127 → 119.
+4. **Searching the pairing for total word length** instead of edges-paired-per-step.
+   The old greedy averaged 7.2 moves a generator where the library's shortest is 5, with
+   a 29-to-63 spread on identical inputs. 119 → 86, and at **a sixth** of the time it
+   replaced.
+5. **Choosing OLL parity away instead of repairing it.** Only the 12 wide quarter turns
+   are odd on the 24 wings, so wing parity is frozen the moment phase 1 ends — and on a
+   reduced cube that *is* OLL parity. It is now chosen at phase 1 rather than fixed
+   afterwards by a gadget and a whole fresh pairing. 86 → 74, and **faster**: 23 states
+   in 30 need no parity pass at all.
+
+**Timing.** A warm `444` solve measures about **1 s** (813 ms and 964 ms on two runs of
+30 states). It is faster than `0.13.0`, not slower, which is worth saying because a
+solver that searches more usually is not: a parity pass costs a whole fresh pairing, and
+most solves no longer have one. `prepareEvent('444')` also now builds the compiled
+pairing library, which was previously left to whichever scramble happened to be first.
+
+### Everything else is unchanged
+
+No public API was added, removed or altered. `generateScramble`, `generateScrambles`,
+`prepareEvent`, `validateScramble`, the notation layer and the `./draw` entry all keep
+their signatures and their types. The other fifteen events emit exactly what they did
+in `0.13.0`.
+
+### Added
+
+- **A per-event move-count gate** (`src/core/move-count.test.ts`). No test anywhere in
+  the package bounded the length of the string it finally emits, which is why a
+  156-move `444` reached a printed scramble sheet. All seventeen events now carry a band
+  sourced from a real TNoodle-WCA-1.2.3 document, and an event that deviates is pinned
+  as a **recorded defect naming the decision that owns it** rather than having its band
+  widened until the suite passes.
+
+### Changed
+
+- `clock` emits fifteen tokens and no trailing pin declaration. The parser is unchanged
+  and still accepts the old form.
+- `444` and `444bf` emit substantially shorter scrambles. Seeded output for both events
+  differs from `0.13.0`; the distribution does not.
+
+### Fixed
+
+- `prepareEvent('444')` no longer leaves the compiled pairing library to be built by the
+  first scramble.
+
 ## 0.13.0
 
 Two capabilities a **competition scramble set** needs and `0.12.0` did not have: a
