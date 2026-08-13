@@ -99,6 +99,54 @@ export function differingIndices(a: ScrambleImage, b: ScrambleImage): number[] {
   return differing;
 }
 
+/**
+ * A Square-1 layer's twelve side stickers, read off the drawn geometry and bucketed
+ * by the 30° wedge each one occupies. Bucket `b` covers `[15 + 30b, 45 + 30b)` on
+ * screen; `'u'` is the upper view, `'l'` the lower one.
+ *
+ * 🔴 Read from the **coordinates**, not from the walk that produced them. A drawing
+ * bug that misorders a ring produces exactly the right multiset of faces in exactly
+ * the right count — the only thing wrong is *where each one landed*, which nothing
+ * that reasons over the shape list in paint order can see. This is the one helper
+ * that looks at where a sticker actually is.
+ */
+export function square1SideRing(image: ScrambleImage, layer: 'u' | 'l'): readonly string[] {
+  const centreY = layer === 'u' ? image.height / 4 : (3 * image.height) / 4;
+  const ring = new Array<string>(12).fill('');
+  for (const shape of image.shapes) {
+    if (shape.kind !== 'polygon') continue;
+    if (shape.face === undefined || !'LBRF'.includes(shape.face)) continue;
+    const cx = shape.points.reduce((sum, [x]) => sum + x, 0) / shape.points.length;
+    const cy = shape.points.reduce((sum, [, y]) => sum + y, 0) / shape.points.length;
+    if ((cy < image.height / 2 ? 'u' : 'l') !== layer) continue;
+    const degrees = (Math.atan2(cy - centreY, cx - image.width / 2) * 180) / Math.PI;
+    const bucket = Math.floor(((((degrees - 15) % 360) + 360) % 360) / 30);
+    if (ring[bucket] !== '') {
+      throw new Error(`invariants: two Square-1 side stickers in wedge ${bucket} of layer ${layer}`);
+    }
+    ring[bucket] = shape.face;
+  }
+  return ring;
+}
+
+/**
+ * Whether every face in `ring` occupies **one contiguous run** of wedges, counting
+ * cyclically.
+ *
+ * This is a fact about the puzzle, not about the drawing: a face is a flat side, so
+ * its stickers are angularly adjacent in every state a Square-1 can reach — a turn
+ * moves pieces between rings and around a ring, but it can never interleave two
+ * faces' stickers within one layer.
+ */
+export function hasContiguousFaceRuns(ring: readonly string[]): boolean {
+  return [...new Set(ring)].every((face) => {
+    const boundaries = ring.filter(
+      (f, i) => f === face && ring[(i + ring.length - 1) % ring.length] !== face,
+    );
+    return boundaries.length === 1;
+  });
+}
+
 // A `seededScrambleSeeds` helper used to live here, for the "20 seeded cases" tests.
 // It went away with the switch to a literal scramble corpus (`__tests__/corpus.ts`) —
 // nothing in the drawing tests generates a scramble any more, so nothing needs a seed.

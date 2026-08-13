@@ -11,6 +11,8 @@ import {
   differingIndices,
   faceCounts,
   fillSequence,
+  hasContiguousFaceRuns,
+  square1SideRing,
   withinBounds,
 } from './__tests__/invariants';
 
@@ -349,6 +351,109 @@ describe('Square-1', () => {
     // Twenty-four side stickers across both layers, plus the middle bar's two fills
     // (both front, because a solved slice is not flipped).
     expect(counts.L! + counts.B! + counts.R! + counts.F!).toBe(24 + 2);
+  });
+
+  it('🔴 keeps every face on ONE contiguous arc while the layers stay intact', () => {
+    // A face is a flat side of the puzzle, so as long as no `/` has mixed the two
+    // rings, each face's stickers are angularly adjacent within its layer. Nothing
+    // that reads the shape list in paint order can see this: a ring walked in the
+    // wrong direction, or with a corner's two side stickers swapped, emits exactly
+    // the right faces in exactly the right counts and merely puts them in the wrong
+    // wedges. `square1SideRing` reads where a sticker actually landed.
+    //
+    // 🔴 The claim stops at the first `/`, and that is the puzzle, not a hedge: a
+    // slice exchanges half of one ring with a *reflected* half of the other, so a
+    // face's stickers genuinely do end up scattered around a layer afterwards.
+    // `RRBFLLLBBFFR` is the upper ring after a single slice, and it is correct.
+    //
+    // This is what the lower layer failed for the whole of 0.13–0.14: drawn forwards
+    // when it is a mirror view and therefore has to be walked backwards, its wedges
+    // read `FLFBLBRBRFRF` on a **solved** puzzle — a plausible-looking ring of
+    // colours that is not any state of any Square-1.
+    for (const scramble of ['', '(1,0)', '(0,1)', '(6,6)', '(-4,5)', '(3,-2)']) {
+      const image = drawScramble('sq1', scramble);
+      for (const layer of ['u', 'l'] as const) {
+        const ring = square1SideRing(image, layer);
+        expect(ring.filter((face) => face !== ''), `${layer} ${scramble}`).toHaveLength(12);
+        expect(hasContiguousFaceRuns(ring), `${layer} ${scramble} — ${ring.join('')}`).toBe(true);
+      }
+    }
+  });
+
+  it('🔴 turns each ring rigidly, in the direction that layer is drawn', () => {
+    // The general form of the check above, and the one that survives a slice: whatever
+    // the state, `(a, b)` must rotate the upper ring `a` wedges and the lower ring `b`
+    // wedges, both **clockwise on screen**. Same sign for both, because the lower view
+    // is mirrored — which is exactly the fact the lower layer used to get wrong, and
+    // it shows up here as a `b` that rotates the wrong way.
+    const ringsOf = (scramble: string) => ({
+      u: square1SideRing(drawScramble('sq1', scramble), 'u'),
+      l: square1SideRing(drawScramble('sq1', scramble), 'l'),
+    });
+    const rotatedBy = (after: readonly string[], before: readonly string[], by: number) =>
+      after.every((face, i) => face === before[(((i - by) % 12) + 12) % 12]);
+
+    for (const base of ['', '(1,0)', '(3,0) / (0,3)', '(-3,2) / (4,-2) / (-1,2)']) {
+      const before = ringsOf(base);
+      for (const [top, bottom] of [[1, 0], [0, 1], [3, -2], [-4, 5]] as const) {
+        const after = ringsOf(`${base ? `${base} ` : ''}(${top},${bottom})`);
+        expect(rotatedBy(after.u, before.u, top), `upper ${base} (${top},${bottom})`).toBe(true);
+        expect(rotatedBy(after.l, before.l, bottom), `lower ${base} (${top},${bottom})`).toBe(true);
+      }
+    }
+  });
+
+  it('🔴 draws the lower layer as a MIRROR of the upper, not a second copy of it', () => {
+    // The upper view looks down at `U`; the lower one looks up at `D`, so it is the
+    // same angular frame reflected about the picture's horizontal axis. Wedge `b`
+    // spans `[15 + 30b, 45 + 30b)`, and reflecting `a -> -a` sends it to wedge
+    // `10 - b`. On a solved puzzle — a cube, corner directly above corner — that
+    // reflection is the entire relationship between the two rings.
+    const image = drawScramble('sq1', '');
+    const upper = square1SideRing(image, 'u');
+    const lower = square1SideRing(image, 'l');
+    for (let b = 0; b < 12; b += 1) {
+      expect(lower[(10 - b + 12) % 12], `wedge ${b}`).toBe(upper[b]);
+    }
+    // Which puts `F` at the bottom of the upper view and at the top of the lower one,
+    // with `L` and `R` staying put — the puzzle tipped towards you, the convention
+    // every official sheet uses.
+    expect(upper.slice(1, 4)).toEqual(['F', 'F', 'F']);
+    expect(lower.slice(7, 10)).toEqual(['F', 'F', 'F']);
+    expect(upper.slice(4, 7)).toEqual(['L', 'L', 'L']);
+    expect(lower.slice(4, 7)).toEqual(['L', 'L', 'L']);
+  });
+
+  it('🔴 puts the cut plane where the middle bar says it is', () => {
+    // The bar draws the `F` face split at one corner's width, so it claims the cut
+    // bisects `F` — vertical on screen, with the half a `/` moves on the right. That
+    // is a claim about the *layer* pictures, and it is only true if the face labels
+    // and the start angle agree with `CUT_BOUNDARIES`. Turn the labels a quarter turn
+    // without turning the picture back and the solved layer still looks perfect;
+    // one `/` later it exchanges the wrong six wedges.
+    //
+    // Asserted as the exchange itself rather than as "these wedges changed": a slice
+    // can land the same colour back in a wedge by chance, so counting what differs
+    // understates it. `MOVING_HALF` is the upper's six wedges; the lower's are those
+    // reflected, and the slice reflects again, so upper `s` trades with lower `s - 1`.
+    const moving = [9, 10, 11, 0, 1, 2];
+    const stationary = [3, 4, 5, 6, 7, 8];
+    for (const base of ['', '(1,0)', '(3,0) / (0,3)', '(-3,2) / (4,-2) / (-1,2)']) {
+      const at = (scramble: string) => ({
+        u: square1SideRing(drawScramble('sq1', scramble), 'u'),
+        l: square1SideRing(drawScramble('sq1', scramble), 'l'),
+      });
+      const before = at(base);
+      const after = at(`${base ? `${base} ` : ''}/`);
+      for (const s of moving) {
+        expect(after.u[s], `upper ${s} after ${base} /`).toBe(before.l[(s + 11) % 12]);
+        expect(after.l[(s + 11) % 12], `lower ${(s + 11) % 12} after ${base} /`).toBe(before.u[s]);
+      }
+      for (const s of stationary) {
+        expect(after.u[s], `upper ${s} held ${base}`).toBe(before.u[s]);
+        expect(after.l[10 - s], `lower ${10 - s} held ${base}`).toBe(before.l[10 - s]);
+      }
+    }
   });
 
   it('🔴 draws the slice-parity bit, which a picture can otherwise silently drop', () => {

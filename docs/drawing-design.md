@@ -198,9 +198,36 @@ rotated vectors are snapped back onto the exact face-centre array entry, keeping
 
 ### Square-1 — two layer views and the middle bar
 
-Top layer at `(width/2, height/4)` rotated `+105°`, bottom at `(width/2, 3*height/4)`
-rotated `-105°`; corner pieces span 60°, wedges 30°. 🔴 Its scheme is its own again:
-`U` yellow and `D` white, the reverse of the cube net.
+Top layer at `(width/2, height/4)`, bottom at `(width/2, 3*height/4)`; corner pieces
+span 60°, wedges 30°. 🔴 Its scheme is its own again: `U` yellow and `D` white, the
+reverse of the cube net.
+
+🔴 **The lower layer is a mirror view, so its ring is walked backwards.** The upper
+view looks down at `U`; the lower one looks *up* at `D`. Both rings are indexed in one
+shared angular frame (that is what makes the slice expressible at all — see
+`square1-design.md` §3), so drawing the lower one forwards, as the upper one is, puts
+slot 0 where slot 11 belongs and runs the angle the wrong way. Reversing the ring maps
+slot `i` to unit `11 - i`, which keeps a corner's two slots adjacent and so leaves the
+piece walk untouched. The `[top, b, a]` swap in `pieceColors` belongs to that
+reversal, not to the colours: reverse without swapping, or swap without reversing, and
+every face is torn into three.
+
+🔴 **The start angles are `±15°`, not TNoodle's `±105°`, and `SIDES` is `FLBR`, not
+its `LBRF`.** This package's ring frame is TNoodle's turned a quarter: its cut plane
+runs between slots `(2,3)` and `(8,9)`, where TNoodle's runs between `(11,0)` and
+`(5,6)`. Where the cut sits **relative to the colours** is drawable — the middle bar
+draws the `F` face split at one corner's width, which is only true if the cut bisects
+`F` — so both the labels and the picture turn back by that quarter. The two turns
+cancel on a *solved* puzzle, which is why either pair draws the same upper layer, and
+they come apart one slice later, when `/` exchanges the wrong six wedges.
+
+Both bugs shipped in 0.13.0 and 0.14.0 and were found by eye: on a solved puzzle the
+lower layer drew as a diamond where the upper drew as a square. The three invariants
+that now pin it (`square1SideRing` + contiguous face runs, rigid per-ring rotation,
+and the slice exchanging exactly the wedges the bar claims) all read the **drawn
+coordinates**, because a misordered ring emits exactly the right faces in exactly the
+right counts — the only thing wrong is where each one landed. Every check that walked
+the shape list in paint order passed throughout.
 
 🔴 **The middle bar carries the slice-parity bit.** Two rectangles flank the centre;
 the second takes the front colour when the slice is solved and the back colour when

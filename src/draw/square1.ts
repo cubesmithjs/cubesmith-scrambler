@@ -55,8 +55,22 @@ export const SQUARE1_DEFAULT_SCHEME: ColorScheme = {
   U: '#ffff00',
 };
 
-/** `String faces = "LBRFUD"` — the four side faces in the order TNoodle indexes them. */
-const SIDES: readonly string[] = ['L', 'B', 'R', 'F'];
+/**
+ * The four side faces, indexed by `piece % 4`.
+ *
+ * 🔴 **Not TNoodle's `"LBRFUD"` order**, and the difference is not cosmetic. This
+ * package's ring frame is TNoodle's rotated a quarter turn: its cut plane runs
+ * between slots `(2,3)` and `(8,9)` (`CUT_BOUNDARIES`), where TNoodle's runs between
+ * its indices `(11,0)` and `(5,6)`. The cut plane's position **relative to the
+ * colours** is a real, drawable fact — the middle bar draws the `F` face split at a
+ * corner's width, which only means anything if the cut actually bisects `F` — so the
+ * labels have to be turned back by that same quarter turn. `SIDES[m]` is therefore
+ * TNoodle's `colorScheme[(m + 3) % 4]`.
+ *
+ * Getting this wrong is invisible on a solved puzzle and visible one slice later:
+ * with the labels a quarter turn out, `/` exchanges the wrong half of the picture.
+ */
+const SIDES: readonly string[] = ['F', 'L', 'B', 'R'];
 const FRONT = 'F';
 const BACK = 'B';
 
@@ -140,12 +154,19 @@ function cornerPolygons(): readonly (readonly [number, number])[][] {
  * rather than TNoodle's interleaving — so the arithmetic is rewritten over this
  * model's own indices. The *structure* is identical: a corner shows its layer's
  * face plus two adjacent side faces, an edge shows its layer's face plus one.
+ *
+ * 🔴 The lower layer's `[top, b, a]` is **not** a colour correction — the two rings
+ * share one angular frame, so a lower corner's stickers sit in the same order as an
+ * upper one's. It is there because the lower layer is drawn **mirrored**, viewed from
+ * underneath, so its ring is walked backwards ({@link drawSquare1Scramble}) and the
+ * corner's two strips come out in the opposite order. Swapping without reversing —
+ * or reversing without swapping — tears every face run into three pieces.
  */
 function pieceColors(piece: number): readonly string[] {
   const corner = isCornerPiece(piece);
   const up = corner ? piece < 4 : piece < 12;
   const top = up ? 'U' : 'D';
-  const index = corner ? piece % 4 : piece % 4;
+  const index = piece % 4;
 
   if (!corner) return [top, SIDES[index]!];
   const a = SIDES[(index + 3) % 4]!;
@@ -289,6 +310,20 @@ function drawMiddle(state: Square1State, scheme: ColorScheme, out: ImageShape[])
   out.push({ kind: 'rect', x, y, w: cornerWidth, h, fill: 'none', stroke: BLACK });
 }
 
+/**
+ * Where slot 0 of each ring lands on screen.
+ *
+ * 🔴 **Not TNoodle's `±(90 + 15)`**, for the same reason {@link SIDES} is not its
+ * `"LBRFUD"`: this frame is a quarter turn from TNoodle's, so the whole picture turns
+ * back by the same quarter turn. `+15°` puts the cut plane on the vertical, with the
+ * half a `/` moves on the right — which is what the middle bar draws.
+ *
+ * The two together are one rotation, so on a *solved* puzzle either pair draws the
+ * same upper layer. They come apart one slice later.
+ */
+const UPPER_START_DEGREES = 15;
+const LOWER_START_DEGREES = -15;
+
 export function drawSquare1Scramble(scramble: string, scheme: ColorScheme): ScrambleImage {
   const state = applySquare1Moves(SOLVED_SQUARE1_STATE, parseSquare1Scramble(scramble));
   const shapes: ImageShape[] = [];
@@ -299,14 +334,23 @@ export function drawSquare1Scramble(scramble: string, scheme: ColorScheme): Scra
   drawLayer(
     state.slots.slice(UPPER_RING, UPPER_RING + RING_SLOTS),
     [x, SQUARE1_IMAGE_HEIGHT / 4],
-    90 + 15,
+    UPPER_START_DEGREES,
     scheme,
     shapes,
   );
+  // 🔴 **Reversed**, and that is the whole of the lower layer's geometry. The upper
+  // view looks down at `U`; the lower one looks *up* at `D`, so it is the same
+  // angular frame seen in a mirror — slot 11 where the upper view puts slot 0, and
+  // angle running the other way. Drawing the ring forwards, as the upper one is,
+  // scatters each face's three units around the picture: the solved layer still looks
+  // like a plausible ring of colours, which is exactly why it survived.
+  //
+  // Reversing maps slot `i` to unit `11 - i`, which keeps a corner's two slots
+  // adjacent, so `firstPieceBoundary` and the 30°-per-unit walk carry over unchanged.
   drawLayer(
-    state.slots.slice(LOWER_RING, LOWER_RING + RING_SLOTS),
+    state.slots.slice(LOWER_RING, LOWER_RING + RING_SLOTS).reverse(),
     [x, (3 * SQUARE1_IMAGE_HEIGHT) / 4],
-    -90 - 15,
+    LOWER_START_DEGREES,
     scheme,
     shapes,
   );

@@ -10,6 +10,62 @@ changes and a patch bump may not.
 
 ---
 
+## 0.14.1
+
+**`drawScramble('sq1', …)` drew the wrong picture.** Nothing else changed, and no
+other event is affected.
+
+A **patch**, and deliberately so, even though the drawn output is different from
+`0.14.0`'s. `0.14.0` took a minor over `0.13.1` because it carried an *improvement* a
+consumer could see — 4x4x4 scrambles got 40% shorter, and the old ones were long, not
+wrong. This release carries no improvement and no new surface: the picture was wrong,
+now it is right. A patch also means `^0.14.0` picks it up without an explicit edit,
+which is how the broken drawing leaves circulation everywhere rather than only where
+someone remembers to bump. The one cost is that a consumer holding a snapshot of `sq1`
+output will auto-upgrade into a diff — a diff it wants.
+
+🔴 **Scramble *generation* is untouched** — no `sq1` scramble this package produced was
+ever wrong, only the picture drawn from one.
+
+### The symptom
+
+On a **solved** puzzle — `drawScramble('sq1', '')` — the upper layer drew as a square
+and the lower layer as a diamond. A solved Square-1 is a cube: both layers are squares
+in the same alignment, so the two views have to be identically oriented.
+
+### Two bugs, both in `draw/square1.ts`
+
+**The lower layer was walked forwards.** The upper view looks down at `U`; the lower
+one looks *up* at `D`, and both rings are indexed in one shared angular frame, so the
+lower ring has to be walked **backwards** — slot 11 where the upper view puts slot 0.
+Drawn forwards, its twelve wedges read `FLFBLBRBRFRF` on a solved puzzle: the right
+faces in the right counts, each in the wrong place, and no state of any Square-1.
+`pieceColors`' existing `[top, b, a]` swap for the lower layer belongs to that
+reversal — reversing without swapping, or swapping without reversing, tears every face
+into three.
+
+**The face labels sat a quarter turn from the cut plane.** This package's ring frame is
+TNoodle's turned a quarter: its cut runs between slots `(2,3)` and `(8,9)`, TNoodle's
+between `(11,0)` and `(5,6)`. Where the cut sits *relative to the colours* is drawable
+— the middle bar draws the `F` face split at one corner's width, which only means
+anything if the cut bisects `F` — so `SIDES` is now `FLBR` and the layers start at
+`±15°`, both turned back by that quarter. The two turns cancel on a solved puzzle,
+which is why the upper layer always looked right; they come apart one `/` later, when
+the slice exchanged the wrong six wedges.
+
+### How it is pinned now
+
+Three invariants, all reading the **drawn coordinates** rather than the shape list,
+because a misordered ring emits exactly the right faces in exactly the right counts —
+every check that walked the list in paint order passed throughout both bugs.
+
+- each face occupies one contiguous arc of a layer, while no `/` has mixed the rings;
+- `(a, b)` rotates each ring rigidly, both clockwise on screen, in every state;
+- `/` exchanges exactly the wedges the middle bar claims it does.
+
+Cross-checked against a port of TNoodle's `SquareOnePuzzle` colour walk over 4000
+generated scrambles, all matching wedge for wedge in both layers.
+
 ## 0.14.0
 
 Two events emit a different string than they did in `0.13.0`: **`clock` now matches
