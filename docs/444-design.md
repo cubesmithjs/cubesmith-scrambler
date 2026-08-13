@@ -481,6 +481,58 @@ scramble and reached 140 ms only after four rounds of measurement. The same
 should be expected here, and the milestones (§12) are arranged so that the
 measurement happens early rather than at the end.
 
+### 🔴 The length estimate was not met, and that is now a measured ceiling
+
+The **45–60 moves** predicted above was written for a four-phase chain with
+PDB-guided phases. What shipped reduces in stages, and as of 2026-08-13 emits
+**59–119 tokens, mean 86** against TNoodle-WCA-1.2.3's **42–46**. The difference is
+**accepted**, and this is the reason, recorded so that nobody spends the same weeks
+finding it out again.
+
+**Where the moves are** (24 states, measured on the shipped solver):
+
+| phase | moves | |
+|---|---|---|
+| centres — `phase1Search` + `solveCentres444` | 16.1 | exact search |
+| pairing — `pairWings444` | 24.5 | searched over the library (§12.9) |
+| parity — gadget-and-repair | 21.5 | 0.6 passes |
+| 3x3x3 hand-off — `solve333` | 23.3 | two-phase solver |
+| **emitted** | **82.5** | after cancellation |
+
+🔴 **Centres + hand-off = 39.4, inside TNoodle's budget for a whole scramble.** The
+two phases that search properly are already the right size. The entire gap is the
+**46 moves of reduction overhead**, and it follows from one structural fact.
+
+**The structural fact.** All 18 outer turns hold solved centres and all 18 preserve
+pairing; all 6 wide half turns break both. Every move that can pair a wing therefore
+unsolves the centres, and centres-solved and wings-paired cannot be established one
+after the other — §6 and `orbits.ts` say this, and it was re-measured on the shipped
+move tables in 2026-08. So the pairing is forced to run over **net-centre-neutral
+sequences**, conjugates averaging about seven moves, where a human's
+slice-flip-slice runs four and repairs the centres later. Parity is the same fact
+again: the reduction lands outside the 3x3x3 subgroup about three times in four, and
+the way back in is another centre-neutral gadget plus a fresh pairing.
+
+**A stronger pruning table does not rescue it.** §6 rejected the 96,909,120-entry
+six-wing coordinate on the cost of *building* it. That rejection is wrong on its
+stated grounds: with a queue rather than a frontier scan, and a verified 24-fold
+symmetry reduction expanding exactly 4,037,880 representatives, it builds in
+**23.1 s** in 233 MB. It is also useless. Its **radius is 8**, and on real
+centres-solved states it reads **mean 6.7, max 7** where the pairing spends **29.9**.
+The 255,024-entry table already here reads 5.4 on the same states — a **380× larger
+table for +1.3**. The family saturates: each further pair of wings multiplies the
+size by about twenty and adds roughly one to the radius, so bounding a 30-move phase
+would need a radius near 30 and a coordinate beyond any size that could be built or
+shipped. The serialized-table question never arises: this table is not worth shipping
+at any price.
+
+**What would actually close it** is a different reduction architecture — one that
+does not hold the centres exact while pairing, and so does not pay for
+centre-neutral sequences. That is what the reference implementations do, and it is a
+rewrite of §6 and §9's phases rather than a tuning of them. It is not scheduled.
+This package's `444` is honest about what it is: correct, uniformly random (χ² 4.89
+against df 5), and about twice as long as the official program's.
+
 ---
 
 ## 9. Open questions, to be settled by computation

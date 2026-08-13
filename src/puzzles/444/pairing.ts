@@ -119,6 +119,16 @@ interface CompiledLibrary {
 
 let compiled: CompiledLibrary | undefined;
 
+/**
+ * Builds the compiled library now, so `prepareEvent('444')` pays for it rather than
+ * whichever scramble happens to be first. Small — 6,660 x 24 x 2 writes — but this is
+ * exactly the kind of lazily-built thing `core/prepare-event.test.ts` exists to catch,
+ * and leaving it out would make the preparer a slightly false promise.
+ */
+export function prepareCompiledLibrary(): void {
+  compiledLibrary();
+}
+
 function compiledLibrary(): CompiledLibrary {
   if (compiled) return compiled;
   const library = extendedLibrary();

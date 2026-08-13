@@ -9,7 +9,7 @@ import { mergeWideMoves } from '../nxn/cancel';
 import { inverseWideMoves, wideMovesToString, type WideMove } from '../nxn/notation';
 import { randomCube444State } from './coordinates';
 import { is333Reachable, parityOf444Handoff, to333State } from './handoff';
-import { pairWings444 } from './pairing';
+import { pairWings444, prepareCompiledLibrary } from './pairing';
 import { oddWingGadget, prepareOddWingGadgets } from './parity';
 import { reduce444BestRoute } from './reduce';
 import { apply444Moves, is444Solved, move444Tables, type Cube444State } from './state';
@@ -112,12 +112,13 @@ function mergeMoveIndices(moves: readonly number[]): number[] {
 /**
  * A sequence of move indices carrying `state` to solved.
  *
- * Not optimal and not near it: **74 to 172 moves, mean 119**, measured over 16 states
- * (2026-08-12), where TNoodle-WCA-1.2.3 prints 42 to 46. It costs length only — the
+ * Not optimal and not near it: **59 to 119 moves, mean 86**, measured over 26 states
+ * (2026-08-13), where TNoodle-WCA-1.2.3 prints 42 to 46. It costs length only — the
  * state is drawn before any of this runs, and the χ² check over the sticker
- * distribution reads 5.02 against df 5 after these changes as it did before them.
+ * distribution reads **4.89** against df 5 after all of it, where the untouched `333`
+ * control has read 4.66, 5.22 and 3.79 across the same runs.
  *
- * That is down from a mean of 154 raw, and four things did it, each measured:
+ * That is down from a mean of 154 raw, and five things did it, each measured:
  *
  * 1. **Cancelling across the phase joins** (`mergeMoveIndices`) — 154 → 137. Free.
  * 2. **Choosing the reduction route** (`reduce444BestRoute`) — 137 → 127. Which parity
@@ -127,12 +128,25 @@ function mergeMoveIndices(moves: readonly number[]): number[] {
  * 3. **Gadgets shortest-first** (`oddWingGadget`) — the pool averages 19 moves in
  *    discovery order and 15.9 taken shortest-first.
  * 4. **The doubled pass** for a `permutation` landing, which provably cannot finish in
- *    one gadget.
+ *    one gadget. (3)+(4): 127 → 119.
+ * 5. **Searching the pairing for total word length** rather than edges-per-step
+ *    (`pairWings444`) — 119 → 86, and at a *sixth* of the time the greedy cost.
  *
- * What is left is the architecture, not a defect: a centre-neutral pairing generator
- * runs about ten moves where a human's slice-flip-slice runs four, and that is the
- * price of reducing in stages. Closing to TNoodle's band needs a pruning-table search
- * over the reduced state — §12 of `docs/444-design.md`.
+ * ## Where the rest is, and why it stays there
+ *
+ * Split over 24 states: centres **16.1**, pairing **24.5**, parity **21.5**, 3x3x3
+ * hand-off **23.3**. 🔴 Centres and the hand-off already sum to **39.4** — inside
+ * TNoodle's budget for a *whole* scramble — so the entire gap is reduction overhead.
+ *
+ * That overhead is structural. Every move that can pair a wing is a wide turn, and
+ * every wide turn unsolves the centres (`orbits.ts`), so the pairing is forced onto
+ * net-centre-neutral *sequences* of about seven moves where a human's slice-flip-slice
+ * is four — and parity exists because the reduction lands outside the 3x3x3 subgroup
+ * about three times in four. A stronger pruning table does not rescue it: the
+ * 96,909,120-entry six-wing coordinate builds in 23 s under a verified 24-fold symmetry
+ * reduction and reads **6.7** on real states where the pairing spends 29.9. Closing the
+ * gap needs a different reduction architecture, and that is not scheduled — §8 of
+ * `docs/444-design.md` is the full argument.
  */
 export function solve444(state: Cube444State): number[] {
   const reduction = reduce444BestRoute(state);
@@ -291,6 +305,7 @@ export function generate444Scramble(random: RandomSource): string {
 export function prepare444Tables(): void {
   move444Tables();
   prepareOddWingGadgets();
+  prepareCompiledLibrary();
   centreTable();
   for (let index = 0; index < AXIS_PAIRS.length; index += 1) centrePairTable(index);
   singleEdgeTable();

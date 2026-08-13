@@ -52,14 +52,14 @@ document that found them:
 
 Every one of these is now **pinned by a test**: `src/core/move-count.test.ts` holds a
 per-event band against TNoodle-WCA-1.2.3's own token counts, and an event that deviates
-carries its band as a *recorded defect* naming the task that closes it — rather than
-having the band widened until the suite passes. Until 2026-08-12 no test anywhere in the
+carries its band as a *recorded defect* naming the task that closes it, or the decision
+that **accepted** it — rather than having the band widened until the suite passes. Until 2026-08-12 no test anywhere in the
 package bounded a generated scramble's length, which is why the `444` row below reached a
 printed scramble sheet.
 
 | Gap | Where | Severity |
 |---|---|---|
-| ⚠️ A `444`/`444bf` scramble runs **59–119 tokens, mean 86** against TNoodle's 42–46 | [444-design.md](./444-design.md) §12.8–12.9 | 94–205 (mean 137.5) → 74–172 (119.4) on 2026-08-12 → **59–119 (85.9)** on 2026-08-13, the last step from searching the pairing for total word length instead of edges-per-step, at no extra wall-clock. What is left is the architecture: a centre-neutral generator is ~7 moves where a human's slice-flip-slice is 4. Whether 42–46 is reachable at all is what `444_pairing_search_plan` task 02 measures. The *state* is uniformly random and unaffected |
+| ⚠️ A `444`/`444bf` scramble runs **59–119 tokens, mean 86** against TNoodle's 42–46 | [444-design.md](./444-design.md) §8, §12.8–12.9 | 94–205 (mean 137.5) → 74–172 (119.4) on 2026-08-12 → **59–119 (85.9)** on 2026-08-13, the last step from searching the pairing for total word length instead of edges-per-step, at no extra wall-clock. **accepted, not outstanding.** Centres (16.1) + hand-off (23.3) = 39.4 already fits TNoodle's whole budget, so the gap is all reduction overhead — every move that can pair a wing unsolves the centres, so pairing runs over ~7-move centre-neutral sequences. The six-wing pruning table *does* build (23.1 s under a 24-fold symmetry fold, against the doc's "minutes to hours") and reads 6.7 where the pairing spends 29.9. Closing it needs a different reduction architecture. The *state* is uniformly random and unaffected |
 | A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20 originally; **4 of 30** on a second sample (2026-08-13). The printed sequence merges one move shorter. Fixing it in the search changes `333` output for every seed; a post-hoc merge would change only the scrambles that have a seam, but interacts with `333fm`'s first/last-move axis restriction and was left alone rather than ridden in on another change |
 | ⚠️ The five 3x3x3-family events run **+3 to +5 moves** over TNoodle (`333` 21–26 against 19–20) | [333-design.md](./333-design.md) §8 rough edge 2 | **accepted, not outstanding.** The cause is that the solver takes the first phase-1 solution rather than sweeping several. Measured 2026-08-13: sweeping buys 1.3 moves for ≥10× the time and 2.1 for ≥73×, and still lands at 21.2. A 3x3x3 scramble is on the consuming app's practice-timer hot path |
 | The `minx` 4b3e floor is measured against the identity state, not "solved up to whole-puzzle rotation" | [megaminx-design.md](./megaminx-design.md) §8 | ~`10^-66`; the floor itself is enforced, this is the residual the piece model cannot yet express |

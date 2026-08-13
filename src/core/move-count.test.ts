@@ -213,11 +213,20 @@ const BANDS: readonly EventBand[] = [
   // moves on the pairing**, and **59–119, mean 85.9** on the whole solve over 26
   // states, in no more wall-clock than before.
   //
-  // What is left is still the architecture: the reduction is
-  // centres-then-centre-neutral-pairing, and a centre-neutral generator is about
-  // seven moves where a human's slice-flip-slice is four. Whether 42–46 is
-  // reachable at all under this package's constraints is what
-  // `444_pairing_search_plan` task 02 exists to measure.
+  // 🔴 What is left is **accepted**, not outstanding. Centres (16.1) and the 3x3x3
+  // hand-off (23.3) already sum to 39.4 — inside TNoodle's budget for a whole
+  // scramble — so the entire gap is reduction overhead, and that follows from a
+  // structural fact: every move that can pair a wing unsolves the centres, so the
+  // pairing must run over centre-neutral *sequences* of about seven moves where a
+  // human's slice-flip-slice runs four.
+  //
+  // `444_pairing_search_plan` task 02 measured the way out and closed it: the
+  // 96,909,120-entry six-wing coordinate does build — 23.1 s under a verified
+  // 24-fold symmetry reduction, against the design doc's "minutes to hours" — and
+  // is useless, reading 6.7 on real states where the pairing spends 29.9. A 380x
+  // larger table than the one already here buys +1.3 on the bound. Closing this
+  // needs a different reduction architecture, which is not scheduled.
+  // See `docs/444-design.md` §8.
   //
   // The ceiling is derived, not sampled: 119 was the worst of 26, and the room
   // above it is one failed doubled parity pass — a 0.8% event on the states that
@@ -230,7 +239,7 @@ const BANDS: readonly EventBand[] = [
     draws: 2,
     size: 4,
     maxRedundant: 0,
-    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan',
+    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan — closed 2026-08-13, the gap is accepted',
     measured: '59–119 over 26 draws, mean 85.9 (was 94–205 mean 137.5; then 74–172 mean 119.4)',
   },
   {
@@ -241,7 +250,7 @@ const BANDS: readonly EventBand[] = [
     draws: 2,
     size: 4,
     maxRedundant: 0,
-    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan',
+    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan — closed 2026-08-13, the gap is accepted',
     measured: 'the same solver plus a whole-cube rotation, so 444 + 0..2 tokens',
   },
 ];
