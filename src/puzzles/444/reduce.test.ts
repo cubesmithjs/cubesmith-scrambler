@@ -3,7 +3,7 @@ import { createRandomSource } from '../../random/random-source';
 import { randomCube444State } from './coordinates';
 import { extendedLibrary, isCentreNeutral } from './generators';
 import { areCentresSolved, areWingsPaired, isReduced } from './orbits';
-import { areAllEdgesPaired, pairedEdgeCount, pairWings444 } from './pairing';
+import { areAllEdgesPaired, greedyPairWings444, pairedEdgeCount, pairWings444 } from './pairing';
 import { MAX_REDUCTION_ROUTES, reduce444, reduce444BestRoute } from './reduce';
 import { parityOf444Handoff, to333State } from './handoff';
 import { apply444Moves, SOLVED_444_STATE } from './state';
@@ -61,6 +61,46 @@ describe('pairing the wings', () => {
     const state = { ...drawn, centreColour: SOLVED_444_STATE.centreColour };
     const result = pairWings444(state);
     expect(areCentresSolved(apply444Moves(state, result.moves))).toBe(true);
+  });
+
+  /**
+   * 🔴 The fallback, which is the reason `greedyPairWings444` is still exported.
+   *
+   * `pairWings444` searches the library for the shortest total word, and that search
+   * only ever extends by a generator that pairs *more* edges — so it walks into the
+   * last-two-edges stall that the greedy's depth-2 rescue exists for, and returns
+   * `undefined` when it does. One state in 24 needed the fallback when the search
+   * landed (2026-08-13).
+   *
+   * The greedy therefore has to stay **total**, and that is a uniformity requirement
+   * rather than tidiness: a pairing that quietly failed on some subset of states, with
+   * generation redrawing in response, would leave the output uniform only conditional
+   * on solvability, and the excluded set would be invisible to any test on the output.
+   */
+  it('the greedy fallback still pairs everything on its own', () => {
+    const random = createRandomSource('444 pairing fallback');
+    for (let trial = 0; trial < 3; trial += 1) {
+      const state = randomCube444State(random);
+      const result = greedyPairWings444(state);
+      expect(areAllEdgesPaired(result.wingPermutation)).toBe(true);
+      expect(apply444Moves(state, result.moves).wingPermutation).toEqual(result.wingPermutation);
+    }
+  });
+
+  /**
+   * The search is what shortened the pairing — 46.7 moves to 30.3 over 26
+   * centres-solved states. Asserted as "no worse than the greedy it replaced" rather
+   * than as a number, because a per-state guarantee is what actually has to hold: the
+   * search either finds something at most as long, or declines and *is* the greedy.
+   */
+  it('never returns a longer word than the greedy it replaced', () => {
+    const random = createRandomSource('444 pairing not worse');
+    for (let trial = 0; trial < 4; trial += 1) {
+      const state = randomCube444State(random);
+      expect(pairWings444(state).moves.length).toBeLessThanOrEqual(
+        greedyPairWings444(state).moves.length,
+      );
+    }
   });
 });
 

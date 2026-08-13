@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 // Imported for its registration side effects: the registry is populated by the
 // package entry point, not by the core module.
 import { generateScramble } from '../../index';
@@ -6,8 +6,21 @@ import { createRandomSource } from '../../random/random-source';
 import { cubeScrambleIsFarEnough } from '../nxn/minimum';
 import { parseWideMove } from '../nxn/notation';
 import { randomCube444State } from './coordinates';
-import { generate444Scramble, solve444 } from './solve';
+import { generate444Scramble, prepare444Tables, solve444 } from './solve';
 import { apply444Moves, cube444StatesEqual, is444Solved, move444Tables, SOLVED_444_STATE } from './state';
+
+/**
+ * The tables, built once before anything is timed.
+ *
+ * Every test below solves a 4x4x4, and without this the first of them pays the whole
+ * cold table build inside its own 180 s budget — which under `--coverage` and full
+ * parallel load is enough to time it out. The build is not what any of these tests is
+ * about, and `hookTimeout` is 10 s while `vitest.config.ts` only raises `testTimeout`,
+ * so the hook needs its own.
+ */
+beforeAll(() => {
+  prepare444Tables();
+}, 900_000);
 
 const indexOfMove = (token: string): number => {
   const move = parseWideMove(token);

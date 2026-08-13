@@ -273,8 +273,21 @@ will be long — plausibly 60 to 150 moves — which the project's stated priori
 accept, and length can be attacked afterwards.
 
 What the seven tables are still worth: the centre table is the exact finisher for
-the last stage, and the wing-pair tables are exactly the per-stage guidance a
-staged pairing needs.
+the last stage.
+
+> 🔴 **Amended 2026-08-13.** This section used to end "…and the wing-pair tables are
+> exactly the per-stage guidance a staged pairing needs." That reading was tested in
+> `444_pairing_search_plan` and does not hold. A stage cannot be a search over single
+> moves at all: **all 6 wide half turns break solved centres** and all 18 outer turns
+> preserve pairing, so the only sequences a stage can use are the net-centre-neutral
+> ones — the conjugate library. The wing-pair tables bound a problem that ignores the
+> centre constraint entirely, which is precisely why the `max` above reads 7–9, and
+> guiding a search with them would not have made that search terminate.
+>
+> What did shorten the pairing was searching the **library** — ranking partial
+> solutions by total word length instead of by edges paired per step — for 46.7 → 30.3
+> moves at no extra wall-clock. See §12.9. The tables remain unused, and now with a
+> reason recorded rather than an oversight.
 
 ### The staged reduction — **plan of record**
 
@@ -814,6 +827,45 @@ Each ends in a commit and a report, and each has a gate:
    needs the PDB-guided search over the reduced state that §8's own estimate table
    assumed — a piece of work in its own right, deliberately not started here rather
    than started badly.
+
+9. ⚠️ **The pairing, searched rather than greedy — 2026-08-13**
+   (`444_pairing_search_plan` task 01), after the split above showed the pairing had
+   become the largest single term.
+
+   **The premise that had to be corrected first.** The plan opened saying the fix was
+   to guide the pairing with the wing-pair pattern databases of §6, which really are
+   built, tested and read by nothing in the solve path. Re-measured on the shipped move
+   tables: **all 18 outer turns hold solved centres and all 6 wide half turns break
+   them**, and `preservesSlotPairs` shows all 18 outer turns preserve *pairing* too. So
+   every move that can pair is a wide turn and every wide turn unsolves the centres —
+   `orbits.ts`'s conclusion, that centres-solved and wings-paired must be reached
+   together, is exactly right. **No search over single moves can pair while holding the
+   centres**, which is why the phase runs over net-centre-neutral *sequences*, and why
+   those tables are loose rather than neglected: they bound a problem that ignores the
+   centre constraint, which is why §6's `max` of all seven reads 7–9 against a true
+   distance in the forties.
+
+   **What changed instead.** The move set is forced to be the library, so the target
+   was how well it is *used*. `pairWings444` maximised edges paired per step with word
+   length only as a tie-break, and never looked past one step: **45.1 moves in 6.3
+   generators**, averaging 7.2 moves each where the library's shortest is 5, with a
+   spread of **29 to 63 on identical inputs**. It now runs a **beam search over the
+   same library ranked by total word length**, and the greedy remains as the fallback
+   for the last-two-edges stall the search walks into.
+
+   | | pairing | whole solve | per solve |
+   |---|---|---|---|
+   | before | 46.7 | ~100–120 | 4603 ms |
+   | after | **30.3** | **59–119, mean 85.9** (26 states) | **4113 ms** |
+
+   🔴 **The length came free**, and the reason is worth recording: a beam of width 64
+   does 64× the work of a one-step greedy and costs no more, because the greedy spent
+   about **13 µs per generator** allocating a fresh 24-entry array each time.
+   Compiling the library into a flat `Uint8Array` destination map and composing into a
+   preallocated scratch buffer paid for the whole beam — greedy 809 ms against beam-64's
+   688 ms on identical states. The width was chosen against the clock rather than the
+   length: 32 finishes in 341 ms but fails 7 states of 24, 64 fails 1, 128 and 256 buy
+   under a move each for two and four times the time.
    **checkpoint H** — every link of §11 tested or proved, including solver totality
    measured over a large sample. Only then does the README say done.
 

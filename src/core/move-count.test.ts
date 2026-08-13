@@ -200,45 +200,48 @@ const BANDS: readonly EventBand[] = [
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '27–31 over 12 draws — the six wrapper tokens included, and correct',
   },
-  // 🔴 The headline, and still a gap after task 03 shortened it by a quarter.
+  // 🔴 The headline, and still a gap — but half what it was.
   //
-  // `solve444` is reduction → parity passes → 3x3x3 hand-off. Task 03 removed the
-  // redundancy the phase joins left behind, made the solver choose among several
+  // `solve444` is reduction → parity passes → 3x3x3 hand-off.
+  // `wca_conformance_plan` task 03 took the mean from 154 raw to ~100–120: it
+  // cancelled across the phase joins, made the solver choose among several
   // equally-valid reductions of the same drawn state (the parity case is a
   // property of the **route**, not the state), took its gadgets shortest-first,
-  // and gave the `permutation` case the two gadgets it provably needs in one pass
-  // instead of two. Mean 154 → 119.
+  // and gave the `permutation` case the two gadgets it provably needs in one pass.
+  // `444_pairing_search_plan` task 01 then replaced the pairing's one-step greedy
+  // with a search over the same library for the shortest total word — **46.7 → 30.3
+  // moves on the pairing**, and **59–119, mean 85.9** on the whole solve over 26
+  // states, in no more wall-clock than before.
   //
-  // What is left is the architecture rather than a defect: the reduction is
-  // centres-then-centre-neutral-pairing, and a centre-neutral pairing generator is
-  // about ten moves where a human's slice-flip-slice is four. Reaching 42–46 needs
-  // a pruning-table search over the reduced state, which is `444-design.md` §12's
-  // own next step and a piece of work in its own right — see the plan's PROGRESS.md
-  // for why it was not started here rather than started badly.
+  // What is left is still the architecture: the reduction is
+  // centres-then-centre-neutral-pairing, and a centre-neutral generator is about
+  // seven moves where a human's slice-flip-slice is four. Whether 42–46 is
+  // reachable at all under this package's constraints is what
+  // `444_pairing_search_plan` task 02 exists to measure.
   //
-  // The ceiling is derived, not sampled: 172 was the worst of 16, and the room
-  // above it is one failed doubled pass — a 0.8% event on the ~29% of states that
+  // The ceiling is derived, not sampled: 119 was the worst of 26, and the room
+  // above it is one failed doubled parity pass — a 0.8% event on the states that
   // land `permutation`.
   {
     event: '444',
     tnoodle: [42, 46],
-    band: [42, 230],
+    band: [42, 180],
     verdict: 'gap',
     draws: 2,
     size: 4,
     maxRedundant: 0,
-    closedBy: 'a follow-up to wca_conformance_plan task 03',
-    measured: '74–172 over 16 draws, mean 119.4 (was 94–205, mean 137.5)',
+    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan',
+    measured: '59–119 over 26 draws, mean 85.9 (was 94–205 mean 137.5; then 74–172 mean 119.4)',
   },
   {
     event: '444bf',
     tnoodle: [42, 46],
-    band: [42, 235],
+    band: [42, 185],
     verdict: 'gap',
     draws: 2,
     size: 4,
     maxRedundant: 0,
-    closedBy: 'a follow-up to wca_conformance_plan task 03',
+    closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan',
     measured: 'the same solver plus a whole-cube rotation, so 444 + 0..2 tokens',
   },
 ];

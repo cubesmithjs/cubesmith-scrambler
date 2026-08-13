@@ -24,14 +24,21 @@ describe('phase2Search', () => {
         expect(isSolved(finalState)).toBe(true);
       }
     },
-    // The heaviest single test in the suite (30 full phase-1+phase-2
-    // solves, each after building all 4 pruning tables) — comfortably
-    // under 35s standalone, but v8 coverage instrumentation and/or
-    // CPU contention from other test files running concurrently can push
-    // it past a lower bound. A generous, test-specific timeout here (built
-    // once and cached, no impact on real-world scramble generation speed)
-    // is simpler than raising the whole file's default for every test.
-    120000,
+    // The heaviest single test in the suite: 30 full phase-1+phase-2 solves,
+    // each after building all 4 pruning tables.
+    //
+    // 🔴 It used to carry a test-specific 120 s on the stated grounds that it ran
+    // "comfortably under 35s standalone". Re-measured 2026-08-13: **59 s
+    // standalone under `--coverage`**, and it began failing at 120 s under full
+    // parallel load — contention roughly doubles it, which is the very effect the
+    // original comment named. Rather than pick a third number that will go stale,
+    // it now takes the file-wide 180 s from `vitest.config.ts`, which is the same
+    // budget every other solver test gets and leaves 3x headroom on the measured
+    // standalone cost.
+    //
+    // What it must not become is a *speed* test. It asserts that phase 1 and
+    // phase 2 together solve the cube; the tables are built once and cached, and
+    // none of this reaches real scramble generation.
   );
 
   it('never turns the same face twice in a row', () => {
