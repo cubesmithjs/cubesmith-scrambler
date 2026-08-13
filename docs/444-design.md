@@ -485,7 +485,7 @@ measurement happens early rather than at the end.
 
 The **45–60 moves** predicted above was written for a four-phase chain with
 PDB-guided phases. What shipped reduces in stages, and as of 2026-08-13 emits
-**59–119 tokens, mean 86** against TNoodle-WCA-1.2.3's **42–46**. The difference is
+**56–114 tokens, mean 74, median 69** against TNoodle-WCA-1.2.3's **42–46**. The difference is
 **accepted**, and this is the reason, recorded so that nobody spends the same weeks
 finding it out again.
 
@@ -495,9 +495,30 @@ finding it out again.
 |---|---|---|
 | centres — `phase1Search` + `solveCentres444` | 16.1 | exact search |
 | pairing — `pairWings444` | 24.5 | searched over the library (§12.9) |
-| parity — gadget-and-repair | 21.5 | 0.6 passes |
+| parity — gadget-and-repair | 21.5 | 0.6 passes; since largely removed, below |
 | 3x3x3 hand-off — `solve333` | 23.3 | two-phase solver |
 | **emitted** | **82.5** | after cancellation |
+
+🔴 **The parity term was then mostly removed, by choosing rather than repairing.**
+Measured 2026-08-13: of the 36 moves, **only the 12 wide quarter turns are odd on the
+24 wings**; the whole 24-move centre-preserving set is even, and everything after
+phase 1 lives in it (the centre solve is over those moves, and a pairing generator
+`A X A'` has its two odd wide quarters cancel). So wing-permutation parity is
+**frozen the moment phase 1 ends** — and on a reduced cube the flip sum's parity *is*
+the wing permutation's, which is exactly OLL parity.
+
+`reduce444BestRoute` therefore picks a phase-1 route whose wing parity is even, paying
+at most one extra phase-1 move to find one. Result: **23 states in 30 need no parity
+pass at all**, and the emitted length falls to **56–114, mean 73.8, median 69**. It is
+also *faster*, since a parity pass costs a whole fresh pairing.
+
+⚠️ Two traps, both hit and both worth not repeating. Asking `phase1Solutions` for a
+short sample returns routes that all share a parity — the depth-first enumeration
+walks them in prefix order — so the filter looks useless until the routes are
+enumerated deeply. And preferring an even route *blindly* is wrong: it rules out
+`flip` at the cost of admitting `permutation`, which is the expensive landing, so the
+plain shortest route is always kept as a baseline and the choice is made on measured
+parity cost.
 
 🔴 **Centres + hand-off = 39.4, inside TNoodle's budget for a whole scramble.** The
 two phases that search properly are already the right size. The entire gap is the

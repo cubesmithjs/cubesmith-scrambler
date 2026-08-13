@@ -209,9 +209,11 @@ const BANDS: readonly EventBand[] = [
   // property of the **route**, not the state), took its gadgets shortest-first,
   // and gave the `permutation` case the two gadgets it provably needs in one pass.
   // `444_pairing_search_plan` task 01 then replaced the pairing's one-step greedy
-  // with a search over the same library for the shortest total word — **46.7 → 30.3
-  // moves on the pairing**, and **59–119, mean 85.9** on the whole solve over 26
-  // states, in no more wall-clock than before.
+  // with a search over the same library for the shortest total word — 46.7 → 30.3
+  // moves on the pairing. A follow-up removed most of the parity work by choosing a
+  // phase-1 route whose **wing parity is even**, which decides OLL parity for the
+  // whole solve: **56–114, mean 73.8, median 69** over 30 states, with 23 of 30
+  // needing no parity pass at all.
   //
   // 🔴 What is left is **accepted**, not outstanding. Centres (16.1) and the 3x3x3
   // hand-off (23.3) already sum to 39.4 — inside TNoodle's budget for a whole
@@ -234,18 +236,18 @@ const BANDS: readonly EventBand[] = [
   {
     event: '444',
     tnoodle: [42, 46],
-    band: [42, 180],
+    band: [42, 170],
     verdict: 'gap',
     draws: 2,
     size: 4,
     maxRedundant: 0,
     closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan — closed 2026-08-13, the gap is accepted',
-    measured: '59–119 over 26 draws, mean 85.9 (was 94–205 mean 137.5; then 74–172 mean 119.4)',
+    measured: '56–114 over 30 draws, mean 73.8, median 69 (was 94–205 mean 137.5, then 74–172, then 59–119)',
   },
   {
     event: '444bf',
     tnoodle: [42, 46],
-    band: [42, 185],
+    band: [42, 175],
     verdict: 'gap',
     draws: 2,
     size: 4,

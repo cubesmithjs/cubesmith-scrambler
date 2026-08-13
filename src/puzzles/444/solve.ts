@@ -112,8 +112,8 @@ function mergeMoveIndices(moves: readonly number[]): number[] {
 /**
  * A sequence of move indices carrying `state` to solved.
  *
- * Not optimal and not near it: **59 to 119 moves, mean 86**, measured over 26 states
- * (2026-08-13), where TNoodle-WCA-1.2.3 prints 42 to 46. It costs length only — the
+ * Not optimal and not near it: **56 to 114 moves, mean 74, median 69**, measured over
+ * 30 states (2026-08-13), where TNoodle-WCA-1.2.3 prints 42 to 46. It costs length only — the
  * state is drawn before any of this runs, and the χ² check over the sticker
  * distribution reads **4.89** against df 5 after all of it, where the untouched `333`
  * control has read 4.66, 5.22 and 3.79 across the same runs.
@@ -131,11 +131,17 @@ function mergeMoveIndices(moves: readonly number[]): number[] {
  *    one gadget. (3)+(4): 127 → 119.
  * 5. **Searching the pairing for total word length** rather than edges-per-step
  *    (`pairWings444`) — 119 → 86, and at a *sixth* of the time the greedy cost.
+ * 6. **Choosing a phase-1 route whose wing parity is even** (`reduce444BestRoute`) —
+ *    86 → 74, median 89 → 69, and *faster*, because a parity pass costs a whole fresh
+ *    pairing. Wing parity is frozen the moment phase 1 ends, and it is exactly OLL
+ *    parity, so this is chosen rather than repaired. 23 states in 30 now need no
+ *    parity pass at all.
  *
  * ## Where the rest is, and why it stays there
  *
- * Split over 24 states: centres **16.1**, pairing **24.5**, parity **21.5**, 3x3x3
- * hand-off **23.3**. 🔴 Centres and the hand-off already sum to **39.4** — inside
+ * Split over 24 states, before the parity-route choice: centres **16.1**, pairing
+ * **24.5**, parity **21.5**, 3x3x3 hand-off **23.3** — the parity term is what (6)
+ * mostly removed. 🔴 Centres and the hand-off already sum to **39.4** — inside
  * TNoodle's budget for a *whole* scramble — so the entire gap is reduction overhead.
  *
  * That overhead is structural. Every move that can pair a wing is a wide turn, and

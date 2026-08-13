@@ -2,6 +2,7 @@ import { solveCentres444 } from './centres';
 import { parityOf444Handoff, to333State } from './handoff';
 import { isReduced } from './orbits';
 import { pairWings444 } from './pairing';
+import { wingParityOf } from './parity';
 import { phase1Search, phase1Solutions } from './phase1-search';
 import { apply444Moves, type Cube444State } from './state';
 
@@ -88,8 +89,94 @@ function parityPassesFor(reduced: Cube444State): 0 | 1 | 2 {
   }
 }
 
-/** How many phase-1 routes `reduce444BestRoute` will try before settling. */
+/** How many phase-1 routes `reduce444BestRoute` will fully reduce before settling. */
 export const MAX_REDUCTION_ROUTES = 4;
+
+/**
+ * How much longer than optimal a phase-1 route may be, when the shorter ones all
+ * carry OLL parity.
+ *
+ * 🔴 **Measured, and the reason this is not zero.** At the optimal length a state
+ * may have *no* even route at all — over 8 states enumerated 4,000 routes deep
+ * (2026-08-13), one had 0 even of 72 at length 9 and 336 even at length 10. Every
+ * one of the 8 had both parities available *somewhere*, and paying **one extra
+ * phase-1 move** to reach an even route buys back a parity pass of about 35.
+ */
+const MAX_EXTRA_PHASE1_LENGTH = 2;
+
+/**
+ * How many phase-1 routes may be *examined* while hunting for even ones, before the
+ * hunt gives up and the parity loop takes over. A bound on the worst case, not a
+ * target — measurement says an even route turns up within a handful.
+ */
+const MAX_ROUTES_EXAMINED = 3_000;
+
+/**
+ * 🔴 **Whether the hand-off will have OLL parity is decided at the end of phase 1,
+ * and nothing after it can change the answer.** So it is chosen here rather than
+ * repaired later.
+ *
+ * Three measured facts compose into that (2026-08-13, on the shipped move tables):
+ *
+ * 1. Of the 36 moves, **only the 12 wide quarter turns are odd** on the 24 wings —
+ *    all 12 outer quarters, all 6 outer halves and all 6 wide halves are even.
+ * 2. So the whole 24-move centre-preserving set `G2` is **even**, and everything
+ *    after phase 1 lives in it: the centre solve is over those 24 moves, and a
+ *    pairing generator is a conjugate `A X A'` whose two odd wide quarters cancel.
+ *    Wing-permutation parity is therefore **invariant** from the end of phase 1.
+ * 3. On a reduced cube the **flip sum's parity equals the wing permutation's**
+ *    (`parity.ts`), and an odd flip sum is exactly OLL parity.
+ *
+ * Together: the reduced cube has OLL parity **iff** the state after phase 1 has odd
+ * wing parity. A route that lands even can never acquire it, and no amount of
+ * re-pairing can remove it from a route that lands odd — which is why the parity
+ * loop needs a deliberately *odd* gadget to fix it, at about 35 moves a pass.
+ *
+ * This supersedes discovering the same thing by trial: `reduce444BestRoute` used to
+ * reduce several routes fully and keep whichever landed cheapest, which found even
+ * routes only when one turned up inside its budget. Filtering first makes it
+ * deterministic and spends the reduction budget on the *other* parity — the
+ * corner/dedge permutation mismatch, which wing parity does **not** determine and
+ * which does vary from route to route.
+ *
+ * ⚠️ **The routes must be enumerated deeply, not sampled.** Asking `phase1Solutions`
+ * for the first 16 solutions returns 16 that all share a parity — the depth-first
+ * enumeration walks them in prefix order, so a short sample is not representative
+ * and the filter looks useless. Enumerated 4,000 deep, both parities are abundant at
+ * essentially every length. That mistake cost a measurement and is worth not
+ * repeating.
+ */
+function landsWithoutOllParity(state: Cube444State, route: readonly number[]): boolean {
+  return wingParityOf(apply444Moves(state, route).wingPermutation) === 0;
+}
+
+/**
+ * Phase-1 routes that leave the wings **even**, shortest first, stopping as soon as
+ * `wanted` of them are in hand.
+ *
+ * Uses `phase1Solutions`' visitor so the search stops at the first few rather than
+ * enumerating everything: even routes are plentiful once the bound is right, and the
+ * visitor is what keeps "look deeper if the optimal length has none" affordable.
+ */
+function evenPhase1Routes(state: Cube444State, wanted: number): number[][] {
+  const optimal = phase1Search(state).length;
+  const found: number[][] = [];
+  // 🔴 A cap on solutions *examined*, not just on solutions kept. `phase1Solutions`
+  // stops only when the visitor says so, and a state whose short routes are all odd
+  // can have thousands at each length — without this, the worst case is enumerating
+  // every phase-1 solution within `MAX_EXTRA_PHASE1_LENGTH`, which is unbounded work
+  // in a library that has to stay predictable.
+  let examined = 0;
+  phase1Solutions(state, {
+    maxLength: optimal + MAX_EXTRA_PHASE1_LENGTH,
+    visit: (route) => {
+      examined += 1;
+      if (landsWithoutOllParity(state, route)) found.push([...route]);
+      return found.length >= wanted || examined >= MAX_ROUTES_EXAMINED;
+    },
+  });
+  return found;
+}
 
 /**
  * The reduction that leaves the **least parity work**, chosen from several
@@ -130,10 +217,20 @@ export function reduce444BestRoute(
   state: Cube444State,
   maxRoutes = MAX_REDUCTION_ROUTES,
 ): Reduction444 {
-  const routes = phase1Solutions(state, { maxSolutions: maxRoutes });
-  if (routes.length === 0) {
-    throw new Error('@cubesmith/scrambler: 4x4x4 phase 1 found no route to the axis pairs');
-  }
+  // Even routes first, because they cannot produce OLL parity — but *never only*
+  // even routes.
+  //
+  // 🔴 An even route rules out `flip` and `both` at the cost of admitting
+  // `permutation`, and `permutation` is the expensive landing: two gadgets and a
+  // doubled pass, about 86 moves against 35-58 for one. So a state whose even routes
+  // all land `permutation` is better served by an odd route that lands `flip`.
+  // Preferring even blindly made exactly that trade, and `reduce.test.ts`'s
+  // "never lands in a costlier parity case than the first route would" caught it.
+  //
+  // The plain shortest route — what `reduce444` uses — is therefore always kept as a
+  // baseline, and the ranking below decides on measured parity cost rather than on
+  // which parity class the route belongs to.
+  const routes = [...evenPhase1Routes(state, maxRoutes), phase1Search(state)];
 
   let best: { reduction: Reduction444; passes: number } | undefined;
   for (const route of routes) {
