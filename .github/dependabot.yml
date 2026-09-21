@@ -1,0 +1,15 @@
+# security_audit_plan F-12 / I-18 — automated dependency and action updates.
+# Grouped so a week's worth of patch bumps is one PR, not twenty; the CI on
+# every PR is the gate (`ci.yml` runs on pull_request).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }

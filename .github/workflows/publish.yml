@@ -9,11 +9,26 @@ on:
   release:
     types: [published]
 
+# 🔴 Least privilege for GITHUB_TOKEN (security_audit_plan F-12): a compromised
+# third-party action running in a PR job must not be able to write to the repo.
+# A job that needs more declares it on the job.
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # `id-token: write` lets npm attach a signed provenance attestation to the
+    # published tarball (security_audit_plan F-12) — consumers can verify the
+    # package was built by THIS workflow from THIS commit. It is also what npm
+    # trusted publishing needs: once the repository/workflow pair is registered
+    # as a trusted publisher on npmjs.com, `NODE_AUTH_TOKEN` below can be
+    # removed and the long-lived `NPM_TOKEN` secret revoked.
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Runs before `npm ci` on purpose: both failures below are knowable from
       # the checkout alone, and failing in five seconds with a sentence beats
@@ -51,7 +66,7 @@ jobs:
 
           echo "Tag '${GITHUB_REF_NAME}' matches package.json '${PKG}', which is not yet published."
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -62,6 +77,6 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
 
-      - run: npm publish --access public
+      - run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
