@@ -23,12 +23,16 @@ jobs:
     # package was built by THIS workflow from THIS commit. It is also what npm
     # trusted publishing needs: once the repository/workflow pair is registered
     # as a trusted publisher on npmjs.com, `NODE_AUTH_TOKEN` below can be
-    # removed and the long-lived `NPM_TOKEN` secret revoked.
+    # removed and the long-lived `NPM_TOKEN` secret revoked. ⚠️ Trusted
+    # publishing needs npm >= 11.5.1 and Node 22 ships npm 10, so that change
+    # must also upgrade npm in this job, or the first tokenless release fails.
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Runs before `npm ci` on purpose: both failures below are knowable from
       # the checkout alone, and failing in five seconds with a sentence beats
@@ -66,10 +70,13 @@ jobs:
 
           echo "Tag '${GITHUB_REF_NAME}' matches package.json '${PKG}', which is not yet published."
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      # No cache in the release job: a cache entry written by another run would
+      # feed straight into the tarball we sign and publish. `cache:` alone is
+      # not enough — setup-node v5+ caches npm by itself unless told not to.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: npm
+          package-manager-cache: false
           registry-url: https://registry.npmjs.org
 
       - run: npm ci

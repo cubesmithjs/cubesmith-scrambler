@@ -57,9 +57,9 @@
     "ci": "npm run typecheck && npm run test:coverage && npm run build"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.12",
     "tsup": "^8.5.0",
     "typescript": "^5",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.12"
   }
 }
