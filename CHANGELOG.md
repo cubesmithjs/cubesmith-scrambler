@@ -62,7 +62,13 @@ members. `dist/draw/index.d.ts` is unchanged.
   **31,408,133,379,194,880,000,000** positions.
 - The random draw is built from that measured structure; χ² on four projections is
   below the 0.1% critical value.
-- Every scramble, read back as text, reaches exactly the drawn state.
+- Every scramble, read back as text, reaches exactly the drawn state — 2,000 seeded
+  scrambles audited end to end, none failing.
+- 🔴 Ground truth from outside this package: xyzzy's FTO solver (the one cubing.js
+  runs) states that `F R U R' U' F'` has an optimal two-face solution of 24 moves,
+  and prints it. That sequence solves this model, and this package's exact `⟨U, L⟩`
+  table measures the state at exactly 24. Both hold only if every face name,
+  adjacency and turning direction matches.
 
 ### Bundle size
 

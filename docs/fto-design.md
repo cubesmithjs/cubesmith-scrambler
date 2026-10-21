@@ -45,8 +45,10 @@ measurement.
 - xyzzy's FTO solver as vendored in cubing.js (`fto-solver.ts`) — read for its
   **conventions** (face names, adjacencies, the Lanlan colour scheme) and its
   **published phase structure and coordinate sizes**, which §5 reproduces as
-  cross-checks. 🔴 No code was copied: the cubing.js copy is GPL, and this
-  package is MIT. The structure is reimplemented from its description.
+  cross-checks, and for the **worked example** in a comment (`F R U R' U' F'`
+  and its 24-move optimal two-face solution), which §6 uses as ground truth.
+  🔴 No code was copied: the cubing.js copy is GPL, and this package is MIT. The
+  structure is reimplemented from its description.
 
 ### Files
 

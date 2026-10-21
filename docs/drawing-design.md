@@ -8,10 +8,12 @@
 ## 1. What this is, and what it deliberately is not
 
 The flat sticker picture that appears beside every scramble on an official WCA
-scramble sheet, for all seventeen events, as **data** plus an optional SVG string.
+scramble sheet, for all eighteen events, as **data** plus an optional SVG string.
 
 For a *picture* the Regulations say nothing at all, so TNoodle is the only
-specification there is — which is exactly why "the same as TNoodle" is a meaningful
+specification there is — for every event but `fto`, which no TNoodle release draws
+yet, and whose picture is therefore this package's own (see *Face Turning
+Octahedron* below) — which is exactly why "the same as TNoodle" is a meaningful
 requirement here rather than a preference. Every constant, layout formula and colour
 below was read from [`thewca/tnoodle-lib`](https://github.com/thewca/tnoodle-lib)
 `master`, package `org.worldcubeassociation.tnoodle.puzzle`.
@@ -274,6 +276,36 @@ own frame. Both are complete descriptions, but they do not draw the same picture
 and an official Clock scramble contains exactly one `y2`, so ignoring the difference
 would draw the two sides swapped on **every real scramble**. Counting the flips is
 that one bit.
+
+### Face Turning Octahedron — 72 triangles, and no TNoodle to follow
+
+Added in 0.15.0, and 🔴 **the one drawing here that is not TNoodle's**: no TNoodle
+release scrambles or draws an FTO (checked 2026-10-21), so there is no source to
+read constants from. Everything below is this package's own choice, provisional in
+the same sense as the FTO notation (`docs/fto-design.md` §8). If the official
+program gains a drawing, this one follows it.
+
+- **The net** is two 180-unit squares side by side, the layout FTO images have long
+  used (and the one xyzzy's solver lays its facelets out in). The left square is the
+  four faces round the top vertex seen from above — `U` top, `L` left, `R` right,
+  `F` bottom. The right square is the four round the bottom vertex seen from below
+  after tipping the puzzle forward — `D` top, `BL` left, `BR` right, `B` bottom.
+  Looking straight down a vertex, its four faces project to the four triangles a
+  square's diagonals cut it into. Each face's nine stickers project to the nine
+  equal triangles of that triangle's 3×3 subdivision. 390 × 200 units.
+- **Both views are from outside**, so neither is a mirror image: a clockwise turn
+  turns clockwise on paper. `fto.test.ts` checks `right × up` points at the viewer
+  for both.
+- **Drawn from the 72-sticker model** in `puzzles/fto/geometry.ts`, not from the
+  piece-level solver state. That model is the one `state.test.ts` proves agrees with
+  the piece model, sticker for sticker.
+- **Colours: the Lanlan scheme** — `U` white, `F` red, `BR` grey, `BL` orange, `L`
+  purple, `R` green, `D` yellow, `B` blue — the scheme xyzzy's solver names.
+
+Checked by: exact tiling (72 equal triangles covering both squares), nine stickers of
+every colour on any scramble, exactly 18 stickers changed by any one turn, the two
+stickers of every edge off the equator drawn sharing a side, and a rendered
+inspection of every single turn (`docs/fto-design.md` §6).
 
 ## 4. How parity is verified, and what is not claimed
 

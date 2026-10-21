@@ -628,13 +628,13 @@ describe('the exported surface', () => {
   });
 
   /**
-   * 🔴 The five bespoke ASTs stay private. Exporting a type freezes it, and
+   * 🔴 The six bespoke ASTs stay private. Exporting a type freezes it, and
    * `Square1Move`, `ClockToken` and friends were written for a solver's
    * convenience — every future refactor of one would become a breaking change
    * of this package. `validateScramble` answers a validity question and
    * reserves the payload for a consumer who turns up with a real need for it.
    */
-  it('does not export the five bespoke move types or their parsers', async () => {
+  it('does not export the six bespoke move types or their parsers', async () => {
     const surface = await import('./index');
     for (const name of [
       'parseMegaminxScramble',
@@ -644,16 +644,21 @@ describe('the exported surface', () => {
       'parseSquare1Scramble',
       'parseMegaminxMove',
       'parseSkewbMove',
+      'parseFtoScramble',
+      'parseFtoMove',
+      'solveFto',
     ]) {
       expect(Object.keys(surface), name).not.toContain(name);
     }
   });
 
-  it('reaches all six notations from the public entry point', async () => {
+  it('reaches all seven notations from the public entry point', async () => {
     const { validateScramble, notationForEvent } = await import('./index');
     expect(notationForEvent('minx')).toBe('megaminx');
     expect(validateScramble('minx', 'R++ D-- U')).toEqual({ valid: true, notation: 'megaminx' });
     expect(validateScramble('sq1', '(1, 0) /')).toEqual({ valid: true, notation: 'square1' });
     expect(validateScramble('333', "R U R'")).toEqual({ valid: true, notation: 'cube' });
+    expect(notationForEvent('fto')).toBe('fto');
+    expect(validateScramble('fto', "U BR' F")).toEqual({ valid: true, notation: 'fto' });
   });
 });

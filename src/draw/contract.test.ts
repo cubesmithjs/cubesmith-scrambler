@@ -152,6 +152,7 @@ describe('colour schemes', () => {
     expect(defaultColorScheme('skewb').R).toBe('#0000ff'); // blue
     expect(defaultColorScheme('sq1').R).toBe('#00ff00'); // green
     expect(defaultColorScheme('pyram').R).toBe('#0000ff'); // blue
+    expect(defaultColorScheme('fto').R).toBe('#00ff00'); // green
   });
 });
 

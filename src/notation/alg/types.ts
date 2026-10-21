@@ -14,9 +14,9 @@
  * cancellation, no reordering. Those need a state model, which the package
  * deliberately does not have at this layer.
  *
- * It also does **not** absorb the five bespoke puzzle notations — Megaminx's
- * Pochmann tokens, Clock's pin/hour syntax, Pyraminx's and Skewb's order-3
- * turns, Square-1's `(a,b)/`. They stay in their own modules and deliberately
+ * It also does **not** absorb the six bespoke puzzle notations — Megaminx's
+ * Pochmann tokens, Clock's pin/hour syntax, the order-3 turns of the Pyraminx,
+ * the Skewb and the Face Turning Octahedron, Square-1's `(a,b)/`. They stay in their own modules and deliberately
  * do not share this type. The temptation to unify them is the main design risk
  * here, and it is a trap: a Pyraminx `2` means *counterclockwise*, not a half
  * turn, so a shared `amount` would be actively wrong.

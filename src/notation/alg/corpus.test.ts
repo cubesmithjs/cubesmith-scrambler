@@ -21,10 +21,10 @@ import { AlgorithmSyntaxError } from './types';
  */
 
 /**
- * The events whose *cube* notation this parser is meant to read. The other five
+ * The events whose *cube* notation this parser is meant to read. The other six
  * are deliberately excluded: Megaminx's Pochmann tokens, Clock's pin/hour
- * syntax, Pyraminx's and Skewb's order-3 turns and Square-1's `(a,b)/` are
- * different notations that happen to be written with letters, and folding them
+ * syntax, Pyraminx's, Skewb's and the FTO's order-3 turns and Square-1's
+ * `(a,b)/` are different notations that happen to be written with letters, and folding them
  * into this AST would be actively wrong — a Pyraminx `2` means
  * *counterclockwise*, not a half turn.
  *
@@ -94,7 +94,11 @@ describe('the package can read its own output', () => {
     }
   });
 
-  it('refuses the five bespoke notations rather than mis-reading them', async () => {
+  it('refuses the bespoke notations it can tell apart rather than mis-reading them', async () => {
+    // Three of the six, not all of them: a Pyraminx, Skewb or FTO scramble is
+    // made of capital letters and primes, which cube notation reads as cube
+    // turns (`BR` as `B R`). That is why `validateScramble` dispatches on the
+    // event rather than guessing the grammar from the text.
     // Not a limitation to apologise for — it is the design. A parser that
     // quietly accepted `R++` or `(3,-2)/` would be claiming they mean
     // something in this grammar, and they do not.

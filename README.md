@@ -605,8 +605,13 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
 ## Independence note
 
 Every puzzle here is implemented from published *descriptions* of its
-mechanics and from this package's own geometric derivations — no code was read
-from or adapted from `cubing.js`, csTimer, or TNoodle. The 3x3x3 solver uses
+mechanics and from this package's own geometric derivations — no code was
+adapted from `cubing.js`, csTimer, or TNoodle. One disclosure, for the Face
+Turning Octahedron: the source file of xyzzy's FTO solver, as vendored in
+`cubing.js`, was consulted for its **comments and stated figures**. Those were
+the face names and adjacencies, the colour scheme, its three-phase structure and
+coordinate sizes, and a worked example the tests use as a cross-check. Its code
+was not copied or translated; `docs/fto-design.md` §1 says exactly what was taken. The 3x3x3 solver uses
 Herbert Kociemba's published two-phase *method*: the group-theoretic
 decomposition and the IDA*-with-pruning-tables technique, not any project's
 source expression of it.
@@ -617,7 +622,7 @@ from coordinate models rather than transcribed, and each puzzle's derivation
 is cross-checked against numbers published independently of this code — the
 Pyraminx's 933,120 states and God's number of 11, the Skewb's 3,149,280 and
 11, the Clock's 12^14, the Megaminx's dodecahedral structure and its 60
-rotations. Those checks are what the test suites spend most of their effort
+rotations, the FTO's 31,408,133,379,194,880,000,000 positions. Those checks are what the test suites spend most of their effort
 on, because a plausible-looking wrong model is the failure mode that matters.
 
 ## Contributing

@@ -246,4 +246,13 @@ describe('generateFtoScramble', () => {
       generateFtoScramble(createRandomSource('fto-same')),
     );
   });
+
+  it('draws a seeded batch through the public API that is reproducible and all distinct', async () => {
+    const { generateScrambles } = await import('../../index');
+    const a = await generateScrambles('fto', 5, { seed: 'fto-batch' });
+    const b = await generateScrambles('fto', 5, { seed: 'fto-batch' });
+    expect(a.map((r) => r.moves)).toEqual(b.map((r) => r.moves));
+    expect(new Set(a.map((r) => r.moves)).size).toBe(5);
+    for (const result of a) expect(result.quality).toBe('random-state');
+  });
 });

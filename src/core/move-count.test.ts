@@ -86,7 +86,7 @@ interface EventBand {
   readonly reference?: string;
   /** Why a wider-than-TNoodle band is not a defect. Required on `in-range`. */
   readonly widthBecause?: string;
-  /** Cube size, for the events whose notation `nxn` can parse. Absent for the five bespoke notations. */
+  /** Cube size, for the events whose notation `nxn` can parse. Absent for the six bespoke notations. */
   readonly size?: number;
   /**
    * How many **redundant** moves the scramble may contain — see

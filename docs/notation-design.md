@@ -8,7 +8,7 @@ package read notation rather than only print it. Targets: `parseAlgorithm`,
 `serializeAlgorithm` and `invertAlgorithm`, shipped since v0.10; and
 `validateAlgorithm` with the `SyntaxErrorReason` codes, shipped since v0.11.
 Since v0.12 this parser is also the `'cube'` arm of `validateScramble`, the
-event-keyed door onto all six notations — see §2.
+event-keyed door onto all seven notations — see §2.
 
 ---
 
@@ -87,25 +87,28 @@ library that was previously fine.
 
 ### What is deliberately not accepted
 
-The five bespoke puzzle notations: Megaminx's Pochmann `R++`/`D--`/`U`,
-Clock's pin-and-hour syntax, Pyraminx's and Skewb's order-3 turns, and
-Square-1's `(a,b)/`. They live in their own modules and do not share this type.
+The six bespoke puzzle notations: Megaminx's Pochmann `R++`/`D--`/`U`,
+Clock's pin-and-hour syntax, the order-3 turns of the Pyraminx, the Skewb and
+(since v0.15) the Face Turning Octahedron, and Square-1's `(a,b)/`. They live in their own modules and do not share this type.
 This is the main design risk in the whole layer, and the reason is concrete: a
 Pyraminx `2` means *counterclockwise*, not a half turn, so a shared `amount`
 field would be actively wrong rather than merely loose. `corpus.test.ts`
 asserts that parsing a generated `minx`, `clock` or `sq1` scramble **throws**,
-so the refusal is tested rather than assumed.
+so the refusal is tested rather than assumed. The other three cannot be refused
+by this parser at all: they are capital letters and primes, which read as cube
+turns — FTO's `BR` as `B R`. Telling them apart takes the event, which is what
+`validateScramble` is for.
 
 Unknown letters are a syntax error too. A validator that tolerates `Q` is not
 validating.
 
-Since v0.12 those five **are** reachable, through a different door:
+Since v0.12 those **are** reachable, through a different door:
 `validateScramble(event, text)` dispatches on a `WcaEventId` to whichever of
-the six grammars applies, and `parseAlgorithm` is one of the six. That changes
+the seven grammars applies, and `parseAlgorithm` is one of the seven. That changes
 nothing here. The trees stay separate — deliberately, not by omission — which
 is why `validateScramble`'s valid arm returns `{ valid: true, notation }` and
-**no parsed form**: there is no shared type to return, and publishing all five
-internal ASTs would freeze five shapes written for a solver's convenience. Its
+**no parsed form**: there is no shared type to return, and publishing all six
+internal ASTs would freeze six shapes written for a solver's convenience. Its
 errors are a sibling class, `ScrambleSyntaxError`, with its own
 `ScrambleErrorReason` union, for the same reason: so that a cube consumer's
 exhaustive code table keeps compiling and never receives a Clock code it has
