@@ -1,7 +1,7 @@
 # Design documents
 
 One document per implemented puzzle, plus a conformance review that spans
-several events. All seventeen WCA events are implemented.
+several events. All eighteen WCA events are implemented.
 
 Most documents follow the same nine-section structure — overview, notation,
 state model, move model, scramble generation, validation, complexity, known
@@ -33,6 +33,7 @@ stated in that document's §8 rather than smoothed over.
 | `clock` | random-state | [clock-design.md](./clock-design.md) |
 | `sq1` | random-state | [square1-design.md](./square1-design.md) |
 | `333mbf` | random-state | [333-design.md](./333-design.md) — `count` × `333bf`, one attempt over many cubes |
+| `fto` | random-state | [fto-design.md](./fto-design.md) — official from 2027-01-02; notation and floor provisional until the regulations (§8) |
 
 ## Cross-cutting
 

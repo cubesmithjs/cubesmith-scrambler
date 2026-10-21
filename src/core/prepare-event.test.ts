@@ -24,13 +24,13 @@ import type { WcaEventId } from './types';
  * hang anywhere else in the suite behind a ten-minute wait.
  */
 
-/** Enough headroom for 17 real table builds under coverage instrumentation. */
+/** Enough headroom for 18 real table builds under coverage instrumentation. */
 const TABLE_BUILD_TIMEOUT = 600_000;
 
 const ALL_EVENTS: readonly WcaEventId[] = [
   '222', '333', '444', '555', '666', '777',
   '333bf', '333fm', '333oh', '333mbf', '444bf', '555bf',
-  'minx', 'pyram', 'clock', 'skewb', 'sq1',
+  'minx', 'pyram', 'clock', 'skewb', 'sq1', 'fto',
 ];
 
 async function millis(work: () => Promise<unknown>): Promise<number> {
@@ -39,9 +39,37 @@ async function millis(work: () => Promise<unknown>): Promise<number> {
   return performance.now() - start;
 }
 
+/**
+ * Milliseconds of **CPU time this process spent** on `work`, where the host can say
+ * (Node's `process.cpuUsage`), and wall time where it cannot.
+ *
+ * For the "did the table build already happen" check, CPU time is the quantity the
+ * claim is actually about — a table build is work this process does — and unlike
+ * wall time it does not grow while the process waits for a core. That matters since
+ * 0.15.0: four test files build FTO's tables in parallel workers, and on 2026-10-21
+ * the first `333mbf` scramble after `prepareEvent` measured 4,367 ms of wall time in
+ * the full coverage run against 50 ms in isolation, with nothing left unbuilt. Vitest
+ * runs each file in its own forked process, so this process's CPU time is its own.
+ *
+ * Reached through `globalThis` rather than declared in `test-host.d.ts`, because a
+ * global `process` declaration would type-check in shipped code too — the boundary
+ * that file exists to keep.
+ */
+type CpuUsage = { user: number; system: number };
+const host = (globalThis as { process?: { cpuUsage?: () => CpuUsage } }).process;
+
+async function cpuMillis(work: () => Promise<unknown>): Promise<number> {
+  const cpuUsage = host?.cpuUsage;
+  if (cpuUsage === undefined) return millis(work);
+  const start = cpuUsage();
+  await work();
+  const end = cpuUsage();
+  return (end.user - start.user + end.system - start.system) / 1000;
+}
+
 describe('prepareEvent', () => {
   it(
-    'accepts every one of the 17 events without throwing',
+    'accepts every one of the 18 events without throwing',
     async () => {
       expect(implementedEvents()).toHaveLength(ALL_EVENTS.length);
       for (const event of ALL_EVENTS) {
@@ -98,13 +126,14 @@ describe('prepareEvent', () => {
   it(
     '🔴 leaves almost nothing for the first scramble to build',
     async () => {
-      for (const event of ['skewb', 'pyram', '333mbf'] as WcaEventId[]) {
+      for (const event of ['skewb', 'pyram', '333mbf', 'fto'] as WcaEventId[]) {
         await prepareEvent(event);
-        const first = await millis(() => generateScramble(event));
-        const warm = await millis(() => generateScramble(event));
+        const first = await cpuMillis(() => generateScramble(event));
+        const warm = await cpuMillis(() => generateScramble(event));
         // A generous absolute ceiling on top of the warm cost rather than a ratio: for
         // an event whose warm cost is ~0 ms a ratio is meaningless, and the claim being
-        // made is "the table build already happened", not "this is fast".
+        // made is "the table build already happened", not "this is fast". Measured in
+        // CPU time, not wall time — see `cpuMillis`.
         expect(first, event).toBeLessThan(warm + 3000);
       }
     },

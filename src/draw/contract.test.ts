@@ -19,12 +19,12 @@ import { withinBounds } from './__tests__/invariants';
 const ALL_EVENTS: readonly WcaEventId[] = [
   '222', '333', '444', '555', '666', '777',
   '333bf', '333fm', '333oh', '333mbf', '444bf', '555bf',
-  'minx', 'pyram', 'clock', 'skewb', 'sq1',
+  'minx', 'pyram', 'clock', 'skewb', 'sq1', 'fto',
 ];
 
 describe('the /draw entry point', () => {
-  it('🔴 draws all 17 events — the coverage gate', () => {
-    expect(drawableEvents()).toHaveLength(17);
+  it('🔴 draws all 18 events — the coverage gate', () => {
+    expect(drawableEvents()).toHaveLength(18);
     for (const event of ALL_EVENTS) {
       expect(isDrawableEvent(event), event).toBe(true);
       const image = drawScramble(event, '');
@@ -63,6 +63,7 @@ describe('scramble errors pass through unchanged', () => {
     expect(() => drawScramble('sq1', '(1, 0) x')).toThrow(ScrambleSyntaxError);
     expect(() => drawScramble('clock', "R U R'")).toThrow(ScrambleSyntaxError);
     expect(() => drawScramble('pyram', 'R++ D--')).toThrow(ScrambleSyntaxError);
+    expect(() => drawScramble('fto', 'R2')).toThrow(ScrambleSyntaxError);
   });
 
   it('an empty scramble is valid everywhere — it means "solved", not "malformed"', () => {

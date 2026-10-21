@@ -26,13 +26,14 @@ import { FEWEST_MOVES_PREFIX, FEWEST_MOVES_SUFFIX } from '../puzzles/333/fewest-
  * §2. Nothing here is recalled — an earlier draft of that table *was*, and it
  * guessed `clock` at 1 token and `sq1` at 30, both wrong.
  *
- * ## The three verdicts, which are the baseline document's own
+ * ## The four verdicts — three from the baseline document, one for an event it predates
  *
  * | verdict | meaning |
  * |---|---|
  * | `exact` | `band` **is** TNoodle's, to the token |
  * | `in-range` | `band` is wider, and the width is a property of the event rather than a defect — a suffix that is sometimes empty, a separator count that varies |
  * | `gap` | 🔴 `band` admits lengths TNoodle would never print. A **recorded defect**, named with the task that closes it — or, where the deviation was measured and deliberately **accepted**, with the decision that accepted it |
+ * | `provisional` | there is **no official number to compare against yet** — `tnoodle` is `null`. The band is this package's own measured output, it names the stand-in it was compared with instead, and it names the task that replaces it with the official figure once one exists. Today only `fto`, which no TNoodle release scrambles |
  *
  * 🔴 **A `gap` band is a record of the defect, not a gate.** Widening a band to
  * make a suite pass is how this shipped in the first place, so the deviating
@@ -58,12 +59,15 @@ import { FEWEST_MOVES_PREFIX, FEWEST_MOVES_SUFFIX } from '../puzzles/333/fewest-
  * once per event rather than letting the first draw pay for the tables.
  */
 
-type Verdict = 'exact' | 'in-range' | 'gap';
+type Verdict = 'exact' | 'in-range' | 'gap' | 'provisional';
 
 interface EventBand {
   readonly event: WcaEventId;
-  /** TNoodle-WCA-1.2.3's own token count, as a range where its sheet varied. */
-  readonly tnoodle: readonly [number, number];
+  /**
+   * TNoodle-WCA-1.2.3's own token count, as a range where its sheet varied —
+   * or `null` for a `provisional` event the official program does not scramble yet.
+   */
+  readonly tnoodle: readonly [number, number] | null;
   /** What this package must produce. Inclusive at both ends. */
   readonly band: readonly [number, number];
   readonly verdict: Verdict;
@@ -78,6 +82,8 @@ interface EventBand {
   readonly closedBy?: string;
   /** What the package actually emitted when the gap was recorded, so the size of the defect is not lost. */
   readonly measured?: string;
+  /** What a `provisional` band was compared with in place of an official number. Required on `provisional`. */
+  readonly reference?: string;
   /** Why a wider-than-TNoodle band is not a defect. Required on `in-range`. */
   readonly widthBecause?: string;
   /** Cube size, for the events whose notation `nxn` can parse. Absent for the five bespoke notations. */
@@ -255,6 +261,30 @@ const BANDS: readonly EventBand[] = [
     closedBy: 'cubesmith-scrambler-plans 444_pairing_search_plan — closed 2026-08-13, the gap is accepted',
     measured: 'the same solver plus a whole-cube rotation, so 444 + 0..2 tokens',
   },
+
+  // ── Provisional: no official reference exists yet. ─────────────────────────
+  // FTO is official from 2027-01-02 and no TNoodle release scrambles it, so there
+  // is no sheet to read a number off. The band is this package's own output:
+  // 29–44 over 1,000 seeded states (median 39, p99 43), measured 2026-10-21 and
+  // split 8.1 + 11.9 + 19.1 across the three phases before cancellation.
+  //
+  // The ceiling is derived, not sampled: phase 3 is at most 29 (the deepest
+  // layer of its exact table), phases 1 and 2 never exceeded 10 and 14, and
+  // cancellation only shortens — 53, plus two for a tail on the two searched
+  // phases. The floor is sampled, and wide of it: nothing below 29 in 1,000.
+  {
+    event: 'fto',
+    tnoodle: null,
+    band: [20, 55],
+    verdict: 'provisional',
+    draws: 3,
+    // 🔴 Nothing external has been compared yet: the band is this package's own
+    // distribution. The stand-in is named so task 10 knows what to measure.
+    reference:
+      'none compared yet — the stand-in to measure is cubing.js randomScrambleForEvent("fto"), the one random-state FTO scrambler in use before the WCA program has one',
+    closedBy: 'cubesmith-scrambler-plans fto_event_plan task 10 — re-baselined against the official program once it scrambles FTO',
+    measured: '29–44 over 1,000 seeded states, median 39, mean 39.08, p99 43',
+  },
 ];
 
 function tokensOf(scramble: string): string[] {
@@ -289,7 +319,7 @@ beforeAll(async () => {
     drawn.set(entry.event, scrambles);
   }
   // An explicit timeout, because `hookTimeout` is 10 s and `vitest.config.ts`
-  // only raises `testTimeout`. Every draw for all seventeen events happens here,
+  // only raises `testTimeout`. Every draw for all eighteen events happens here,
   // and the 4x4x4 pair alone is minutes under coverage.
 }, 900_000);
 
@@ -300,15 +330,19 @@ describe('the band table itself', () => {
 
   it('gives an `exact` verdict exactly when the band is TNoodle\'s own', () => {
     for (const entry of BANDS) {
-      const identical = entry.band[0] === entry.tnoodle[0] && entry.band[1] === entry.tnoodle[1];
+      const identical =
+        entry.tnoodle !== null &&
+        entry.band[0] === entry.tnoodle[0] &&
+        entry.band[1] === entry.tnoodle[1];
       expect(identical, `${entry.event} is ${entry.verdict}`).toBe(entry.verdict === 'exact');
     }
   });
 
   it('makes an `in-range` band overlap TNoodle\'s, and say why it is wider', () => {
     for (const entry of BANDS.filter((band) => band.verdict === 'in-range')) {
-      expect(entry.band[0], entry.event).toBeLessThanOrEqual(entry.tnoodle[1]);
-      expect(entry.band[1], entry.event).toBeGreaterThanOrEqual(entry.tnoodle[0]);
+      const tnoodle = entry.tnoodle!;
+      expect(entry.band[0], entry.event).toBeLessThanOrEqual(tnoodle[1]);
+      expect(entry.band[1], entry.event).toBeGreaterThanOrEqual(tnoodle[0]);
       expect(entry.widthBecause, entry.event).toBeTruthy();
       expect(entry.closedBy, `${entry.event} is not a defect and must name no task`).toBeUndefined();
     }
@@ -321,21 +355,40 @@ describe('the band table itself', () => {
    */
   it('keeps every recorded gap a real gap, named with the task that closes it', () => {
     for (const entry of BANDS.filter((band) => band.verdict === 'gap')) {
+      const tnoodle = entry.tnoodle!;
       expect(
         entry.band[1],
         `${entry.event} no longer admits anything TNoodle would not print — promote it to 'exact'/'in-range' and drop closedBy`,
-      ).toBeGreaterThan(entry.tnoodle[1]);
+      ).toBeGreaterThan(tnoodle[1]);
       expect(entry.closedBy, entry.event).toBeTruthy();
       expect(entry.measured, `${entry.event} must record what it actually emitted`).toBeTruthy();
       // The floor stays TNoodle's own, so the fix passes without editing anything.
-      expect(entry.band[0], entry.event).toBeLessThanOrEqual(entry.tnoodle[0]);
+      expect(entry.band[0], entry.event).toBeLessThanOrEqual(tnoodle[0]);
+    }
+  });
+
+  /**
+   * A `provisional` band has nothing official to sit under, so it must say what
+   * it was compared with instead and which task replaces it — and only an event
+   * with no official number may be provisional at all.
+   */
+  it('lets an event be provisional only while there is no official number, and names its way out', () => {
+    for (const entry of BANDS) {
+      expect(entry.tnoodle === null, entry.event).toBe(entry.verdict === 'provisional');
+    }
+    for (const entry of BANDS.filter((band) => band.verdict === 'provisional')) {
+      expect(entry.reference, entry.event).toBeTruthy();
+      expect(entry.closedBy, entry.event).toBeTruthy();
+      expect(entry.measured, entry.event).toBeTruthy();
     }
   });
 });
 
 describe('the emitted scramble length', () => {
   for (const entry of BANDS) {
-    it(`${entry.event} lands in ${entry.band[0]}..${entry.band[1]} (TNoodle ${entry.tnoodle[0]}..${entry.tnoodle[1]})`, () => {
+    const official =
+      entry.tnoodle === null ? 'no official number yet' : `TNoodle ${entry.tnoodle[0]}..${entry.tnoodle[1]}`;
+    it(`${entry.event} lands in ${entry.band[0]}..${entry.band[1]} (${official})`, () => {
       const scrambles = drawn.get(entry.event)!;
       expect(scrambles).toHaveLength(entry.draws);
       for (const scramble of scrambles) {

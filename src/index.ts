@@ -7,6 +7,7 @@
 import { register222Scrambler } from './puzzles/222';
 import { register333Scrambler, register333FewestMovesScrambler } from './puzzles/333';
 import { registerClockScrambler } from './puzzles/clock';
+import { registerFtoScrambler } from './puzzles/fto';
 import { registerMegaminxScrambler } from './puzzles/megaminx';
 import { registerRandomMoveCubeScramblers } from './puzzles/nxn';
 import { registerPyraminxScrambler } from './puzzles/pyraminx';
@@ -34,6 +35,7 @@ registerMegaminxScrambler();
 registerRandomMoveCubeScramblers();
 registerSquare1Scrambler();
 register444Scrambler();
+registerFtoScrambler();
 // Last, because the variant events build on the scramblers registered above.
 registerVariantScramblers();
 
@@ -111,14 +113,15 @@ export type {
 } from './notation/alg';
 
 /**
- * One door onto **all six** notations, keyed on the event.
+ * One door onto **all seven** notations, keyed on the event.
  *
- * `parseAlgorithm` reads the twelve cube events. The other five — Megaminx,
- * Clock, Pyraminx, Skewb and Square-1 — are written in grammars of their own,
- * whose parsers lived inside this package, fully tested, and were reachable
- * from nowhere outside it until v0.12. `validateScramble` is that reach, and
- * it gives all five what v0.11 gave cube notation: an offset, a span, and a
- * stable code instead of an English sentence.
+ * `parseAlgorithm` reads the twelve cube events. The other six — Megaminx,
+ * Clock, Pyraminx, Skewb, Square-1 and, since v0.15, the Face Turning
+ * Octahedron — are written in grammars of their own. The first five parsers
+ * lived inside this package, fully tested, and were reachable from nowhere
+ * outside it until v0.12. `validateScramble` is that reach, and it gives all
+ * six what v0.11 gave cube notation: an offset, a span, and a stable code
+ * instead of an English sentence.
  *
  * `ScrambleSyntaxError` is deliberately **not** a subclass of
  * `AlgorithmSyntaxError`, and `ScrambleErrorReason` deliberately not a member

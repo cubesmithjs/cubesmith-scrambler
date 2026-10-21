@@ -12,7 +12,7 @@ import { parseMove } from './notation/move';
 /**
  * Every member of `WcaEventId`, spelled out. `WcaEventId` is a type, so there
  * is no runtime list to check against — keeping one here at least makes the
- * "N of seventeen" claim testable. Promoting this to a real export is on the
+ * "N of eighteen" claim testable. Promoting this to a real export is on the
  * API-review list.
  */
 const EVERY_WCA_EVENT: readonly WcaEventId[] = [
@@ -33,6 +33,7 @@ const EVERY_WCA_EVENT: readonly WcaEventId[] = [
   'clock',
   'skewb',
   'sq1',
+  'fto',
 ];
 import {
   applyMoves,
@@ -102,7 +103,7 @@ describe('@cubesmith/scrambler public entry point', () => {
    * The floor was missing on four events for months while `README.md` claimed
    * it was enforced everywhere, and `src/readme.test.ts` did not catch it
    * because the claim was prose rather than a runnable example. Asserting the
-   * property for all sixteen events would mean generating sixteen scrambles
+   * property for every event would mean generating sixteen scrambles
    * and building every pruning table in this file — minutes, not seconds — so
    * instead each event has to name *where* its floor lives, and the list is
    * checked against the registry.
@@ -130,12 +131,13 @@ describe('@cubesmith/scrambler public entry point', () => {
       pyram: 'puzzles/pyraminx/solve.ts — drawStateAtLeastMovesFromSolved, 4b3f minimum 6',
       skewb: 'puzzles/skewb/solve.ts — drawStateAtLeastMovesFromSolved, 4b3c minimum 7',
       sq1: 'puzzles/square1/solve.ts — drawStateAtLeastMovesFromSolved, 4b3d minimum 11',
+      fto: 'puzzles/fto/solve.ts — isAtLeastMovesFromSolved, MIN_FTO_SOLVE_DISTANCE (provisional 2)',
     } as Record<WcaEventId, string>;
 
     expect(Object.keys(floorEnforcedBy).sort()).toEqual([...implementedEvents()].sort());
   });
 
-  it('registers all seventeen WCA events', () => {
+  it('registers all eighteen WCA events', () => {
     const implemented = [
       '222',
       '333',
@@ -154,6 +156,7 @@ describe('@cubesmith/scrambler public entry point', () => {
       'pyram',
       'skewb',
       'sq1',
+      'fto',
     ] as const;
 
     for (const event of implemented) expect(isImplementedEvent(event)).toBe(true);
@@ -162,7 +165,7 @@ describe('@cubesmith/scrambler public entry point', () => {
     // seventeen" sat in the README and in this test's own name while the real
     // number was thirteen — a hand-maintained claim with nothing checking it.
     expect([...implementedEvents()].sort()).toEqual([...implemented].sort());
-    expect(implemented.length).toBe(17);
+    expect(implemented.length).toBe(18);
     expect(implemented.length).toBe(EVERY_WCA_EVENT.length);
   });
 

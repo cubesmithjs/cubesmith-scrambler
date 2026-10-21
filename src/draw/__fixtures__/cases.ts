@@ -68,4 +68,6 @@ export const FIXTURE_CASES: readonly FixtureCase[] = [
     // stored in a consumer's database was written this way.
     scramble: '(-3, -4) / (6, 3) / (-5, -2) / (-1, -1) /',
   },
+  fromCorpus('fto-a', 'fto', 0),
+  fromCorpus('fto-b', 'fto', 1),
 ];

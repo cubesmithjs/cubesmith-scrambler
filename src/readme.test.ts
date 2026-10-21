@@ -60,21 +60,21 @@ const NUMBER_WORDS: Readonly<Record<number, string>> = {
   22: 'Twenty-two',
 };
 
-const EVENT_TOTAL = 17;
+const EVENT_TOTAL = 18;
 
 describe('the README status claims', () => {
   it('states the number of working events that the registry actually holds', () => {
     const count = [...implementedEvents()].length;
-    // "Seventeen of the seventeen" would be true and badly written, so the
+    // "Eighteen of the eighteen" would be true and badly written, so the
     // complete case gets its own sentence — and this test still fails the
     // moment the registry stops holding all of them.
     if (count === EVENT_TOTAL) {
-      expect(README).toContain('**All seventeen WCA events work end to end.**');
+      expect(README).toContain('**All eighteen WCA events work end to end.**');
       return;
     }
     const word = NUMBER_WORDS[count];
     expect(word, `no word for ${count}`).toBeDefined();
-    expect(README).toContain(`**${word} of the seventeen WCA events work end to end.**`);
+    expect(README).toContain(`**${word} of the eighteen WCA events work end to end.**`);
   });
 
   it('lists every event in the status table', () => {
@@ -196,10 +196,11 @@ describe('the README notation examples', () => {
  * build.
  */
 describe('the README validateScramble examples', () => {
-  it('validates the three events the first snippet names', () => {
+  it('validates the four events the first snippet names', () => {
     expect(validateScramble('minx', 'R++ D-- U').valid).toBe(true);
     expect(validateScramble('sq1', '(1, 0) / (0, -2) /').valid).toBe(true);
     expect(validateScramble('333', "R U R' U'").valid).toBe(true);
+    expect(validateScramble('fto', "U BR' F L' BL D").valid).toBe(true);
   });
 
   it('rejects the Clock example with exactly the reason, offset, span and hour it claims', () => {
@@ -255,7 +256,7 @@ describe('the README validateScramble examples', () => {
     // Every code but the shared residual names the grammar that produces it.
     for (const code of codes) {
       if (code === 'unexpected-token') continue;
-      expect(code, code).toMatch(/^(megaminx|clock|pyraminx|skewb|square1)-/);
+      expect(code, code).toMatch(/^(megaminx|clock|pyraminx|skewb|square1|fto)-/);
     }
 
     const word = NUMBER_WORDS[codes.length];

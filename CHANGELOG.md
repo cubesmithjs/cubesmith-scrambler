@@ -10,6 +10,82 @@ changes and a patch bump may not.
 
 ---
 
+## 0.15.0
+
+**The Face Turning Octahedron.** `fto` joins as the eighteenth event — scrambled,
+validated and drawn. The WCA made it official on 2026-06-24, to be held from
+**2027-01-02**; this release exists so a consumer has it before then.
+
+A **minor**, because it is new surface and because two public unions grew (below).
+
+🔴 **Provisional until the WCA publishes the FTO regulations** (a draft is expected
+in the January 2027 cycle). The notation, the minimum solve distance and the picture
+are this package's best reading of current practice, not the regulation's text — see
+`docs/fto-design.md` §8. If the regulations differ, the fix is a patch.
+
+### Added
+
+- **`generateScramble('fto')`** — random-state. A uniformly random state, solved by a
+  three-phase reduction (a block around the `D B BR BL` corner, then `U F R L`, then
+  an exact table over the 63,504,000 states `⟨U, L⟩` reaches), and inverted.
+  **29–44 moves, median 39** over 1,000 seeded states. Respects the 4b3 floor of 2.
+- **`prepareEvent('fto')`** — **6.5 s** cold, measured in a fresh process on the dev
+  box (Node 22.14). The first scramble after it costs 271 ms, a warm one median 81 ms,
+  p99 227 ms. The largest table is stored two bits per state: 15.9 MB.
+- **`validateScramble('fto', …)`** — a seventh grammar, `'fto'`: the eight faces
+  `U F R L B D BR BL`, `'` for anticlockwise, and no `2` (a double 120° turn *is*
+  the prime turn). Two reason codes: **`fto-not-a-face`** (`BX`) and
+  **`fto-bad-amount`** (`R2`).
+- **`drawScramble('fto', …)`** from `@cubesmith/scrambler/draw` — a two-square net (the
+  four faces round each vertex) in the Lanlan colours. 🔴 **The first picture here that
+  is not TNoodle's**: no TNoodle release draws an FTO, so this one is the package's own.
+
+### ⚠️ Compile-visible: two unions grew
+
+`WcaEventId` gained `'fto'`, and `Notation` gained `'fto'` (so `BespokeNotation` did
+too). Nothing existing changed shape, but an **exhaustive** `switch` or
+`Record<WcaEventId, …>` / `Record<Notation, …>` table now needs one more arm.
+`ScrambleErrorReason` gained two codes; a consumer switching on it should already keep
+a default arm, as its doc comment asks.
+
+Measured, not asserted: with comments and tsup's chunk hashes stripped, the built
+`dist/index.d.ts` (plus its types chunk) differs from `0.14.1`'s in exactly three
+lines — `WcaEventId`, `Notation` and `ScrambleErrorReason`, each only *gaining*
+members. `dist/draw/index.d.ts` is unchanged.
+
+### How it was checked
+
+- Schreier–Sims over the derived turns: the group has
+  158,260,810,061,489,362,698,240,000,000 elements — `(6!/2)·2⁵·(12!/2)³` exactly —
+  in the piece model and in an independent 72-sticker model. Dividing out look-alike
+  centres and whole-puzzle rotations gives the published
+  **31,408,133,379,194,880,000,000** positions.
+- The random draw is built from that measured structure; χ² on four projections is
+  below the 0.1% critical value.
+- Every scramble, read back as text, reaches exactly the drawn state.
+
+### Bundle size
+
+Measured with `gzip -9` on both builds (`0.14.1` from the registry tarball):
+
+| | `0.14.1` | `0.15.0` | change |
+|---|---|---|---|
+| `dist/index.js` | 234,137 B / 50,935 B gzip | 265,810 B / 57,929 B gzip | +31,673 B (+13.5%) / +6,994 B gzip (+13.7%) |
+| `dist/draw/index.js` | 97,132 B / 23,460 B gzip | 104,135 B / 25,088 B gzip | +7,003 B (+7.2%) / +1,628 B gzip (+6.9%) |
+
+The package has one scrambling entry point, so every consumer carries the FTO solver
+whether it scrambles FTO or not — about 7 KB gzipped. Its tables are built only on
+first use, so the memory cost is paid only by a process that scrambles an FTO.
+
+### Also
+
+- `prepare-event.test.ts`'s first-scramble check now measures **CPU time**, not
+  wall time. With FTO's tables building in parallel workers, the first `333mbf`
+  scramble after a prepare measured 4.4 s of wall time in the full coverage run
+  against 50 ms in isolation — contention, not a gap. Nothing shipped changed.
+- `move-count.test.ts` gained a fourth verdict, `provisional`, for an event with no
+  official number to compare against yet.
+
 ## 0.14.1
 
 **`drawScramble('sq1', …)` drew the wrong picture.** Nothing else changed, and no

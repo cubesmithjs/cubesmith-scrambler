@@ -35,7 +35,11 @@ npm install @cubesmith/scrambler
 
 ## Status
 
-**All seventeen WCA events work end to end.** `333mbf` was the last one, and it
+**All eighteen WCA events work end to end.** The newest is the **Face Turning
+Octahedron** (`fto`), official from 2027-01-02 — added in 0.15.0, ahead of the
+WCA's own FTO regulations, so its notation and minimum solve distance are
+**provisional** until those are published (see
+[`docs/fto-design.md`](./docs/fto-design.md) §8). `333mbf`, the one before it,
 turned out to need an optional `count`, not a new API (see below).
 
 > ⚠️ **Upgrading to 0.10.0 from 0.9.x?** `333fm` and `444bf` now produce
@@ -62,6 +66,7 @@ the [4x4x4 design](./docs/444-design.md).
 | `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
 | `444` `444bf` | random-state | ✅ Reduction (centres, then wings with verified centre-neutral generators) + 3x3x3 hand-off; parity fixed by derived gadgets, not memorised algorithms. Long (~140 moves) and slow (~2s) by design — correctness first. `444bf` adds a random **whole-cube rotation** (`x`/`y`/`z`), which is how 4b3a is satisfied on a cube with no fixed centre |
 | `333mbf` | random-state | ✅ One attempt, many cubes: `count` draws that many independent `333bf` scrambles, each with its own orientation suffix and its own 4b3 floor. `moves` is still the first of them |
+| `fto` | random-state | ✅ Octahedral geometry on an exact integer lattice; Schreier–Sims reproduces the published 31,408,133,379,194,880,000,000 positions. Three-phase reduction (a block, then `U F R L`, then an exact `⟨U, L⟩` table over 63,504,000 states); ~39 moves. Notation provisional until the WCA's FTO regulations |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
 `generateScramble()` / registry / typed "not implemented" errors, seeded and
@@ -80,7 +85,9 @@ Precomputing and shipping serialized tables to eliminate the cold-start cost
 is the natural next optimization, not yet done. **clock** has no table and no
 cold start at all — ~0.011ms (~93,000/sec). The random-moves events have no
 table and no search either: **minx** ~0.01ms, **555/666/777** ~0.011 / 0.014 /
-0.018ms. See `npm run bench`.
+0.018ms. **fto** — ~6.5s cold-build (15.9 MB for its largest table, stored two
+bits per state), then ~90ms per scramble (median 81ms, p99 ~230ms). See
+`npm run bench`.
 
 ## Usage
 
@@ -94,6 +101,7 @@ const { moves: skewb } = await generateScramble('skewb');
 const { moves: clock } = await generateScramble('clock');
 const { moves: megaminx } = await generateScramble('minx');
 const { moves: big } = await generateScramble('777');
+const { moves: octahedron } = await generateScramble('fto');
 // blindfolded events additionally orient the puzzle randomly:
 const { moves: blind } = await generateScramble('333bf');
 // multi-blind is one attempt over many cubes, so it takes a count:
@@ -176,11 +184,11 @@ Megaminx, Clock, Pyraminx, Skewb and Square-1 — are deliberately **not** part
 of this grammar, and parsing one throws; `validateScramble` below is the door
 onto those. See [`docs/notation-design.md`](./docs/notation-design.md).
 
-### Validating a scramble, for any of the seventeen events
+### Validating a scramble, for any of the eighteen events
 
-Cube notation covers twelve events. The other five are written in grammars of
-their own, and since 0.12 there is one entry point onto all six, keyed on the
-event rather than on which parser you guessed:
+Cube notation covers twelve events. The other six are written in grammars of
+their own, and since 0.12 there is one entry point onto all of them, keyed on
+the event rather than on which parser you guessed:
 
 ```ts
 import { validateScramble } from '@cubesmith/scrambler';
@@ -188,6 +196,7 @@ import { validateScramble } from '@cubesmith/scrambler';
 validateScramble('minx', 'R++ D-- U').valid; // true
 validateScramble('sq1', '(1, 0) / (0, -2) /').valid; // true
 validateScramble('333', "R U R' U'").valid; // true
+validateScramble('fto', "U BR' F L' BL D").valid; // true — BR is one face
 
 const bad = validateScramble('clock', 'UR4+ UR9+');
 bad.valid; // false
@@ -201,10 +210,10 @@ if (!bad.valid && bad.notation !== 'cube') {
 
 The invalid arm carries **one of two error classes**, and `notation` says
 which. A cube failure is the `AlgorithmSyntaxError` above with a
-`SyntaxErrorReason`; the other five are a `ScrambleSyntaxError` with a
-`ScrambleErrorReason` — one of thirteen documented string codes, each prefixed
+`SyntaxErrorReason`; the other six are a `ScrambleSyntaxError` with a
+`ScrambleErrorReason` — one of fifteen documented string codes, each prefixed
 by the grammar that produced it (`megaminx-*`, `clock-*`, `pyraminx-*`,
-`skewb-*`, `square1-*`), carrying whatever a message would interpolate
+`skewb-*`, `square1-*`, `fto-*`), carrying whatever a message would interpolate
 (`token`, `char`, `pins`, `hours`).
 
 🔴 The two are **deliberately separate**, and neither class extends the other:
@@ -225,10 +234,10 @@ unions, two classes. **The package ships no message strings for the new codes
 either, and never will** — same rule as 0.11.
 
 The valid arm is `{ valid: true, notation }` and carries **no parsed form**.
-There is no shared tree to hand back: the five notations have five node types,
+There is no shared tree to hand back: the six notations have six node types,
 and merging them would be actively wrong — a Pyraminx `2` means
-*counterclockwise*, not a half turn — while publishing all five would freeze
-five types written for a solver's convenience. Adding a payload later is
+*counterclockwise*, not a half turn — while publishing all six would freeze
+six types written for a solver's convenience. Adding a payload later is
 additive, so the door is left open rather than nailed shut.
 
 `validateScramble` answers *"is this valid notation for this event"* and
@@ -334,7 +343,7 @@ DOM type in the package's types.
 ### Drawing a scramble: `@cubesmith/scrambler/draw`
 
 The flat sticker picture that appears beside every scramble on an official WCA
-scramble sheet, for all seventeen events, as **data** — plus a thin SVG serializer.
+scramble sheet, for all eighteen events, as **data** — plus a thin SVG serializer.
 No DOM, no canvas, no WebGL: 2D is in scope precisely because it is geometry.
 
 ```ts
@@ -368,7 +377,8 @@ Four things worth knowing:
   all. Read `defaultColorScheme(event)` before overriding a key.
 
 The geometry, the layout constants and the colours are TNoodle's, read from
-`tnoodle-lib` source. What is **not** claimed is pixel-exact equality with a real
+`tnoodle-lib` source — for every event but `fto`, which no TNoodle release draws
+yet: its two-square net and Lanlan colours are this package's own, and provisional. What is **not** claimed is pixel-exact equality with a real
 TNoodle SVG — that would need TNoodle built and its output committed as a fixture.
 See `docs/drawing-design.md`.
 
@@ -381,7 +391,7 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
 - **A minimum number of moves to solve.** Regulation 4b3 sets a floor of 2
   moves, with per-puzzle exceptions: **2x2x2 ≥ 4** (4b3b), **Skewb ≥ 7**
   (4b3c), **Square-1 ≥ 11** (4b3d), **Pyraminx ≥ 6** (4b3f). The base floor of
-  2 is enforced for every one of the seventeen events too, including the
+  2 is enforced for every one of the eighteen events too, including the
   random-*moves* cubes and Megaminx, where 4b3e restates it. For the
   blindfolded events it is checked **after** the orientation suffix, because a
   wide move moves the state by a move as well as reorienting it (see
@@ -581,6 +591,16 @@ rules apply, and all four are implemented (`src/core/scramble-shape.ts` and
   Still open, and not blocking correctness:
   checkpoint H's empirical half — solver totality measured over a large sample
   rather than the dozens run so far.
+- **`src/puzzles/fto/`** — the Face Turning Octahedron, the first puzzle added
+  as an official event *before* its regulations. `geometry.ts` derives every
+  turn from a 120° rotation about a face normal on an integer lattice, with the
+  face names pinned by the notation's adjacencies and its handedness; a
+  Schreier–Sims test over the derived turns proves the reachable group is
+  exactly `A6 ⋉ Z2^5 × A12 × A12 × A12`, which is what `random-state.ts` draws
+  from. The solver is a three-phase reduction — a block around one corner, then
+  `U F R L`, then an exact table over the 63,504,000 states `⟨U, L⟩` reaches —
+  the structure xyzzy published, implemented independently
+  ([`docs/fto-design.md`](./docs/fto-design.md)).
 
 ## Independence note
 

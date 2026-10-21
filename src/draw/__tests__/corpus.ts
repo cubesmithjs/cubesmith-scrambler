@@ -117,6 +117,13 @@ export const SCRAMBLE_CORPUS: Readonly<Partial<Record<WcaEventId, readonly strin
     "(3,5) / (-5,1) / (0,-3) / (0,3) / (-1,2) / (-2,4) / (-1,5) / (0,1) / (-3,0) / (-2,5) / (0,-4) / (-2,-5) /",
     "(-3,5) / (6,3) / (0,3) / (-5,-2) / (0,-3) / (-1,2) / (-3,0) / (-2,0) / (0,3) / (-4,1) / (-4,6) / (0,4) / (-3,0) /",
   ],
+  // `fto` was added at 0.15.0 and captured 2026-10-21 the same way, from
+  // `generateScramble('fto', { seed: 'lit-fto-<i>' })`.
+  "fto": [
+    "U' L U' L' U' L U' L U' L U L U L' U F R L U R' L U' L' U' L F U B' BL U B' D R' L U' R",
+    "L U' L U L U' L' U L' U L' U L' U L U' L' U' R U F R' U R F U' F R L' U L D L BL B' R' B' BR",
+    "L U L U' L' U' L' U' L U L' U' L' U' L' U L U' L' U R F R L U' F' U F' L F L' B BR U' BL U' L' D BL",
+  ],
 };
 
 /** The scrambles for one event, or a loud failure — a silent empty array would pass every loop. */

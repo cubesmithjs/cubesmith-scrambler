@@ -26,6 +26,7 @@
 import type { WcaEventId } from '../core/types';
 import { registerClockDrawer } from './clock';
 import { registerCubeDrawers } from './cube';
+import { registerFtoDrawer } from './fto';
 import { registerMegaminxDrawer } from './megaminx';
 import { registerPyraminxDrawer } from './pyraminx';
 import { registerSkewbDrawer } from './skewb';
@@ -43,6 +44,7 @@ registerSkewbDrawer();
 registerClockDrawer();
 registerMegaminxDrawer();
 registerSquare1Drawer();
+registerFtoDrawer();
 
 /**
  * Draws `scramble` for `event`, returning the picture as data.

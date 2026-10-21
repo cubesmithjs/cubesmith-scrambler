@@ -9,7 +9,7 @@ import { implementedEvents } from './scrambler-registry';
 import type { WcaEventId } from './types';
 
 /**
- * The event-keyed door onto six grammars.
+ * The event-keyed door onto seven grammars.
  *
  * Every generated scramble in this file lives here rather than in the five
  * notation test files for the reason `corpus.test.ts` gives: generating a
@@ -20,28 +20,30 @@ import type { WcaEventId } from './types';
 describe('notationForEvent', () => {
   /**
    * The dispatch is total over the registry, and its shape is asserted rather
-   * than assumed: an eighteenth event added tomorrow would default to `'cube'`
+   * than assumed: a nineteenth event added tomorrow would default to `'cube'`
    * and silently pass a "every event maps to something" check, so the counts
    * are pinned instead. A new event fails here and has to be classified
    * deliberately.
    */
-  it('maps every registered event onto one of the six notations, twelve of them cube', () => {
+  it('maps every registered event onto one of the seven notations, twelve of them cube', () => {
     const byNotation = new Map<Notation, WcaEventId[]>();
     for (const event of implementedEvents()) {
       const notation = notationForEvent(event);
       byNotation.set(notation, [...(byNotation.get(notation) ?? []), event]);
     }
 
-    expect([...implementedEvents()]).toHaveLength(17);
+    expect([...implementedEvents()]).toHaveLength(18);
     expect(byNotation.get('cube')).toHaveLength(12);
     expect(byNotation.get('megaminx')).toEqual(['minx']);
     expect(byNotation.get('clock')).toEqual(['clock']);
     expect(byNotation.get('pyraminx')).toEqual(['pyram']);
     expect(byNotation.get('skewb')).toEqual(['skewb']);
     expect(byNotation.get('square1')).toEqual(['sq1']);
+    expect(byNotation.get('fto')).toEqual(['fto']);
     expect([...byNotation.keys()].sort()).toEqual([
       'clock',
       'cube',
+      'fto',
       'megaminx',
       'pyraminx',
       'skewb',
@@ -52,7 +54,7 @@ describe('notationForEvent', () => {
   /** The set `corpus.test.ts` derives its cube-event list from, so it cannot drift. */
   it('derives the non-cube event set from the notation map rather than a second literal', () => {
     expect([...NON_CUBE_EVENTS].sort()).toEqual(Object.keys(BESPOKE_NOTATION_BY_EVENT).sort());
-    expect([...NON_CUBE_EVENTS].sort()).toEqual(['clock', 'minx', 'pyram', 'skewb', 'sq1']);
+    expect([...NON_CUBE_EVENTS].sort()).toEqual(['clock', 'fto', 'minx', 'pyram', 'skewb', 'sq1']);
     for (const event of NON_CUBE_EVENTS) {
       expect(notationForEvent(event as WcaEventId), event).not.toBe('cube');
     }
@@ -61,7 +63,7 @@ describe('notationForEvent', () => {
   /**
    * A parser needs no scrambler, so an event with none validates anyway rather
    * than throwing `UnimplementedEventError`. Currently unreachable — all
-   * seventeen are implemented — and documented so it is not discovered.
+   * eighteen are implemented — and documented so it is not discovered.
    */
   it('answers cube for an event it has never heard of, rather than refusing', () => {
     expect(notationForEvent('888' as WcaEventId)).toBe('cube');
@@ -78,10 +80,10 @@ describe('validateScramble', () => {
    * for **every** event, read back by the public validator.
    *
    * The event list is derived from the registry rather than written out, so an
-   * eighteenth event has to be generated and validated here too rather than
+   * nineteenth event has to be generated and validated here too rather than
    * silently skipped.
    *
-   * One file, seventeen tests. The file is what shares the warm pruning tables
+   * One file, eighteen tests. The file is what shares the warm pruning tables
    * — Vitest isolates by file, and building the 3x3x3 tables a second time
    * costs a minute under `--coverage`. The split into separate `it`s is about
    * the *timeout*, which is per test: as a single loop this measured ~144 s
@@ -120,12 +122,19 @@ describe('validateScramble', () => {
     expect(validateScramble('clock', 'UR4+ DR3+ y2 ALL2- DL').valid).toBe(true);
     expect(validateScramble('sq1', '(6, 2) / (-2, 4) /').valid).toBe(true);
     expect(validateScramble('333', "R U R' U'").valid).toBe(true);
+    expect(validateScramble('fto', "U BR' F L' BL D").valid).toBe(true);
 
     // Each grammar refuses the others rather than mis-reading them.
     expect(validateScramble('minx', '(6, 2) /').valid).toBe(false);
     expect(validateScramble('sq1', 'R++ D--').valid).toBe(false);
     expect(validateScramble('333', 'R++ D--').valid).toBe(false);
     expect(validateScramble('clock', "R U R'").valid).toBe(false);
+    // A cube half turn is not an FTO move.
+    expect(validateScramble('fto', 'R U2').valid).toBe(false);
+    // 🔴 And the reverse is why FTO needs its own grammar at all: cube notation
+    // happily reads `BR BL` as four cube turns, `B R B L`. Only the event says
+    // that `BR` is one face.
+    expect(validateScramble('333', 'BR BL').valid).toBe(true);
   });
 
   /**
@@ -174,13 +183,14 @@ describe('validateScramble', () => {
     }
   });
 
-  it('carries the offset and span for each of the five bespoke notations', () => {
+  it('carries the offset and span for each of the six bespoke notations', () => {
     const cases = [
       { event: 'minx', text: 'R++ R+++', reason: 'megaminx-bad-direction', offset: 4, length: 4 },
       { event: 'pyram', text: 'U Z', reason: 'pyraminx-not-a-vertex', offset: 2, length: 1 },
       { event: 'skewb', text: 'U R2', reason: 'skewb-bad-amount', offset: 2, length: 2 },
       { event: 'clock', text: 'UR4+ UR9+', reason: 'clock-hour-out-of-range', offset: 5, length: 4 },
       { event: 'sq1', text: '(1, 0) / (0, 0)', reason: 'square1-zero-turn', offset: 9, length: 6 },
+      { event: 'fto', text: "U BR'' L", reason: 'fto-bad-amount', offset: 2, length: 4 },
     ] as const;
 
     for (const { event, text, reason, offset, length } of cases) {

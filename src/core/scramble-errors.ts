@@ -1,32 +1,37 @@
 /**
- * The error type for the **five bespoke puzzle notations** — Megaminx, Clock,
- * Pyraminx, Skewb and Square-1 — and the reason codes they can produce.
+ * The error type for the **six bespoke puzzle notations** — Megaminx, Clock,
+ * Pyraminx, Skewb, Square-1 and, since v0.15, the Face Turning Octahedron — and
+ * the reason codes they can produce.
  *
  * Everything here mirrors what `AlgorithmSyntaxError` established in v0.11 for
  * cube notation, deliberately and one field at a time, because the alternative
- * was a public API that is localizable for twelve events and not for the other
- * five. Those five parsers exist and are tested; until v0.12 they threw a bare
- * `Error` carrying an English sentence, no offset, no span and no code.
+ * was a public API that is localizable for twelve events and not for the rest.
+ * The first five parsers existed and were tested long before v0.12, but threw a
+ * bare `Error` carrying an English sentence, no offset, no span and no code; the
+ * FTO's was written against this class from the start.
  */
 
 import type { SyntaxErrorReason } from '../notation/alg/types';
 
 /**
- * The six grammars this package reads. Not an event id — twelve of the
- * seventeen WCA events share one grammar, and the map from event to notation
+ * The seven grammars this package reads. Not an event id — twelve of the
+ * eighteen WCA events share one grammar, and the map from event to notation
  * lives in `event-notation.ts`.
  *
  * `'cube'` names the grammar `parseAlgorithm` reads and is handled by
  * `AlgorithmSyntaxError`, not by this class; it appears in this union because
- * `validateScramble` dispatches over all six.
+ * `validateScramble` dispatches over all seven.
+ *
+ * Adding `'fto'` in v0.15 widened this union: an exhaustive `switch` over it
+ * needs one more arm.
  */
-export type Notation = 'cube' | 'megaminx' | 'clock' | 'pyraminx' | 'skewb' | 'square1';
+export type Notation = 'cube' | 'megaminx' | 'clock' | 'pyraminx' | 'skewb' | 'square1' | 'fto';
 
-/** The five that are not cube notation — the ones this error class covers. */
+/** The six that are not cube notation — the ones this error class covers. */
 export type BespokeNotation = Exclude<Notation, 'cube'>;
 
 /**
- * Every distinct way one of the five bespoke notations can be malformed, as a
+ * Every distinct way one of the six bespoke notations can be malformed, as a
  * **stable string code**, prefixed by the notation that produces it.
  *
  * 🔴 **Deliberately a separate union from `SyntaxErrorReason`**, rather than
@@ -34,7 +39,7 @@ export type BespokeNotation = Exclude<Notation, 'cube'>;
  * codes — a `Record<SyntaxErrorReason, Template>` message table, which is
  * exactly what the demo carries — would stop compiling on upgrade if these
  * became members of that union, even though nothing it does had changed. The
- * cost is that a consumer handling all six grammars writes two switches, and
+ * cost is that a consumer handling all seven grammars writes two switches, and
  * that is the honest shape of the thing: they are two grammars.
  *
  * The prefix is not decoration. A code read in a log says which grammar
@@ -57,12 +62,14 @@ export type BespokeNotation = Exclude<Notation, 'cube'>;
  * | `clock-pin-not-a-corner` | `ALL1+ U` |
  * | `square1-stray-character` | `(1, 0) x` |
  * | `square1-zero-turn` | `(0, 0)` |
+ * | `fto-not-a-face` | `BX` |
+ * | `fto-bad-amount` | `R2` |
  * | `unexpected-token` | — the residual; see below |
  *
  * `unexpected-token` is the **residual**, spelled the same as the cube union's
  * for the same reason and with the same meaning: it is what a
  * `ScrambleSyntaxError` constructed without a detail reports, rather than a
- * precision it does not have. Nothing any of the five parsers currently
+ * precision it does not have. Nothing any of the six parsers currently
  * produces reaches it.
  */
 export type ScrambleErrorReason =
@@ -78,6 +85,8 @@ export type ScrambleErrorReason =
   | 'clock-pin-not-a-corner'
   | 'square1-stray-character'
   | 'square1-zero-turn'
+  | 'fto-not-a-face'
+  | 'fto-bad-amount'
   | 'unexpected-token';
 
 /**
@@ -113,7 +122,7 @@ export interface ScrambleSyntaxErrorDetail {
 }
 
 /**
- * A syntax error from one of the five bespoke notations, carrying the **offset**
+ * A syntax error from one of the six bespoke notations, carrying the **offset**
  * it occurred at, the **span** it covers, a machine-readable
  * {@link ScrambleErrorReason} and the data a localized message needs.
  *
@@ -134,7 +143,7 @@ export interface ScrambleSyntaxErrorDetail {
  *   consumer, in the consumer's language.
  */
 export class ScrambleSyntaxError extends Error {
-  /** Which of the six grammars rejected the input. Never `'cube'` — that path throws `AlgorithmSyntaxError`. */
+  /** Which of the seven grammars rejected the input. Never `'cube'` — that path throws `AlgorithmSyntaxError`. */
   readonly notation: BespokeNotation;
   readonly input: string;
   readonly offset: number;
@@ -152,7 +161,7 @@ export class ScrambleSyntaxError extends Error {
     message: string,
     detail?: ScrambleSyntaxErrorDetail,
   ) {
-    // The `<notation>-notation:` prefix is what these five parsers already
+    // The `<notation>-notation:` prefix is what the first five parsers already
     // printed before they carried any structure, kept byte-for-byte so a
     // consumer or test matching on it does not break on the upgrade.
     super(`${notation}-notation: ${message} at offset ${offset} in "${input}"`);

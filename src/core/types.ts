@@ -23,7 +23,14 @@ export type WcaEventId =
   | 'pyram'
   | 'clock'
   | 'skewb'
-  | 'sq1';
+  | 'sq1'
+  /**
+   * Face Turning Octahedron — an official WCA event from 2027-01-02 (announced
+   * 2026-06-24). Added in 0.15.0; its notation and minimum solve distance are
+   * provisional until the WCA publishes the FTO regulations. See
+   * `docs/fto-design.md`.
+   */
+  | 'fto';
 
 /**
  * How the scramble was produced, and therefore what can be claimed about it.

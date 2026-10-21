@@ -4,7 +4,7 @@ import type { WcaEventId } from './types';
 /**
  * Which grammar each WCA event's scramble is written in.
  *
- * 🔴 **Five rows, not seventeen.** Twelve of the seventeen events are written
+ * 🔴 **Six rows, not eighteen.** Twelve of the eighteen events are written
  * in cube notation, and listing them would be a second hand-maintained copy of
  * the registry that could drift from it — exactly the failure this package
  * designs against, and the one `README.md` already suffered when it claimed
@@ -20,10 +20,11 @@ export const BESPOKE_NOTATION_BY_EVENT = {
   pyram: 'pyraminx',
   skewb: 'skewb',
   sq1: 'square1',
+  fto: 'fto',
 } as const satisfies Readonly<Partial<Record<WcaEventId, Notation>>>;
 
 /**
- * The five events `parseAlgorithm` deliberately refuses. Derived from the map
+ * The six events `parseAlgorithm` deliberately refuses. Derived from the map
  * above rather than written twice.
  */
 export const NON_CUBE_EVENTS: ReadonlySet<string> = new Set(
