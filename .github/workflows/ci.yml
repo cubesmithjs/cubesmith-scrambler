@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run by hand from the Actions tab, on any branch — including a Dependabot one,
+  # which the job below otherwise skips.
+  workflow_dispatch:
 
 # 🔴 Least privilege for GITHUB_TOKEN (security_audit_plan F-12): a compromised
 # third-party action running in a PR job must not be able to write to the repo.
@@ -13,6 +16,14 @@ permissions:
 
 jobs:
   test:
+    # 🔴 Dependabot pull requests do not run CI, to save the account's monthly
+    # Actions minutes (owner decision, 2026-10-21). The branch name is the test,
+    # not the actor, so a human pushing a fix onto a Dependabot branch is skipped
+    # too. A skipped job counts as passing for a required status check, so the PR
+    # stays mergeable. Prove a bump with `npm run ci` locally (or run this
+    # workflow by hand); `main` is tested again on merge, and the publish job
+    # runs the whole suite before anything reaches npm.
+    if: ${{ !startsWith(github.head_ref, 'dependabot/') }}
     runs-on: ubuntu-latest
     steps:
       # `persist-credentials: false` keeps GITHUB_TOKEN out of the checkout, where

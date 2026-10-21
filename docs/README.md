@@ -50,6 +50,9 @@ surface and its claims are untouched. Every convention is labelled as one.
 
 ## Cross-cutting
 
+- [architecture.md](./architecture.md) — the source layout, the scramble-shape rules every
+  event obeys, cold-start and per-scramble cost, and where the code came from.
+
 - [notation-design.md](./notation-design.md) — the algorithm-notation layer: parser,
   serializer and inverter. Syntax only, no puzzle behind it.
 - [blindfolded-review.md](./blindfolded-review.md) — Regulation 4b3a conformance

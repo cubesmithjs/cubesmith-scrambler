@@ -9,7 +9,7 @@ import { generate333Scramble } from './solve';
  * via `bench()` here, which repeats its function many times and would
  * only ever time the *cached* path after the first iteration. As of this
  * writing that cold build (all 4 move + pruning tables) takes ~11s; see
- * the README's Status section for the current number.
+ * `docs/architecture.md` §3 for the current number.
  */
 
 describe('generate333Scramble — steady state (tables already built)', () => {

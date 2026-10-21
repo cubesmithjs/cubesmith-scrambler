@@ -44,6 +44,12 @@ import SCRAMBLE_ERRORS_SOURCE from './core/scramble-errors.ts?raw';
 // The `./draw` export path is a fact about the manifest, not about prose, and the
 // README now tells a consumer to import it — so the manifest is read the same way.
 import PACKAGE_JSON_SOURCE from '../package.json?raw';
+// The README links out for detail rather than carrying it (2026-10-21). Importing each
+// target is what proves the link resolves: a `?raw` import of a missing file fails the
+// whole suite at load time.
+import ARCHITECTURE from '../docs/architecture.md?raw';
+import CONTRIBUTING from '../CONTRIBUTING.md?raw';
+import CHANGELOG from '../CHANGELOG.md?raw';
 
 const readmeLines = (): string[] => README.split(/\r?\n/);
 
@@ -91,10 +97,25 @@ describe('the README status claims', () => {
    */
   it('does not call a populated directory empty', () => {
     const populated = ['444', 'square1'];
-    for (const directory of populated) {
-      expect(README).not.toContain(`src/puzzles/{444,square1}/\`** — empty`);
-      expect(README).not.toMatch(new RegExp(`puzzles/${directory}/\`\\*\\* — empty`));
+    // The source-tree tour moved to docs/architecture.md, so the claim is checked there too.
+    for (const text of [README, ARCHITECTURE]) {
+      for (const directory of populated) {
+        expect(text).not.toContain(`src/puzzles/{444,square1}/\`** — empty`);
+        expect(text).not.toMatch(new RegExp(`puzzles/${directory}/\`\\*\\* — empty`));
+      }
     }
+  });
+
+  it('links out for the detail it no longer carries, and every target exists', () => {
+    for (const target of ['./CHANGELOG.md', './CONTRIBUTING.md', './docs/architecture.md']) {
+      expect(README, target).toContain(`](${target})`);
+    }
+    // The moved sections really moved, rather than being dropped.
+    expect(ARCHITECTURE).toContain('## 1. Source layout');
+    expect(ARCHITECTURE).toContain('Scramble shape');
+    expect(ARCHITECTURE).toContain('## 4. Independence');
+    expect(CONTRIBUTING).toContain('npm run ci');
+    expect(CHANGELOG).toContain('## 0.15.0');
   });
 
   it('does not say a working event throws', () => {

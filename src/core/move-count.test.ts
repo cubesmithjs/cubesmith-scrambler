@@ -123,11 +123,15 @@ const BANDS: readonly EventBand[] = [
   {
     event: 'sq1',
     tnoodle: [23, 23],
-    band: [18, 32],
+    // The floor was 18, set from 18 draws, and failed at random about one CI run in a
+    // hundred: these draws are unseeded, and a legal scramble can be shorter. Measured
+    // 2026-10-21 over 3,000 seeded scrambles: 15..31 tokens, with 10 below 18. The band
+    // now covers that with a two-token margin below.
+    band: [13, 32],
     verdict: 'in-range',
     draws: 3,
     widthBecause:
-      'a Square-1 scramble is turn pairs interleaved with slices, and how many slices the solution needs is not fixed — TNoodle prints 12 pairs and 11 separators on the sheet read, this package 22..28 across 18 draws',
+      'a Square-1 scramble is turn pairs interleaved with slices, and how many slices the solution needs is not fixed — TNoodle prints 12 pairs and 11 separators on the sheet read, this package 15..31 over 3,000 seeded scrambles (median 25)',
   },
 
   // Closed 2026-08-12 by task 02, and this row is what closing it looks like:
