@@ -306,9 +306,27 @@ Provisional, against 4b3's general rule, until the FTO regulations exist (§8).
 
 ### Independent verification
 
-The published position count, reproduced from a group order the tests compute
-rather than read; xyzzy's coordinate sizes and reduction factors, reproduced
-from phases whose targets are computed rather than listed.
+- **The published solver's own worked example** (`solve.test.ts`). xyzzy's
+  source states that the scramble `F R U R' U' F'` has an optimal two-face
+  solution of 24 moves, and prints it. Here that sequence solves the scrambled
+  state, *and* the exact `⟨U, L⟩` table measures the state at exactly 24. Both
+  are facts about the real puzzle under the established names, so they hold only
+  if every face name, adjacency and turning direction matches. A mirror image of
+  this model, or a reversed clockwise, fails them.
+- The published position count, reproduced from a group order the tests compute
+  rather than read; xyzzy's coordinate sizes and reduction factors, reproduced
+  from phases whose targets are computed rather than listed.
+- **An end-to-end audit** on 2026-10-21, run once rather than kept as a test:
+  2,000 seeded scrambles were all valid text and all distinct, each reached
+  exactly its drawn state, each kept the floor, and none had a redundant move
+  (none twice in a row, nor across a commuting opposite face). Lengths were 28–44,
+  median 39. χ² on the states the *scrambles* reach was 13.37 (edge slot, df 11),
+  0.05 (corner twist, df 1) and 6.27 (centre colour, df 3).
+- **The picture was inspected rendered**, not only as data: solved, every single
+  turn, `U U'` and a real scramble, screenshotted from the SVG. Each turn moves
+  the strips the geometry predicts — `U` carries B's strip to R, R's to L and
+  L's to B — and `draw/fto.test.ts` pins that the two stickers of every edge off
+  the equator are drawn sharing a side.
 
 ### Edge cases
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EDGE_POSITIONS_FTO, FACE_NORMALS, FACELETS_FTO } from '../puzzles/fto/geometry';
 import { FTO_FACES } from '../puzzles/fto/notation';
 import { vecCross, vecDot } from '../utils/vec3';
 import { corpusFor } from './__tests__/corpus';
@@ -43,6 +44,37 @@ describe('the FTO drawing', () => {
     // Equal small triangles: the 3×3 subdivision of each face projects to nine of one size.
     const areas = image.shapes.map((s) => (s.kind === 'polygon' ? area(s.points) : 0));
     for (const a of areas) expect(a).toBeCloseTo((180 * 180) / 36, 6);
+  });
+
+  /**
+   * Stickers of one physical edge piece must touch in the picture. Of the twelve
+   * edges, the eight that meet the top or bottom vertex have both faces in the
+   * same square, so their two triangles must share a whole side; the four on the
+   * equator straddle the two squares and are checked by colour alone.
+   */
+  it('draws the two stickers of every non-equator edge as triangles sharing a side', () => {
+    const image = drawScramble('fto', '');
+    const key = ([x, y]: readonly [number, number]): string => `${x.toFixed(6)},${y.toFixed(6)}`;
+    const points = image.shapes.map((s) => (s.kind === 'polygon' ? s.points.map(key) : []));
+    let checked = 0;
+    for (let i = 0; i < FACELETS_FTO.length; i += 1) {
+      const a = FACELETS_FTO[i]!;
+      if (a.kind !== 'edge') continue;
+      // The edge this sticker belongs to, and the other face sharing it.
+      const e = EDGE_POSITIONS_FTO.find(
+        (edge) => vecDot(edge, FACE_NORMALS[a.face]) === 2 &&
+          [0, 1, 2].every((k) => a.point[k] === FACE_NORMALS[a.face][k]! + 3 * edge[k]!),
+      )!;
+      if (e[2] === 0) continue; // an equator edge: its stickers are in different squares
+      const j = FACELETS_FTO.findIndex(
+        (b, k) => k !== i && b.kind === 'edge' && b.face !== a.face &&
+          [0, 1, 2].every((c) => b.point[c] === FACE_NORMALS[b.face][c]! + 3 * e[c]!),
+      );
+      const shared = points[i]!.filter((p) => points[j]!.includes(p));
+      expect(shared, `${a.face} edge sticker`).toHaveLength(2);
+      checked += 1;
+    }
+    expect(checked).toBe(16); // 8 edges × 2 stickers
   });
 
   it('views both halves from outside, so neither is a mirror image', () => {

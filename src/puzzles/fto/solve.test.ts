@@ -179,6 +179,32 @@ describe('solveFto', () => {
   });
 });
 
+/**
+ * 🔴 Ground truth from outside this package. xyzzy's FTO solver — the one
+ * cubing.js runs — states in its source that the scramble `F R U R' U' F'` has
+ * "a 6-move 4-gen solution (F U R U' R' F'), but the optimal 2-gen solution is
+ * 24 moves", and prints that 24-move solution. Both are facts about the *real*
+ * puzzle under the established names, so they hold here only if every face name,
+ * every adjacency and the turning direction match that implementation. A mirror
+ * image of this model, or a reversed clockwise, fails the first assertion.
+ */
+describe('against the published FTO solver', () => {
+  const scrambled = applyFtoMoves(SOLVED_FTO_STATE, parseFtoScramble("F R U R' U' F'"));
+
+  it("is solved by xyzzy's 24-move ⟨U, L⟩ solution of F R U R' U' F'", () => {
+    const twoGen = "U L' U L' U' L' U' L U' L U L' U L' U L U L' U' L U' L U L'";
+    expect(parseFtoScramble(twoGen)).toHaveLength(24);
+    expect(isSolvedFto(applyFtoMoves(scrambled, parseFtoScramble(twoGen)))).toBe(true);
+  });
+
+  it('measures that state at exactly 24 moves inside ⟨U, L⟩ — the optimum xyzzy states', () => {
+    // Already in ⟨U, L⟩ with the block and phase-2 pieces solved, so phases 1
+    // and 2 are empty and phase 3 — an exact descent — is the optimal 2-gen length.
+    const { phase1, phase2, phase3 } = solveFtoInPhases(scrambled);
+    expect([phase1.length, phase2.length, phase3.length]).toEqual([0, 0, 24]);
+  });
+});
+
 describe('isAtLeastMovesFromSolved', () => {
   const u: FtoMove = { face: 'U', amount: 1 };
   const r: FtoMove = { face: 'R', amount: 2 };
