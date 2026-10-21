@@ -5,9 +5,15 @@ name: Publish
 # or tag creation. Nothing publishes to npm until that step is taken by
 # hand. Requires an `NPM_TOKEN` repository secret (an npm automation token)
 # to be added before this can succeed.
+#
+# It can also be run by hand from the Actions tab (`workflow_dispatch`) as a
+# DRY RUN: every check, the whole test suite and the build, then
+# `npm publish --dry-run`, which prints the tarball and uploads nothing. Use it
+# to prove a change to this file before the next real release.
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 # 🔴 Least privilege for GITHUB_TOKEN (security_audit_plan F-12): a compromised
 # third-party action running in a PR job must not be able to write to the repo.
@@ -15,39 +21,37 @@ on:
 permissions:
   contents: read
 
+# Three stages (2026-10-22). The tests used to run in this job, serially, on one
+# runner: 10 to 19 minutes per release. They now run as `ci.yml`'s own parallel
+# jobs, called rather than copied, so a release is tested by exactly what tests
+# every push, and nothing is published unless all of it passes.
 jobs:
-  publish:
+  # ---------------------------------------------------------------------------
+  # Stage 1: fail in seconds on a release that can never succeed.
+  # ---------------------------------------------------------------------------
+  verify:
+    name: Verify the tag and version
     runs-on: ubuntu-latest
-    # `id-token: write` lets npm attach a signed provenance attestation to the
-    # published tarball (security_audit_plan F-12) — consumers can verify the
-    # package was built by THIS workflow from THIS commit. It is also what npm
-    # trusted publishing needs: once the repository/workflow pair is registered
-    # as a trusted publisher on npmjs.com, `NODE_AUTH_TOKEN` below can be
-    # removed and the long-lived `NPM_TOKEN` secret revoked. ⚠️ Trusted
-    # publishing needs npm >= 11.5.1 and Node 22 ships npm 10, so that change
-    # must also upgrade npm in this job, or the first tokenless release fails.
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # Runs before `npm ci` on purpose: both failures below are knowable from
-      # the checkout alone, and failing in five seconds with a sentence beats
-      # failing after a full test run with npm's `403 Forbidden`, which reads
-      # like a credentials problem and is not one.
+      # Runs before anything else on purpose: both failures below are knowable
+      # from the checkout alone, and failing in five seconds with a sentence
+      # beats failing after a full test run with npm's `403 Forbidden`, which
+      # reads like a credentials problem and is not one.
       #
       # This exists because of a real incident on 2026-08-08. The v0.11.0
       # release was created moments before the 0.11.0 commit reached `main`, so
       # the tag was cut from the previous commit. A tag is a fixed pointer and
-      # this job checks out the *tag*, so it rebuilt 0.10.0 and tried to
+      # this workflow checks out the *tag*, so it rebuilt 0.10.0 and tried to
       # republish it — and would have kept doing so on every re-run, because
       # `main` moving forward afterwards does not drag the tag along. The fix is
       # to delete the release *and* the tag (deleting a release leaves its tag
       # behind), then recreate it.
       - name: Verify the tag matches the version being published
+        if: github.event_name == 'release'
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME#v}"
@@ -70,9 +74,56 @@ jobs:
 
           echo "Tag '${GITHUB_REF_NAME}' matches package.json '${PKG}', which is not yet published."
 
+      - name: Report what a dry run would publish
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if npm view "@cubesmith/scrambler@${PKG}" version >/dev/null 2>&1; then
+            echo "::warning::Dry run of ${PKG}, which is already on npm: a real release needs a version bump first."
+          else
+            echo "Dry run of ${PKG} from ${GITHUB_REF_NAME}: not yet on npm."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: the CI workflow itself — four test shards, the typecheck and build
+  # with its bundle checks, and the merged result — on the tagged commit.
+  # ---------------------------------------------------------------------------
+  ci:
+    name: CI
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  # ---------------------------------------------------------------------------
+  # Stage 3: build the tarball and publish it, only after every CI job passed.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish to npm
+    needs: [verify, ci]
+    runs-on: ubuntu-latest
+    # `id-token: write` lets npm attach a signed provenance attestation to the
+    # published tarball (security_audit_plan F-12) — consumers can verify the
+    # package was built by THIS workflow from THIS commit. The tarball is built
+    # in this job, from the tag, so that statement stays exactly true. It is
+    # also what npm trusted publishing needs: once the repository/workflow pair
+    # is registered as a trusted publisher on npmjs.com, `NODE_AUTH_TOKEN`
+    # below can be removed and the long-lived `NPM_TOKEN` secret revoked.
+    # ⚠️ Trusted publishing needs npm >= 11.5.1 and Node 22 ships npm 10, so
+    # that change must also upgrade npm in this job, or the first tokenless
+    # release fails.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       # No cache in the release job: a cache entry written by another run would
       # feed straight into the tarball we sign and publish. `cache:` alone is
       # not enough — setup-node v5+ caches npm by itself unless told not to.
+      # (The CI jobs above do use the cache; they only test, they ship nothing.)
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -80,10 +131,14 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test:coverage
       - run: npm run build
 
-      - run: npm publish --access public --provenance
+      - name: Publish
+        if: github.event_name == 'release'
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run (manual runs never publish)
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --access public --dry-run

@@ -10,6 +10,20 @@ changes and a patch bump may not.
 
 ---
 
+## Unreleased
+
+### Also
+
+- **Releases are tested in parallel.** The Publish workflow no longer runs the test suite
+  serially in its own job (10–19 minutes per release). It verifies the tag, then calls
+  the CI workflow itself (four test shards, the typecheck and build with the bundle
+  checks, and the merged result) and publishes only when all of it passes. The tarball
+  is still built in the publish job from the tagged commit, with provenance.
+- Publish can be run by hand from the Actions tab as a **dry run**: every check and the
+  whole suite, then `npm publish --dry-run`, which uploads nothing.
+
+---
+
 ## 0.15.0
 
 **The Face Turning Octahedron, sixteen unofficial events, and no repeated move at the

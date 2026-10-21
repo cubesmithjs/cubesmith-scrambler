@@ -6,6 +6,9 @@ on:
   pull_request:
   # Run by hand from the Actions tab, on any branch.
   workflow_dispatch:
+  # Run by `publish.yml` before anything reaches npm, so a release is tested by
+  # exactly these jobs, in parallel, rather than by a second copy of them.
+  workflow_call:
 
 # 🔴 Least privilege for GITHUB_TOKEN (security_audit_plan F-12): a compromised
 # third-party action running in a PR job must not be able to write to the repo.
@@ -13,9 +16,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same branch makes an in-flight run obsolete.
+# A newer push to the same branch makes an in-flight run obsolete. The workflow
+# name is part of the group: when `publish.yml` calls this file, `github.workflow`
+# is "Publish", so a release never cancels, or is cancelled by, an ordinary CI run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # Why the jobs are split (2026-10-21): one job took ~23 minutes, nearly all of it
