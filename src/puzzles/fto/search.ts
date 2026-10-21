@@ -22,12 +22,14 @@ import {
   phase1Tables,
   phase2Projections,
   phase2Tables,
+  phase2To3,
   phase3Projections,
   phase3Table,
   RECOLOUR_A1,
   RECOLOUR_B1,
 } from './phases';
 import { applyFtoMove, type FtoState } from './state';
+import { conjugateFtoState, FTO_SYMMETRIES, moveFromFrame, type Symmetry } from './symmetry';
 import { mod3At, UNVISITED_MOD3 } from './tables';
 
 /**
@@ -46,18 +48,32 @@ import { mod3At, UNVISITED_MOD3 } from './tables';
  * `moveOrder` permutes the order moves are tried in at every node, for the reason
  * `puzzles/skewb/search.ts` gives: a fixed order biases which of several
  * equal-length solutions is found, and therefore how the scramble ends.
+ *
+ * ## Where the length comes from, and how it is shortened
+ *
+ * Two levers, both measured (`fto-design.md` §5):
+ *
+ * - **Frames.** The state is re-expressed under several of the octahedron's 48
+ *   symmetries (`symmetry.ts`) and solved in each. Every frame is a different
+ *   problem — a different block corner, different faces playing `U` and `L` — and
+ *   the shortest wins. This is the freedom xyzzy's solver gets from wide turns.
+ * - **Phase 2 is scored with phase 3.** A phase-2 endpoint's phase-3 coordinate is
+ *   four array reads (`phase2To3`), so phase 2 is a branch-and-bound over *every*
+ *   path up to its optimum plus a slack, keeping the endpoint with the shortest
+ *   phase 2 + phase 3 — not the first one, and not a handful.
  */
 
 /**
  * How hard the solver looks for a short whole. Every candidate is scored by its
- * exact total — phase 3 is a table lookup — so these trade time for length and
- * nothing else; see `fto-design.md` §7 for the measurements behind them.
+ * exact total, so these trade time for length and nothing else; see
+ * `fto-design.md` §5 for the measurements behind them.
  */
 export const SEARCH = {
-  phase1Limit: 4,
+  /** How many of `FTO_SYMMETRIES` to solve in, from the front of the list. */
+  frames: 24,
+  phase1Limit: 1,
   phase1Slack: 0,
-  phase2Limit: 16,
-  phase2Slack: 1,
+  phase2Slack: 0,
 };
 
 export interface FtoSolveOptions {
@@ -145,26 +161,35 @@ function phase1Candidates(
 }
 
 /**
- * The best phase 2 from a state whose block is solved: among up to `limit`
- * solutions from the optimum to `slack` moves beyond it, the one whose phase 3
- * — read exactly off the phase-3 table — makes the shortest whole. Arriving in
- * `⟨U, L⟩` at all is the one condition the phase-2 tables cannot see, so it is
- * checked on arrival rather than assumed.
+ * The best phase 2 from a state whose block is solved: over **every** phase-2
+ * path from the optimum to `slack` moves beyond it, the endpoint whose phase 2 +
+ * phase 3 is shortest. Phase 3's exact length is read at each endpoint through
+ * `phase2To3` and a descent, so no state is rebuilt to score one.
+ *
+ * `budget` is a branch-and-bound cutoff: only a total *below* it is wanted (the
+ * caller's best so far, minus what phase 1 already spent), and a path that cannot
+ * beat it — its length plus the phase-2 heuristic already reaches it — is dropped.
+ * Returns `null` when nothing beats the budget.
  */
 function bestPhase2(
   state: FtoState,
   order: readonly number[],
-  limit: number,
   slack: number,
-): { readonly moves: number[]; readonly total: number } {
+  budget: number,
+): { readonly moves: number[]; readonly total: number } | null {
   const p = phase2Projections();
   const t = phase2Tables();
+  const toThree = phase2To3();
+  const p3 = phase3Projections();
+  const table3 = phase3Table();
   const sizeEdges = p.edges.size;
-  const [se, sc, sa, sb] = [p.edges.size, p.corners.size, p.centreA.size, p.centreB.size];
+  const [se, sc, sa, sb, sx] = [p.edges.size, p.corners.size, p.centreA.size, p.centreB.size, p.allEdges.size];
   const te = p.edges.transition;
   const tc = p.corners.transition;
   const ta = p.centreA.transition;
   const tb = p.centreB.transition;
+  const tx = p.allEdges.transition;
+  const [sb3, se3, sc3] = [p3.centreB.size, p3.edges.size, p3.corners.size];
   const local = orderedLocal(PHASE2_MOVES, order);
 
   const start = [
@@ -172,6 +197,7 @@ function bestPhase2(
     p.corners.indexOf(cornersValue(state)),
     p.centreA.indexOf(centreColoursValue(state.centreA, IDENTITY_COLOURS)),
     p.centreB.indexOf(centreColoursValue(state.centreB, IDENTITY_COLOURS)),
+    p.allEdges.indexOf(edgesValue(state)),
   ] as const;
   if (start.some((i) => i < 0)) throw new Error('fto-search: phase 2 began outside its group');
 
@@ -183,44 +209,52 @@ function bestPhase2(
     );
 
   let best: { moves: number[]; total: number } | null = null;
-  let count = 0;
+  let cutoff = budget;
+  let reached = false;
   const path: number[] = [];
 
-  const consider = (): void => {
-    let s = state;
-    for (const move of path) s = applyFtoMove(s, ALL_MOVES_FTO[move]!);
-    const index = phase3Index(s);
-    if (index < 0) return;
-    count += 1;
-    const total = path.length + phase3Distance(index);
-    if (best === null || total < best.total) best = { moves: [...path], total };
-  };
-
-  const dfs = (e: number, c: number, a: number, b: number, g: number, bound: number): void => {
+  const dfs = (e: number, c: number, a: number, b: number, x: number, g: number, bound: number): void => {
     const dist = h(e, c, a, b);
+    if (g + dist > bound || g + dist >= cutoff) return;
     if (dist === 0) {
-      if (g === bound) consider();
-      return;
+      // A phase-2 endpoint: score it whole. It is also a node like any other — a
+      // longer path through it can end somewhere phase 3 finishes faster.
+      reached = true;
+      const ia = toThree.centreA[a]!;
+      const ib = toThree.centreB[b]!;
+      const ix = toThree.edges[x]!;
+      const ic = toThree.corners[c]!;
+      if (ia >= 0 && ib >= 0 && ix >= 0 && ic >= 0) {
+        const index = ((ia * sb3 + ib) * se3 + ix) * sc3 + ic;
+        if (mod3At(table3, index) !== UNVISITED_MOD3) {
+          const total = g + phase3Distance(index);
+          if (total < cutoff) {
+            best = { moves: [...path], total };
+            cutoff = total;
+          }
+        }
+      }
     }
-    if (g + dist > bound) return;
+    if (g === bound) return;
     const last = path.length > 0 ? path[path.length - 1]! : -1;
     for (const k of local) {
-      if (count >= limit) return;
       const move = PHASE2_MOVES[k]!;
       if (!mayFollow(last, move)) continue;
       path.push(move);
-      dfs(te[k * se + e]!, tc[k * sc + c]!, ta[k * sa + a]!, tb[k * sb + b]!, g + 1, bound);
+      dfs(te[k * se + e]!, tc[k * sc + c]!, ta[k * sa + a]!, tb[k * sb + b]!, tx[k * sx + x]!, g + 1, bound);
       path.pop();
     }
   };
 
+  // Grow the bound to phase 2's optimum, then `slack` beyond it. An endpoint is
+  // "reached" even when the budget forbids keeping it; that still fixes the optimum.
+  const first = h(start[0], start[1], start[2], start[3]);
   let optimum = -1;
-  for (let bound = h(...start); count < limit; bound += 1) {
-    if (optimum >= 0 && bound > optimum + slack) break;
+  for (let bound = first; optimum < 0 || bound <= optimum + slack; bound += 1) {
+    if (bound >= cutoff) break;
     dfs(...start, 0, bound);
-    if (optimum < 0 && count > 0) optimum = bound;
+    if (optimum < 0 && reached) optimum = bound;
   }
-  if (best === null) throw new Error('fto-search: phase 2 found nothing');
   return best;
 }
 
@@ -315,8 +349,13 @@ export function cancelFtoMoves(moves: readonly number[]): number[] {
   return out.length === moves.length ? out : cancelFtoMoves(out);
 }
 
-/** The three phases' moves, as move indices, before cancellation across the joins. */
+/**
+ * The three phases' moves, as move indices **in the frame they were solved in**,
+ * before cancellation across the joins. `frame` is the symmetry the state was
+ * re-expressed under (`symmetry.ts`); the identity when no other frame won.
+ */
 export interface FtoPhaseSolution {
+  readonly frame: Symmetry;
   readonly phase1: readonly number[];
   readonly phase2: readonly number[];
   readonly phase3: readonly number[];
@@ -327,33 +366,50 @@ function applyIndices(state: FtoState, moves: readonly number[]): FtoState {
 }
 
 /**
- * The solver's work phase by phase — what {@link solveFto} joins and cancels.
- * Exposed for the tests that check each phase lands where it claims, and for
- * measuring where the moves go.
+ * The solver's work phase by phase — what {@link solveFto} joins, maps back out of
+ * its frame and cancels. Exposed for the tests that check each phase lands where
+ * it claims, and for measuring where the moves go.
  */
 export function solveFtoInPhases(
   state: FtoState,
   options: FtoSolveOptions = {},
 ): FtoPhaseSolution {
   const order = options.moveOrder ?? IDENTITY_ORDER;
+  const frames = FTO_SYMMETRIES.slice(0, Math.max(1, SEARCH.frames));
 
-  let best: { phase1: number[]; phase2: number[]; total: number } | null = null;
-  for (const phase1 of phase1Candidates(state, order, SEARCH.phase1Limit, SEARCH.phase1Slack)) {
-    const phase2 = bestPhase2(applyIndices(state, phase1), order, SEARCH.phase2Limit, SEARCH.phase2Slack);
-    const total = phase1.length + phase2.total;
-    if (best === null || total < best.total) best = { phase1, phase2: phase2.moves, total };
+  let best: { frame: Symmetry; framed: FtoState; phase1: number[]; phase2: number[]; total: number } | null =
+    null;
+  for (const frame of frames) {
+    const framed = frame === FTO_SYMMETRIES[0] ? state : conjugateFtoState(state, frame);
+    for (const phase1 of phase1Candidates(framed, order, SEARCH.phase1Limit, SEARCH.phase1Slack)) {
+      const budget = best === null ? Number.POSITIVE_INFINITY : best.total - phase1.length;
+      if (budget <= 0) continue;
+      const phase2 = bestPhase2(applyIndices(framed, phase1), order, SEARCH.phase2Slack, budget);
+      if (phase2 === null) continue;
+      const total = phase1.length + phase2.total;
+      if (best === null || total < best.total) best = { frame, framed, phase1, phase2: phase2.moves, total };
+    }
   }
-  if (best === null) throw new Error('fto-search: phase 1 found nothing');
+  if (best === null) throw new Error('fto-search: no frame produced a solution');
 
-  const phase3 = solvePhase3(applyIndices(state, [...best.phase1, ...best.phase2]), order);
-  return { phase1: best.phase1, phase2: best.phase2, phase3 };
+  const phase3 = solvePhase3(applyIndices(best.framed, [...best.phase1, ...best.phase2]), order);
+  return { frame: best.frame, phase1: best.phase1, phase2: best.phase2, phase3 };
 }
+
+/** A move index in `frame`, as the move index it is in the original frame. */
+export function moveIndexFromFrame(move: number, frame: Symmetry): number {
+  const mapped = moveFromFrame(ALL_MOVES_FTO[move]!, frame);
+  return (FTO_FACE_INDEX.get(mapped.face)! << 1) | (mapped.amount - 1);
+}
+
+const FTO_FACE_INDEX = new Map(ALL_MOVES_FTO.filter((_, i) => i % 2 === 0).map((m, f) => [m.face, f]));
 
 /**
  * A solution for `state`: a sequence that takes it to solved as the eye sees it
  * (centres of one colour are interchangeable, so "solved" is about colours).
  */
 export function solveFto(state: FtoState, options: FtoSolveOptions = {}): FtoMove[] {
-  const { phase1, phase2, phase3 } = solveFtoInPhases(state, options);
-  return cancelFtoMoves([...phase1, ...phase2, ...phase3]).map((m) => ALL_MOVES_FTO[m]!);
+  const { frame, phase1, phase2, phase3 } = solveFtoInPhases(state, options);
+  const original = [...phase1, ...phase2, ...phase3].map((m) => moveIndexFromFrame(m, frame));
+  return cancelFtoMoves(original).map((m) => ALL_MOVES_FTO[m]!);
 }

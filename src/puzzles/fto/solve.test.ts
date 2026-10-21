@@ -27,7 +27,8 @@ import {
   RECOLOUR_B1,
 } from './phases';
 import { randomFtoState } from './random-state';
-import { solveFto, solveFtoInPhases } from './search';
+import { SEARCH, solveFto, solveFtoInPhases } from './search';
+import { conjugateFtoState } from './symmetry';
 import {
   generateFtoScramble,
   isAtLeastMovesFromSolved,
@@ -102,6 +103,27 @@ describe('the tables', () => {
   });
 });
 
+/**
+ * Runs `work` with the solver restricted to `frames` symmetry frames. The
+ * identity alone is what a test wants when its claim is about the plain
+ * three-phase structure — an exact phase-3 length, a reference figure — rather
+ * than about the shortest answer the frames can find.
+ */
+function withFrames<T>(frames: number, work: () => T): T {
+  const saved = SEARCH.frames;
+  SEARCH.frames = frames;
+  try {
+    return work();
+  } finally {
+    SEARCH.frames = saved;
+  }
+}
+
+/**
+ * The phases are checked in the frame the solver chose to solve in: the state
+ * is re-expressed there first (`symmetry.ts`), and that is the state phase 1
+ * sees, so it is the state each phase's claim is about.
+ */
 describe('solveFtoInPhases', () => {
   const states = (() => {
     const random = createRandomSource('fto-phases');
@@ -112,7 +134,8 @@ describe('solveFtoInPhases', () => {
     const p = phase1Projections();
     const t = phase1Tables();
     for (const state of states) {
-      const after = applyIndices(state, solveFtoInPhases(state).phase1);
+      const { frame, phase1 } = solveFtoInPhases(state);
+      const after = applyIndices(conjugateFtoState(state, frame), phase1);
       const e = p.edges.indexOf(edgePiecesValue(after, BLOCK.edges));
       const c = p.corner.indexOf(cornerPieceValue(after, BLOCK_CORNER_INDEX));
       const a = p.centreA.indexOf(centreColoursValue(after.centreA, RECOLOUR_A1));
@@ -125,11 +148,11 @@ describe('solveFtoInPhases', () => {
 
   it('uses only U F R L in phase 2 and only U L in phase 3, and lands phase 2 in ⟨U, L⟩', () => {
     for (const state of states) {
-      const { phase1, phase2, phase3 } = solveFtoInPhases(state);
+      const { frame, phase1, phase2, phase3 } = solveFtoInPhases(state);
       expect(phase2.every((m) => PHASE2_MOVES.includes(m))).toBe(true);
       expect(phase3.every((m) => PHASE3_MOVES.includes(m))).toBe(true);
 
-      const after2 = applyIndices(state, [...phase1, ...phase2]);
+      const after2 = applyIndices(conjugateFtoState(state, frame), [...phase1, ...phase2]);
       // Every piece U and L cannot move is solved...
       for (const slot of PHASE2_TARGETS.edges) expect(after2.edgePermutation[slot]).toBe(slot);
       for (const slot of PHASE2_TARGETS.centreA) {
@@ -146,8 +169,10 @@ describe('solveFtoInPhases', () => {
 
 describe('solveFto', () => {
   it('solves every state it is given', () => {
+    // Twenty here, because each solve tries 24 frames and this file runs under
+    // coverage; the volume claim is the 10,000-scramble run in `fto-design.md` §6.
     const random = createRandomSource('fto-solve');
-    for (let trial = 0; trial < 40; trial += 1) {
+    for (let trial = 0; trial < 20; trial += 1) {
       const state = randomFtoState(random);
       expect(isSolvedFto(applyFtoMoves(state, solveFto(state)))).toBe(true);
     }
@@ -168,7 +193,7 @@ describe('solveFto', () => {
 
   it('never turns a face twice running, even across a commuting opposite face', () => {
     const random = createRandomSource('fto-cancelled');
-    for (let trial = 0; trial < 20; trial += 1) {
+    for (let trial = 0; trial < 10; trial += 1) {
       const moves = solveFto(randomFtoState(random));
       const faces = moves.map((m) => FTO_FACES.indexOf(m.face));
       for (let i = 1; i < faces.length; i += 1) {
@@ -200,10 +225,19 @@ describe('against the published FTO solver', () => {
   });
 
   it('measures that state at exactly 24 moves inside ⟨U, L⟩ — the optimum xyzzy states', () => {
-    // Already in ⟨U, L⟩ with the block and phase-2 pieces solved, so phases 1
-    // and 2 are empty and phase 3 — an exact descent — is the optimal 2-gen length.
-    const { phase1, phase2, phase3 } = solveFtoInPhases(scrambled);
+    // Already in ⟨U, L⟩ with the block and phase-2 pieces solved, so — in the
+    // identity frame — phases 1 and 2 are empty and phase 3, an exact descent, is
+    // the optimal 2-gen length.
+    const { phase1, phase2, phase3 } = withFrames(1, () => solveFtoInPhases(scrambled));
     expect([phase1.length, phase2.length, phase3.length]).toEqual([0, 0, 24]);
+  });
+
+  it('finds something far shorter when allowed other frames — as short as the 6-move 4-gen answer', () => {
+    // In a frame where those six moves are phase 1 and phase 2's business rather
+    // than a 2-gen problem, the solver is no longer stuck with 24.
+    const solution = solveFto(scrambled);
+    expect(isSolvedFto(applyFtoMoves(scrambled, solution))).toBe(true);
+    expect(solution.length).toBeLessThanOrEqual(6);
   });
 });
 
@@ -264,7 +298,7 @@ describe('the phase-3 descent', () => {
       const length = 1 + randomInt(random, 9);
       const word = Array.from({ length }, () => twoGen[randomInt(random, 4)]!);
       const state = applyFtoMoves(SOLVED_FTO_STATE, word);
-      const { phase1, phase2, phase3 } = solveFtoInPhases(state);
+      const { phase1, phase2, phase3 } = withFrames(1, () => solveFtoInPhases(state));
       expect([phase1.length, phase2.length]).toEqual([0, 0]);
       expect(phase3.length, word.map((m) => m.face + (m.amount === 2 ? "'" : '')).join(' ')).toBe(
         optimal(state, length),
@@ -280,9 +314,9 @@ describe('the phase-3 descent', () => {
  */
 describe('known answers', () => {
   it.each([
-    ['fto-kat-0', "L' U L' U L' U L U' L U' L U L' U' L' U L U' L' R U' F R' L' R F U' R' F' U' R' BL B' D BR D' R' U BL' D"],
-    ['fto-kat-1', "L U' L U' L' U' L' U L' U L U L' U' L U' L U L' F' U' F' R' L' F U R' F' L U' L U BR' D L R B' BR' F' R"],
-    [2027, "L' U L U' L U' L' U L' U L' U' L U L U L' U L' U F L R U' R L' F' U L F' U' B BR U' BL B' BR' D U BL"],
+    ['fto-kat-0', "D' BR' D' BR D BR D BR' D BR D' BR D' BR' D' BR D BR' D B BR' D BL' BR' D BL D' BR' BL' U' BR' R' B' L BL D' L'"],
+    ['fto-kat-1', "L F L' F' L F L F' L' F' L F L F L' F L F' L' F' L R L' R F' U R F' L' R' F' BR' D R L B' BR' F' R"],
+    [2027, "R BR R' BR' R' BR' R' BR' R BR R' BR' R' BR R BR' R F' R F' D R F' R F' BR' D R' D U L' R' U' L' R' BR' D' B"],
   ] as const)('seed %j gives the same scramble it always has', async (seed, expected) => {
     const { generateScramble } = await import('../../index');
     expect((await generateScramble('fto', { seed })).moves).toBe(expected);

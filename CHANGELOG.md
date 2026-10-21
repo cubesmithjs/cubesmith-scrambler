@@ -26,12 +26,14 @@ are this package's best reading of current practice, not the regulation's text �
 ### Added
 
 - **`generateScramble('fto')`** — random-state. A uniformly random state, solved by a
-  three-phase reduction (a block around the `D B BR BL` corner, then `U F R L`, then
-  an exact table over the 63,504,000 states `⟨U, L⟩` reaches), and inverted.
-  **29–44 moves, median 39** over 1,000 seeded states. Respects the 4b3 floor of 2.
-- **`prepareEvent('fto')`** — **6.5 s** cold, measured in a fresh process on the dev
-  box (Node 22.14). The first scramble after it costs 271 ms, a warm one median 81 ms,
-  p99 227 ms. The largest table is stored two bits per state: 15.9 MB.
+  three-phase reduction (a block around one corner, then `U F R L`, then an exact
+  table over the 63,504,000 states `⟨U, L⟩` reaches), and inverted. The state is
+  solved in 24 symmetry frames — every rotation of the puzzle — and the shortest
+  answer kept. Phase 2 is chosen by its *total* with phase 3, not on its own.
+  **28–41 moves, median 37** over 3,000 seeded scrambles. Respects the 4b3 floor of 2.
+- **`prepareEvent('fto')`** — **6.4 s** cold, measured in a fresh process on the dev
+  box (Node 22.14). The first scramble after it costs 317 ms, a warm one median
+  286 ms, p99 535 ms. The largest table is stored two bits per state: 15.9 MB.
 - **`validateScramble('fto', …)`** — a seventh grammar, `'fto'`: the eight faces
   `U F R L B D BR BL`, `'` for anticlockwise, and no `2` (a double 120° turn *is*
   the prime turn). Two reason codes: **`fto-not-a-face`** (`BX`) and
@@ -80,9 +82,11 @@ members. `dist/draw/index.d.ts` is unchanged.
 
 ### Known: longer than cubing.js's FTO scrambles
 
-**~39 moves here against ~27** from cubing.js's `randomScrambleForEvent('fto')`
-(28–44 vs 23–29). Both are random-state and both are correct; only the length
-differs. See `docs/fto-design.md` §8. A pasted typographic apostrophe (`R’`) is
+**~37 moves here against ~27** from cubing.js's `randomScrambleForEvent('fto')`
+(28–41 vs 23–29). Both are random-state and both are correct; only the length
+differs. Solving in symmetry frames and scoring phase 2 with phase 3 took two
+moves off the first build's ~39; what remains needs a different solver
+architecture, and `docs/fto-design.md` §5 and §8 record what was tried. A pasted typographic apostrophe (`R’`) is
 rejected as `fto-bad-amount`, as in every other grammar here; normalise it to `'`
 before validating pasted text.
 
@@ -92,11 +96,11 @@ Measured with `gzip -9` on both builds (`0.14.1` from the registry tarball):
 
 | | `0.14.1` | `0.15.0` | change |
 |---|---|---|---|
-| `dist/index.js` | 234,137 B / 50,935 B gzip | 265,810 B / 57,929 B gzip | +31,673 B (+13.5%) / +6,994 B gzip (+13.7%) |
+| `dist/index.js` | 234,137 B / 50,935 B gzip | 274,808 B / 60,557 B gzip | +40,671 B (+17.4%) / +9,622 B gzip (+18.9%) |
 | `dist/draw/index.js` | 97,132 B / 23,460 B gzip | 104,135 B / 25,088 B gzip | +7,003 B (+7.2%) / +1,628 B gzip (+6.9%) |
 
 The package has one scrambling entry point, so every consumer carries the FTO solver
-whether it scrambles FTO or not — about 7 KB gzipped. Its tables are built only on
+whether it scrambles FTO or not — about 9.6 KB gzipped, the symmetry frames included. Its tables are built only on
 first use, so the memory cost is paid only by a process that scrambles an FTO.
 
 ### Also

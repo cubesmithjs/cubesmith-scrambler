@@ -61,7 +61,8 @@ measurement.
 | `coordinates.ts` | BFS-discovered projections, move pruning, opposite faces |
 | `tables.ts` | pair tables (one byte per entry) and the mod-3 table (two bits) |
 | `phases.ts` | what each of the three phases solves, *computed* from the move sets |
-| `search.ts` | IDA\* for phases 1 and 2, descent for phase 3, cancellation |
+| `symmetry.ts` | the octahedron's 48 symmetries, stickers ⇄ pieces, and re-expressing a state in another frame |
+| `search.ts` | IDA\* for phase 1, branch-and-bound phase 2 scored with phase 3, descent for phase 3, frames, cancellation |
 | `solve.ts` | the 4b3 floor, inversion, registration |
 | `../../draw/fto.ts` | the two-square picture, from an independent 72-sticker model |
 
@@ -209,7 +210,9 @@ inverting each turn.
 2. Redraw if a sequence of fewer than `MIN_FTO_SOLVE_DISTANCE` (2) turns solves
    it — proved by exhaustive search, since FTO is far too big for an exact
    distance.
-3. Solve it in three phases, join the phases, cancel across the joins, invert.
+3. Re-express it in each of `SEARCH.frames` symmetry frames (24, all rotations)
+   and solve each in three phases; keep the shortest, map it back out of its
+   frame, cancel across the phase joins, and invert.
 
 The three phases are a reduction, each restricting the moves the next may use.
 The structure is xyzzy's; this is an independent implementation of it. 🔴 No
@@ -236,21 +239,52 @@ residues alone, and walking it to the goal both solves and *measures* the
 state. It is built breadth-first with bitset frontiers, because a scan for
 "entries equal to `d`" cannot tell a layer from the one three back.
 
-**Search effort.** The first solution of each phase gives 42.6 moves on average.
-Scoring candidates instead is cheap, because phase 3's length is one descent.
-`SEARCH` tries up to 4 optimal phase-1 solutions and, for each, up to 16 phase-2
-solutions at its optimum and one move beyond, keeping the shortest whole. The
-sweep that chose it, on the seed `sweep`:
+**Search effort, and the two levers on length.** Taking the first solution of
+each phase gives about 42.6 moves. Two changes shorten that, and both are
+measured below.
 
-| phase 1 limit/slack, phase 2 limit/slack | states | mean length | mean ms |
-|---|---|---|---|
-| 1/0, 1/0 — first found | 20 | 42.6 | 6.6 |
-| 1/0, 16/1 | 20 | 40.1 | 21.3 |
-| 1/0, 16/2 | 40 | 40.5 | 39.4 |
-| **4/0, 16/1 — shipped** | 40 | **39.1** | **98.9** |
-| 8/0, 32/1 | 40 | 38.8 | 198.3 |
+1. **Frames** (`symmetry.ts`). The octahedron has 48 symmetries: 24 rotations and
+   their mirror images. Re-expressing the state under one gives a different
+   problem for the same solver — a different corner becomes the phase-1 block,
+   different faces play `U` and `L` — and a solution found there maps back exactly:
+   each face to its pre-image, each turn reversed under a mirror. The solver runs in
+   `SEARCH.frames` of them, sharing one branch-and-bound cutoff, and keeps the
+   shortest. This is the freedom xyzzy's solver gets from wide turns, reached
+   without them. `symmetry.test.ts` proves, for every one of the 48, that
+   re-expressing a state commutes with turning.
+2. **Phase 2 is scored together with phase 3.** A phase-2 endpoint's phase-3
+   coordinate is four array reads (`phase2To3`: phase 2's own projections mapped
+   onto phase 3's, plus a whole-edge projection that exists for this alone). Its
+   exact phase-3 length is one descent. So phase 2 can be a branch-and-bound over
+   *every* path up to its optimum plus `phase2Slack`, keeping the endpoint whose
+   phase 2 + phase 3 is shortest, rather than scoring a handful.
 
-Beyond the shipped setting, a further 0.3 moves costs double the time.
+The sweep that chose the shipped setting, on 40 seeded states. The rows above the
+divider are this solver's earlier versions, for comparison:
+
+| setting | mean length | mean ms |
+|---|---|---|
+| first solution of each phase | 42.6 | 6.6 |
+| 4 phase-1 × 16 phase-2 candidates (the first 0.15.0 build) | 39.1 | 98.9 |
+| — | | |
+| 1 frame, every phase-2 path at the optimum + 1 | 40.3 | 58 |
+| 12 frames (tetrahedral rotations), optimum | 37.7 | 142 |
+| **24 frames (all rotations), optimum — shipped** | **37.0** | **273** |
+| 48 frames (with mirrors), optimum | 36.5 | 552 |
+| 24 frames, optimum + 1 | 35.3 | 1,262 |
+| 48 frames, optimum + 1 | 35.0 | 2,554 |
+
+Past the shipped setting, a move costs about four times the time. The setting is
+one object (`SEARCH`), and this table is what a different trade looks like.
+
+**Ruled out, with its measurement: shortcut sequences in phase 3.** xyzzy's phase
+3 uses "36 move sequences", mostly two-face, to "temporarily [go] out of LU
+2-gen". Exhaustive search finds 22 core sequences of 6–8 moves over `U F R L` that
+leave every piece outside the `⟨U, L⟩` region exactly where it was. One is
+`F R U R' U' F'`, which needs 24 moves in two faces. But on real phase-3 starting
+states, allowing one such sequence after a two-face prefix of up to three moves cut
+phase 3 from 20.42 to 20.17 on average, and allowing two cut it no further. They
+rescue particular states, not typical ones, so they were not built in.
 
 ### Random-state vs random-move
 
@@ -330,8 +364,8 @@ Provisional, against 4b3's general rule, until the FTO regulations exist (§8).
 - The published position count, reproduced from a group order the tests compute
   rather than read; xyzzy's coordinate sizes and reduction factors, reproduced
   from phases whose targets are computed rather than listed.
-- **An end-to-end audit** on 2026-10-21, run once rather than kept as a test:
-  2,000 seeded scrambles were all valid text and all distinct, each reached
+- **An end-to-end audit** on 2026-10-21 (first 0.15.0 build, before frames), run
+  once rather than kept as a test: 2,000 seeded scrambles were all valid text and all distinct, each reached
   exactly its drawn state, each kept the floor, and none had a redundant move
   (none twice in a row, nor across a commuting opposite face). Lengths were 28–44,
   median 39. χ² on the states the *scrambles* reach was 13.37 (edge slot, df 11),
@@ -342,12 +376,25 @@ Provisional, against 4b3's general rule, until the FTO regulations exist (§8).
   L's to B — and `draw/fto.test.ts` pins that the two stickers of every edge off
   the equator are drawn sharing a side.
 
-- **A 10,000-scramble stress run**, 2026-10-21, once, through the public API.
+- **A 10,000-scramble stress run**, 2026-10-21 (first build, before frames), once,
+  through the public API.
   There were **0 failures** and all 10,000 were distinct. Each one was valid
   text, reached exactly its drawn state, kept the floor, had no redundant move,
   and drew with nine stickers of every colour. Lengths were 28–45, median 39,
   p99.9 44. The slowest solve took 290 ms (median 69 ms, p99.9 253 ms). Raised
   from the 1,000-state figures in §7, the maximum length is one move higher.
+- **The same checks on the shipped solver**, 2026-10-21, after frames went in:
+  3,000 seeded scrambles with 0 failures and all distinct. Each was valid, reached
+  its drawn state, kept the floor, had no redundant move and drew correctly.
+  Lengths were 28–41. Its 40 scrambles plus its own solutions were checked again
+  on cubing.js's puzzle: 0 left unsolved. Six more mutations, aimed at the
+  symmetry code, were all caught:
+  - a mirror frame that does not reverse turns;
+  - a conjugation that does not recolour;
+  - moves mapped out of a frame by `M` instead of `M⁻¹`;
+  - a corner twist misread from stickers;
+  - a solution not mapped out of its frame;
+  - phase 2 scored through the wrong edge map.
 - **Mutation testing**, 2026-10-21, once. Fifteen realistic bugs were planted
   one at a time in the shipped source, and every one was caught by the suite:
   - a reversed turn direction;
@@ -390,6 +437,7 @@ its length (≤ 29), at most 4 table probes per step.
 | phase 1 (3 pair tables) | 142,560 + 2 × 221,760 | 0.6 MB |
 | phase 2 (3 pair tables) | 2 × 8,467,200 + 322,560 | 17.3 MB |
 | phase 3 (mod 3) | 63,504,000 | **15.9 MB** |
+| phase 2 → phase 3 maps, and the whole-edge projection | 25,200 × 2 + 960 + 20,160 | 0.3 MB |
 
 Measured right after `prepareEvent('fto')`: typed arrays +51.9 MB, including
 the 15.9 MB of bitset frontiers built for phase 3 and not yet collected; JS heap
@@ -398,17 +446,21 @@ entry those figures were +82.2 MB and +48.1 MB, which is why the table is mod 3.
 
 ### Expected scramble generation time
 
+Measured in a fresh process with the shipped settings (2026-10-21):
+
 | | |
 |---|---|
-| cold `prepareEvent('fto')` | **6.5 s** (8.2 s before the mod-3 table) |
-| first scramble after it | 271 ms |
-| warm scramble | median 81 ms, mean 86 ms, p99 227 ms, max 279 ms (1,000 states) |
+| cold `prepareEvent('fto')` | **6.4 s** |
+| first scramble after it | 317 ms |
+| warm scramble | median 286 ms, mean 297 ms, p99 535 ms, max 938 ms (3,000 states) |
+
+About three times the first 0.15.0 build (median 69 ms), for two moves shorter and
+a four-move shorter worst case. See §5 for cheaper settings.
 
 ### Length
 
-Over 1,000 seeded states: **29–44 moves, median 39, mean 39.08, p99 43.** Before
-cancellation the phases average 8.10 + 11.88 + 19.10; their maxima were 10, 14
-and 26, against a phase-3 table whose deepest layer is 29.
+Over 3,000 seeded scrambles with the shipped settings: **28–41 moves, median 37,
+mean 36.93, p99 40.** The first 0.15.0 build gave 28–45, median 39, over 10,000.
 
 ---
 
@@ -443,21 +495,21 @@ of them is a patch, and `fto_event_plan` task 10 re-checks every one.
   19 moves of two faces — before the other faces appear. It is visible on a
   sheet. It is not a uniformity problem (the state is drawn first), but a
   scramble that looked like TNoodle's would not show its method so plainly.
-- 🔴 **~39 moves, against cubing.js's ~27.** Measured on 2026-10-21: this
-  package gives 28–44 (median 39); cubing.js's scrambler gives 23–29 (median 27)
+- 🔴 **~37 moves, against cubing.js's ~27.** Measured on 2026-10-21: this
+  package gives 28–41 (median 37); cubing.js's scrambler gives 23–29 (median 27)
   for the same random-state task. Both are correct, and `interop.test.ts` proves
-  the puzzles identical. It is the scrambles' *length* that differs, by about a
-  third. The difference is in the solver. xyzzy's phase 1 uses wide turns, which
-  amount to a free choice of which corner to build the block around, and its
-  phase 3 adds 36 short sequences to the two faces. This package fixes the block
-  corner and finishes in pure `⟨U, L⟩`. Closing the gap is a solver change, not a
-  correctness fix, and would change every seeded output (`solve.test.ts`'s known
-  answers).
+  the puzzles identical; only the length differs. Two levers closed about two
+  moves of the gap — frames, and scoring phase 2 with phase 3 (§5). Two more were
+  measured and ruled out: shortcut sequences in phase 3 (−0.25 moves), and a
+  deeper phase-2 search, which buys about a move per fourfold time. The remaining
+  ~10 moves need a different solver *architecture*, not tuning. The reduction
+  here ends in pure `⟨U, L⟩`, where a typical state needs about 20 moves however
+  it is reached, and that is where the length sits.
 - **A pasted `’` is not a prime.** Like every other grammar here, FTO rejects
   the typographic apostrophe (`fto-bad-amount`, pointing at the token) rather
   than guessing. A consumer accepting pasted text should normalise `’` to `'`
   first. `notation.test.ts` pins this.
-- **6.5 s cold** — in the same range as `444`, the slowest event here, and paid
+- **6.4 s cold** — in the same range as `444`, the slowest event here, and paid
   once per process.
 
 ### Planned improvements

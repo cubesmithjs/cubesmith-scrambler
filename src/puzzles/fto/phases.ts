@@ -250,6 +250,33 @@ export const phase2Projections = memo(() => {
       PHASE2_MOVES,
       moveCentreBValue,
     ),
+    /**
+     * Every edge, not just phase 2's three. No phase-2 table reads it; it exists so
+     * that a phase-2 endpoint's phase-3 coordinate is a lookup ({@link phase2To3}),
+     * which is what lets the search score thousands of endpoints instead of a few.
+     */
+    allEdges: buildProjection(edgesValue(solved), PHASE2_MOVES, moveEdgesValue),
+  };
+});
+
+/**
+ * Phase 2's coordinates, mapped straight onto phase 3's: `-1` where the value is
+ * not one `⟨U, L⟩` reaches. With these, the phase-3 table index of any phase-2
+ * search node is four array reads — no state is rebuilt, no string is hashed.
+ */
+export const phase2To3 = memo(() => {
+  const p2 = phase2Projections();
+  const p3 = phase3Projections();
+  const map = (from: Projection, to: Projection): Int32Array => {
+    const out = new Int32Array(from.size);
+    for (let i = 0; i < from.size; i += 1) out[i] = to.indexOf(from.valueAt(i));
+    return out;
+  };
+  return {
+    centreA: map(p2.centreA, p3.centreA),
+    centreB: map(p2.centreB, p3.centreB),
+    corners: map(p2.corners, p3.corners),
+    edges: map(p2.allEdges, p3.edges),
   };
 });
 
@@ -287,4 +314,5 @@ export function prepareFtoTables(): void {
   phase1Tables();
   phase2Tables();
   phase3Table();
+  phase2To3();
 }

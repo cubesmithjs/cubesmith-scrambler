@@ -265,13 +265,13 @@ const BANDS: readonly EventBand[] = [
   // ── Provisional: no official reference exists yet. ─────────────────────────
   // FTO is official from 2027-01-02 and no TNoodle release scrambles it, so there
   // is no sheet to read a number off. The band is this package's own output:
-  // 29–44 over 1,000 seeded states (median 39, p99 43), measured 2026-10-21 and
-  // split 8.1 + 11.9 + 19.1 across the three phases before cancellation.
+  // 28–41 over 3,000 seeded scrambles (median 37, p99 40), measured 2026-10-21.
   //
-  // The ceiling is derived, not sampled: phase 3 is at most 29 (the deepest
-  // layer of its exact table), phases 1 and 2 never exceeded 10 and 14, and
-  // cancellation only shortens — 53, plus two for a tail on the two searched
-  // phases. The floor is sampled, and wide of it: nothing below 29 in 1,000.
+  // The ceiling is derived, not sampled: in any one frame phase 3 is at most 29
+  // (the deepest layer of its exact table), phases 1 and 2 never exceeded 10 and
+  // 14, and cancellation only shortens — 53, plus two for a tail on the two
+  // searched phases; trying more frames can only lower it. The floor is sampled,
+  // and wide of it: nothing below 28 in 13,000 across both builds.
   {
     event: 'fto',
     tnoodle: null,
@@ -279,14 +279,14 @@ const BANDS: readonly EventBand[] = [
     verdict: 'provisional',
     draws: 3,
     // 🔴 Measured against the stand-in on 2026-10-21, and the gap is real: cubing.js's
-    // scrambler (xyzzy's solver) prints ~12 fewer moves for the same kind of state.
+    // scrambler (xyzzy's solver) prints ~10 fewer moves for the same kind of state.
     // Both are random-state and both are correct — `fto/interop.test.ts` proves the two
     // puzzles identical turn for turn — so this is length, not validity. See
     // `docs/fto-design.md` §8.
     reference:
-      'cubing.js 0.63.3 randomScrambleForEvent("fto"): 23–29 moves, median 27, over 40 scrambles — ~12 shorter than this package',
+      'cubing.js 0.63.3 randomScrambleForEvent("fto"): 23–29 moves, median 27, over 40 scrambles — ~10 shorter than this package',
     closedBy: 'cubesmith-scrambler-plans fto_event_plan task 10 — re-baselined against the official program once it scrambles FTO',
-    measured: '29–44 over 1,000 seeded states, median 39, mean 39.08, p99 43',
+    measured: '28–41 over 3,000 seeded scrambles, median 37, mean 36.93, p99 40 (the first build: 28–45, median 39)',
   },
 ];
 
