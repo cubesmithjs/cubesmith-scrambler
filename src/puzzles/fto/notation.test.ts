@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ScrambleSyntaxError } from '../../core/scramble-errors';
+import { createRandomSource } from '../../random/random-source';
+import { randomInt } from '../../utils/random-int';
 import {
   allMovesFto,
   FTO_AMOUNTS,
@@ -62,6 +64,66 @@ describe('inversion', () => {
 describe('allMovesFto', () => {
   it('lists all sixteen turns in face order, clockwise before prime', () => {
     expect(allMovesFto()).toEqual(ALL);
+  });
+});
+
+/**
+ * What arrives from a text box or a paste, not from this package. Thousands of
+ * random strings over an alphabet chosen to be *nearly* FTO — real faces, primes,
+ * a cube `2`, lowercase, whitespace of three kinds, a typographic apostrophe — and
+ * every one must either parse to tokens that print back exactly, or fail with a
+ * `ScrambleSyntaxError` whose span points at text that is really there. Nothing
+ * else may escape: a `TypeError` here would be a bug a user can trigger by typing.
+ */
+describe('parseFtoScramble — fuzzed input', () => {
+  const ALPHABET = ['U', 'F', 'R', 'L', 'B', 'D', 'BR', 'BL', "'", '2', 'r', 'X', ' ', '  ', '\t', '\n', '’', 'Ü'];
+
+  it('parses or rejects cleanly, with an honest span, on 5,000 random strings', () => {
+    const random = createRandomSource('fto-fuzz');
+    let valid = 0;
+    for (let trial = 0; trial < 5_000; trial += 1) {
+      const pieces = Array.from({ length: randomInt(random, 12) }, () => ALPHABET[randomInt(random, ALPHABET.length)]!);
+      const text = pieces.join(randomInt(random, 2) === 0 ? ' ' : '');
+      let moves: FtoMove[] | undefined;
+      try {
+        moves = parseFtoScramble(text);
+      } catch (error) {
+        expect(error, JSON.stringify(text)).toBeInstanceOf(ScrambleSyntaxError);
+        const e = error as ScrambleSyntaxError;
+        expect(e.input).toBe(text);
+        expect(e.offset).toBeGreaterThanOrEqual(0);
+        expect(e.offset + e.length).toBeLessThanOrEqual(text.length);
+        expect(e.token, JSON.stringify(text)).toBe(text.slice(e.offset, e.offset + e.length));
+        expect(['fto-not-a-face', 'fto-bad-amount']).toContain(e.reason);
+        continue;
+      }
+      valid += 1;
+      // A valid parse prints back as the same tokens, whatever the whitespace was.
+      expect(ftoMovesToString(moves), JSON.stringify(text)).toBe(text.trim().split(/\s+/).filter(Boolean).join(' '));
+    }
+    // The alphabet is close enough to FTO that both arms are genuinely exercised.
+    expect(valid).toBeGreaterThan(500);
+    expect(valid).toBeLessThan(4_500);
+  });
+
+  /**
+   * 🔴 A typographic apostrophe is **not** a prime — consistently with every other
+   * grammar in this package. A scramble pasted from a word processor (`R’`) fails
+   * here, pointing at the token, rather than being silently read as `R`. A consumer
+   * accepting pasted text should normalise `’` to `'` before validating.
+   */
+  it("rejects a typographic apostrophe as a bad amount, pointing at the token", () => {
+    const result = (() => {
+      try {
+        parseFtoScramble('U R’ F');
+        return null;
+      } catch (error) {
+        return error as ScrambleSyntaxError;
+      }
+    })();
+    expect(result).toBeInstanceOf(ScrambleSyntaxError);
+    expect(result!.reason).toBe('fto-bad-amount');
+    expect([result!.offset, result!.length, result!.token]).toEqual([2, 2, 'R’']);
   });
 });
 

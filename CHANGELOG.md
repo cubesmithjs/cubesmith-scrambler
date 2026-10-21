@@ -69,6 +69,22 @@ members. `dist/draw/index.d.ts` is unchanged.
   and prints it. That sequence solves this model, and this package's exact `⟨U, L⟩`
   table measures the state at exactly 24. Both hold only if every face name,
   adjacency and turning direction matches.
+- 🔴 **Identical to cubing.js's FTO, turn for turn** — the model a consumer is most
+  likely to display a scramble with. Exactly one correspondence of pieces makes all
+  eight named turns equal, and none does with the directions reversed; group orders
+  of random words agree, corner twist included. cubing.js's turn tables are frozen in
+  the test suite, so this re-runs on every build with no new dependency. Scrambles
+  from either side are solved by the other's model.
+- 15 planted bugs, from a reversed turn to a biased random draw, were each caught by
+  the suite.
+
+### Known: longer than cubing.js's FTO scrambles
+
+**~39 moves here against ~27** from cubing.js's `randomScrambleForEvent('fto')`
+(28–44 vs 23–29). Both are random-state and both are correct; only the length
+differs. See `docs/fto-design.md` §8. A pasted typographic apostrophe (`R’`) is
+rejected as `fto-bad-amount`, as in every other grammar here; normalise it to `'`
+before validating pasted text.
 
 ### Bundle size
 

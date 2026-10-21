@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EDGE_POSITIONS_FTO, FACE_NORMALS, FACELETS_FTO } from '../puzzles/fto/geometry';
 import { FTO_FACES } from '../puzzles/fto/notation';
+import { CUBINGJS_FTO_SCRAMBLES } from '../puzzles/fto/__tests__/cubingjs-reference';
 import { vecCross, vecDot } from '../utils/vec3';
 import { corpusFor } from './__tests__/corpus';
 import { differingIndices, faceCounts, withinBounds } from './__tests__/invariants';
@@ -98,6 +99,13 @@ describe('the FTO drawing', () => {
     expect(differingIndices(solved, drawScramble('fto', face))).toHaveLength(18);
     expect(drawScramble('fto', `${face} ${face}'`)).toEqual(solved);
     expect(drawScramble('fto', `${face} ${face} ${face}`)).toEqual(solved);
+  });
+
+  it('draws every cubing.js scramble too, with nine stickers of each colour', () => {
+    for (const scramble of CUBINGJS_FTO_SCRAMBLES) {
+      const counts = faceCounts(drawScramble('fto', scramble));
+      for (const face of FTO_FACES) expect(counts[face], `${face}: ${scramble}`).toBe(9);
+    }
   });
 
   it('draws every corpus scramble with the right number of each colour', () => {

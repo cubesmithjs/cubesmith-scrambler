@@ -308,6 +308,18 @@ Provisional, against 4b3's general rule, until the FTO regulations exist (§8).
 
 ### Independent verification
 
+- 🔴 **Turn for turn, against cubing.js** (`interop.test.ts`, every CI run).
+  cubing.js's FTO is the model a consumer most likely *displays* a scramble with.
+  Its turn tables for the eight faces (`cubing@0.63.3`) are frozen as data in
+  `__tests__/cubingjs-reference.ts`, so the check needs no dependency. There is
+  **exactly one** way to match this package's slots to cubing.js's so that every
+  named turn is the same permutation of corners, of edges and of all 24
+  centres. With each turn taken as the other's *prime*, there is **none**, so
+  direction is pinned. Group orders of 600 random words agree too, corner twist
+  included. Measured once outside the suite with cubing.js itself: 1,000 random
+  words had equal orders; 30 of this package's scrambles, followed by this
+  package's own solutions, left cubing.js's puzzle solved; and 40 of cubing.js's
+  own scrambles were solved by this package's solver, as cubing.js confirmed.
 - **The published solver's own worked example** (`solve.test.ts`). xyzzy's
   source states that the scramble `F R U R' U' F'` has an optimal two-face
   solution of 24 moves, and prints it. Here that sequence solves the scrambled
@@ -329,6 +341,29 @@ Provisional, against 4b3's general rule, until the FTO regulations exist (§8).
   the strips the geometry predicts — `U` carries B's strip to R, R's to L and
   L's to B — and `draw/fto.test.ts` pins that the two stickers of every edge off
   the equator are drawn sharing a side.
+
+- **A 10,000-scramble stress run**, 2026-10-21, once, through the public API.
+  There were **0 failures** and all 10,000 were distinct. Each one was valid
+  text, reached exactly its drawn state, kept the floor, had no redundant move,
+  and drew with nine stickers of every colour. Lengths were 28–45, median 39,
+  p99.9 44. The slowest solve took 290 ms (median 69 ms, p99.9 253 ms). Raised
+  from the 1,000-state figures in §7, the maximum length is one move higher.
+- **Mutation testing**, 2026-10-21, once. Fifteen realistic bugs were planted
+  one at a time in the shipped source, and every one was caught by the suite:
+  - a reversed turn direction;
+  - `R` and `L` swapped;
+  - a cut through the middle layer, for stickers and for centres;
+  - an edge test that admits a neighbour;
+  - a prime turn that forgets a twist;
+  - a parity never repaired, a twist sum not enforced, a subtly biased repair;
+  - a prime parsed as clockwise;
+  - wrong cancellation arithmetic;
+  - a descent stepping to the wrong residue, and a mod-3 table written one layer off;
+  - a mirrored lower half in the drawing, and a prime drawn as the plain turn.
+
+  One more planted change survived, and it is *equivalent*, not a gap: a cut
+  threshold of 1 instead of 3 selects the same stickers, because no sticker's
+  dot product with a normal lies between them.
 
 ### Edge cases
 
@@ -397,11 +432,10 @@ of them is a patch, and `fto_event_plan` task 10 re-checks every one.
 3. **Image** — the two-square net and the Lanlan colours are this package's own.
    No TNoodle release draws an FTO.
 4. **Reference length** — `move-count.test.ts` carries the `fto` band as
-   `provisional`: it is this package's own measured distribution, and **nothing
-   external has been compared with it yet**. cubing.js's random-state FTO
-   scrambler is the stand-in to measure against until the official program
-   scrambles FTO; then its sheets become the baseline, as TNoodle's did for
-   every other event.
+   `provisional`. The stand-in, cubing.js's random-state FTO scrambler, was
+   measured on 2026-10-21: **23–29 moves, median 27** over 40 scrambles (see
+   *Rough edges*). When the official program scrambles FTO, its sheets become
+   the baseline, as TNoodle's did for every other event.
 
 ### Rough edges, stated plainly
 
@@ -409,9 +443,20 @@ of them is a patch, and `fto_event_plan` task 10 re-checks every one.
   19 moves of two faces — before the other faces appear. It is visible on a
   sheet. It is not a uniformity problem (the state is drawn first), but a
   scramble that looked like TNoodle's would not show its method so plainly.
-- **~39 moves** is long. A two-phase solver with a richer phase 3 (xyzzy's uses
-  36 short sequences as well as the two faces) would be shorter, at the cost of
-  another table.
+- 🔴 **~39 moves, against cubing.js's ~27.** Measured on 2026-10-21: this
+  package gives 28–44 (median 39); cubing.js's scrambler gives 23–29 (median 27)
+  for the same random-state task. Both are correct, and `interop.test.ts` proves
+  the puzzles identical. It is the scrambles' *length* that differs, by about a
+  third. The difference is in the solver. xyzzy's phase 1 uses wide turns, which
+  amount to a free choice of which corner to build the block around, and its
+  phase 3 adds 36 short sequences to the two faces. This package fixes the block
+  corner and finishes in pure `⟨U, L⟩`. Closing the gap is a solver change, not a
+  correctness fix, and would change every seeded output (`solve.test.ts`'s known
+  answers).
+- **A pasted `’` is not a prime.** Like every other grammar here, FTO rejects
+  the typographic apostrophe (`fto-bad-amount`, pointing at the token) rather
+  than guessing. A consumer accepting pasted text should normalise `’` to `'`
+  first. `notation.test.ts` pins this.
 - **6.5 s cold** — in the same range as `444`, the slowest event here, and paid
   once per process.
 

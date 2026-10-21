@@ -46,6 +46,77 @@ describe('randomFtoState — determinism', () => {
  * runs *per seed*, and the seed is fixed, so it either always passes or always
  * fails. The statistics this seed produced are recorded in `fto-design.md` §6.
  */
+/**
+ * 🔴 **Joint** distributions, at much higher power. A single-slot test cannot see a
+ * draw that is uniform on each part but *links* two parts — the classic bug when
+ * one parity is repaired using another — and the group has no such link
+ * (`state.test.ts`), so the draw must not invent one. Each test is against the
+ * exact expected count per cell, at the 0.1% critical value for its degrees of
+ * freedom (Wilson–Hilferty, computed in the test).
+ */
+describe('randomFtoState — joint uniformity', () => {
+  const DRAWS = 264_000;
+  const draws = (() => {
+    const random = createRandomSource('fto-joint');
+    return Array.from({ length: DRAWS }, () => randomFtoState(random));
+  })();
+
+  function critical(df: number): number {
+    const z = 3.0902; // the 0.1% upper quantile of the standard normal
+    const a = 2 / (9 * df);
+    return df * (1 - a + z * Math.sqrt(a)) ** 3;
+  }
+  function chiSquared(counts: readonly number[], expected: readonly number[]): number {
+    return counts.reduce((sum, c, i) => sum + (c - expected[i]!) ** 2 / expected[i]!, 0);
+  }
+  function check(counts: number[], probabilities: number[]): void {
+    const expected = probabilities.map((p) => p * DRAWS);
+    const cells = probabilities.filter((p) => p > 0).length;
+    const df = cells - 1;
+    const kept = counts.filter((_, i) => probabilities[i]! > 0);
+    const keptExpected = expected.filter((_, i) => probabilities[i]! > 0);
+    // A zero-probability cell must be exactly zero — that is a constraint, not noise.
+    counts.forEach((c, i) => {
+      if (probabilities[i] === 0) expect(c, `cell ${i}`).toBe(0);
+    });
+    expect(chiSquared(kept, keptExpected)).toBeLessThan(critical(df));
+  }
+
+  it('places the edges in slots 0 and 1 as every ordered pair, equally (132 cells)', () => {
+    const counts = new Array<number>(144).fill(0);
+    for (const s of draws) counts[s.edgePermutation[0]! * 12 + s.edgePermutation[1]!]! += 1;
+    check(counts, counts.map((_, i) => (Math.floor(i / 12) === i % 12 ? 0 : 1 / 132)));
+  });
+
+  it('draws the corners and the edges independently (144 cells)', () => {
+    const counts = new Array<number>(144).fill(0);
+    for (const s of draws) {
+      counts[(2 * s.cornerPermutation[0]! + s.cornerOrientation[0]!) * 12 + s.edgePermutation[0]!]! += 1;
+    }
+    check(counts, counts.map(() => 1 / 144));
+  });
+
+  it('gives every even-sum twist vector the same chance, and odd-sum ones none (64 cells)', () => {
+    const counts = new Array<number>(64).fill(0);
+    for (const s of draws) counts[s.cornerOrientation.reduce((v, o, i) => v | (o << i), 0)]! += 1;
+    const evenSum = (v: number): boolean => v.toString(2).split('1').length % 2 === 1;
+    check(counts, counts.map((_, v) => (evenSum(v) ? 1 / 32 : 0)));
+  });
+
+  it('colours two centre slots of an orbit with the right joint law (16 cells)', () => {
+    // Three of each of four colours in twelve slots: P(c1, c2) = 3/12 · (3 − [c1 = c2]) / 11.
+    const counts = new Array<number>(16).fill(0);
+    for (const s of draws) counts[centreColour(s.centreB[2]!) * 4 + centreColour(s.centreB[9]!)]! += 1;
+    check(counts, counts.map((_, i) => (3 / 12) * ((Math.floor(i / 4) === i % 4 ? 2 : 3) / 11)));
+  });
+
+  it('draws the two centre orbits independently of each other (16 cells)', () => {
+    const counts = new Array<number>(16).fill(0);
+    for (const s of draws) counts[centreColour(s.centreA[4]!) * 4 + centreColour(s.centreB[4]!)]! += 1;
+    check(counts, counts.map(() => 1 / 16));
+  });
+});
+
 describe('randomFtoState — uniformity', () => {
   const DRAWS = 24_000;
 

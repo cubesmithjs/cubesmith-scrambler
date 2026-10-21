@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
+import { randomInt } from '../../utils/random-int';
+import { CUBINGJS_FTO_SCRAMBLES } from './__tests__/cubingjs-reference';
 import {
   ALL_MOVES_FTO,
   centreColoursValue,
@@ -202,6 +204,98 @@ describe('against the published FTO solver', () => {
     // and 2 are empty and phase 3 — an exact descent — is the optimal 2-gen length.
     const { phase1, phase2, phase3 } = solveFtoInPhases(scrambled);
     expect([phase1.length, phase2.length, phase3.length]).toEqual([0, 0, 24]);
+  });
+});
+
+/**
+ * Scrambles from somewhere else — what a consumer pastes in. Each of cubing.js's
+ * twelve is applied here and solved by this package's solver. (That cubing.js's
+ * own puzzle agrees each solution solves *its* state was checked once outside the
+ * suite, for 40 scrambles; see `fto-design.md` §6.)
+ */
+describe('scrambles this package did not write', () => {
+  it("solves every cubing.js scramble", () => {
+    for (const scramble of CUBINGJS_FTO_SCRAMBLES) {
+      const state = applyFtoMoves(SOLVED_FTO_STATE, parseFtoScramble(scramble));
+      expect(isSolvedFto(applyFtoMoves(state, solveFto(state))), scramble).toBe(true);
+    }
+  });
+});
+
+/**
+ * The states a reduction is most likely to fumble are the ones that are almost
+ * solved: a phase whose goal is already met, a block solved by accident, a
+ * search whose first bound is zero. Every one- and two-move state is tried.
+ */
+describe('near-solved states', () => {
+  it('solves all 16 one-move and all 256 two-move states', () => {
+    const moves = ALL_MOVES_FTO;
+    for (const a of moves) {
+      const one = applyFtoMove(SOLVED_FTO_STATE, a);
+      expect(isSolvedFto(applyFtoMoves(one, solveFto(one)))).toBe(true);
+      for (const b of moves) {
+        const two = applyFtoMove(one, b);
+        expect(isSolvedFto(applyFtoMoves(two, solveFto(two)))).toBe(true);
+      }
+    }
+  });
+});
+
+/**
+ * Phase 3 stores distances **mod 3** and recovers them by descent — the one
+ * place a subtle encoding bug would give a *valid but non-optimal* (or looping)
+ * phase 3. So its length is checked against a brute-force optimum, found by
+ * trying every `U`/`L` sequence, on states a short random `⟨U, L⟩` word makes.
+ */
+describe('the phase-3 descent', () => {
+  it('is optimal: equals an exhaustive search over U and L on 60 random states', () => {
+    const twoGen = [0, 1, 6, 7].map((m) => ALL_MOVES_FTO[m]!); // U U' L L'
+    const optimal = (state: FtoState, limit: number): number => {
+      const within = (s: FtoState, depth: number, last: string): boolean => {
+        if (isSolvedFto(s)) return true;
+        if (depth === 0) return false;
+        return twoGen.some((m) => m.face !== last && within(applyFtoMove(s, m), depth - 1, m.face));
+      };
+      for (let d = 0; d <= limit; d += 1) if (within(state, d, '')) return d;
+      throw new Error('not within the limit');
+    };
+    const random = createRandomSource('fto-phase3-optimal');
+    for (let trial = 0; trial < 60; trial += 1) {
+      const length = 1 + randomInt(random, 9);
+      const word = Array.from({ length }, () => twoGen[randomInt(random, 4)]!);
+      const state = applyFtoMoves(SOLVED_FTO_STATE, word);
+      const { phase1, phase2, phase3 } = solveFtoInPhases(state);
+      expect([phase1.length, phase2.length]).toEqual([0, 0]);
+      expect(phase3.length, word.map((m) => m.face + (m.amount === 2 ? "'" : '')).join(' ')).toBe(
+        optimal(state, length),
+      );
+    }
+  });
+});
+
+/**
+ * Known answers. A seeded scramble is part of this package's behaviour: a
+ * consumer who stored one, or a test fixture of theirs, expects the same string
+ * back. Any change to these is a visible change and belongs in the CHANGELOG.
+ */
+describe('known answers', () => {
+  it.each([
+    ['fto-kat-0', "L' U L' U L' U L U' L U' L U L' U' L' U L U' L' R U' F R' L' R F U' R' F' U' R' BL B' D BR D' R' U BL' D"],
+    ['fto-kat-1', "L U' L U' L' U' L' U L' U L U L' U' L U' L U L' F' U' F' R' L' F U R' F' L U' L U BR' D L R B' BR' F' R"],
+    [2027, "L' U L U' L U' L' U L' U L' U' L U L U L' U L' U F L R U' R L' F' U L F' U' B BR U' BL B' BR' D U BL"],
+  ] as const)('seed %j gives the same scramble it always has', async (seed, expected) => {
+    const { generateScramble } = await import('../../index');
+    expect((await generateScramble('fto', { seed })).moves).toBe(expected);
+  });
+
+  it('draws from the crypto source when no seed is given, and still meets every rule', async () => {
+    const { generateScramble } = await import('../../index');
+    for (let i = 0; i < 3; i += 1) {
+      const { moves } = await generateScramble('fto');
+      const reached = applyFtoMoves(SOLVED_FTO_STATE, parseFtoScramble(moves));
+      expect(isAtLeastMovesFromSolved(reached, MIN_FTO_SOLVE_DISTANCE)).toBe(true);
+      expect(isSolvedFto(applyFtoMoves(reached, solveFto(reached)))).toBe(true);
+    }
   });
 });
 

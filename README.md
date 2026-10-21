@@ -66,7 +66,7 @@ the [4x4x4 design](./docs/444-design.md).
 | `sq1` | random-state | ✅ Shape-changing 24-slot model; two-phase solver, exact 4b3d verification, 3,678 twistable shapes and 11,958,666,854,400 positions reproduced |
 | `444` `444bf` | random-state | ✅ Reduction (centres, then wings with verified centre-neutral generators) + 3x3x3 hand-off; parity fixed by derived gadgets, not memorised algorithms. Long (~140 moves) and slow (~2s) by design — correctness first. `444bf` adds a random **whole-cube rotation** (`x`/`y`/`z`), which is how 4b3a is satisfied on a cube with no fixed centre |
 | `333mbf` | random-state | ✅ One attempt, many cubes: `count` draws that many independent `333bf` scrambles, each with its own orientation suffix and its own 4b3 floor. `moves` is still the first of them |
-| `fto` | random-state | ✅ Octahedral geometry on an exact integer lattice; Schreier–Sims reproduces the published 31,408,133,379,194,880,000,000 positions. Three-phase reduction (a block, then `U F R L`, then an exact `⟨U, L⟩` table over 63,504,000 states); ~39 moves. Notation provisional until the WCA's FTO regulations |
+| `fto` | random-state | ✅ Octahedral geometry on an exact integer lattice; Schreier–Sims reproduces the published 31,408,133,379,194,880,000,000 positions. Three-phase reduction (a block, then `U F R L`, then an exact `⟨U, L⟩` table over 63,504,000 states). Proven identical to cubing.js's FTO turn for turn. ~39 moves — longer than cubing.js's ~27, correct but not short. Notation provisional until the WCA's FTO regulations |
 
 Supporting pieces, all done: package scaffold (strict TypeScript, ESM, Vitest),
 `generateScramble()` / registry / typed "not implemented" errors, seeded and

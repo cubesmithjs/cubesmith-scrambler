@@ -278,10 +278,13 @@ const BANDS: readonly EventBand[] = [
     band: [20, 55],
     verdict: 'provisional',
     draws: 3,
-    // 🔴 Nothing external has been compared yet: the band is this package's own
-    // distribution. The stand-in is named so task 10 knows what to measure.
+    // 🔴 Measured against the stand-in on 2026-10-21, and the gap is real: cubing.js's
+    // scrambler (xyzzy's solver) prints ~12 fewer moves for the same kind of state.
+    // Both are random-state and both are correct — `fto/interop.test.ts` proves the two
+    // puzzles identical turn for turn — so this is length, not validity. See
+    // `docs/fto-design.md` §8.
     reference:
-      'none compared yet — the stand-in to measure is cubing.js randomScrambleForEvent("fto"), the one random-state FTO scrambler in use before the WCA program has one',
+      'cubing.js 0.63.3 randomScrambleForEvent("fto"): 23–29 moves, median 27, over 40 scrambles — ~12 shorter than this package',
     closedBy: 'cubesmith-scrambler-plans fto_event_plan task 10 — re-baselined against the official program once it scrambles FTO',
     measured: '29–44 over 1,000 seeded states, median 39, mean 39.08, p99 43',
   },
