@@ -67,6 +67,8 @@ function twoPhaseSolve(
       phase1Moves.length === 0 ? restrictions.firstMoveAxis : undefined,
       restrictions.lastMoveAxis,
     ),
+    // Phase 1's moves as history, so the join cannot print `R2 R'`.
+    phase1Moves,
   );
   return [...phase1Moves, ...phase2Moves];
 }

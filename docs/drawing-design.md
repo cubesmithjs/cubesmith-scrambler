@@ -5,6 +5,10 @@
 > Plan: [`cubesmith-scrambler-plans/plans/scramble_drawing_and_batch_plan/`](https://github.com/DrSiroukane/cubesmith-scrambler-plans),
 > spec: `02-tnoodle-drawing-spec.md`.
 
+> The unofficial events' drawings (big cubes, blindfolded variants, and the
+> shape-mod geometry engine) live behind `@cubesmith/scrambler/unofficial/draw` and
+> are documented in [shape-mod-drawing-design.md](./shape-mod-drawing-design.md).
+
 ## 1. What this is, and what it deliberately is not
 
 The flat sticker picture that appears beside every scramble on an official WCA

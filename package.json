@@ -38,6 +38,14 @@
       "types": "./dist/draw/index.d.ts",
       "import": "./dist/draw/index.js"
     },
+    "./unofficial": {
+      "types": "./dist/unofficial/index.d.ts",
+      "import": "./dist/unofficial/index.js"
+    },
+    "./unofficial/draw": {
+      "types": "./dist/unofficial/draw/index.d.ts",
+      "import": "./dist/unofficial/draw/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

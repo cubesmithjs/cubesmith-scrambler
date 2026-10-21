@@ -12,18 +12,28 @@ changes and a patch bump may not.
 
 ## 0.15.0
 
-**The Face Turning Octahedron.** `fto` joins as the eighteenth event — scrambled,
+**The Face Turning Octahedron, sixteen unofficial events, and no repeated move at the
+`333` seam.** Three changes in one release:
+
+- **`fto`**, official from 2027-01-02 (below);
+- **sixteen puzzles the WCA does not hold**, behind two new entry points,
+  `@cubesmith/scrambler/unofficial` and `@cubesmith/scrambler/unofficial/draw`;
+- **a fix**: no 3x3x3-family scramble prints a redundant move where the solver's two
+  phases meet.
+
+**The Face Turning Octahedron.** `fto` joins as the eighteenth WCA event — scrambled,
 validated and drawn. The WCA made it official on 2026-06-24, to be held from
 **2027-01-02**; this release exists so a consumer has it before then.
 
-A **minor**, because it is new surface and because two public unions grew (below).
+A **minor**, because it is new surface, because two public unions grew, and because
+the `333` fix changes some seeded scrambles (all below).
 
 🔴 **Provisional until the WCA publishes the FTO regulations** (a draft is expected
 in the January 2027 cycle). The notation, the minimum solve distance and the picture
 are this package's best reading of current practice, not the regulation's text — see
 `docs/fto-design.md` §8. If the regulations differ, the fix is a patch.
 
-### Added
+### Added — `fto`
 
 - **`generateScramble('fto')`** — random-state. A uniformly random state, solved by a
   three-phase reduction (a block around one corner, then `U F R L`, then an exact
@@ -42,6 +52,51 @@ are this package's best reading of current practice, not the regulation's text �
   four faces round each vertex) in the Lanlan colours. 🔴 **The first picture here that
   is not TNoodle's**: no TNoodle release draws an FTO, so this one is the package's own.
 
+### Added — unofficial events (`@cubesmith/scrambler/unofficial`)
+
+- **`generateUnofficialScramble`, `generateUnofficialScrambles`,
+  `prepareUnofficialEvent`, `validateUnofficialScramble`,
+  `isImplementedUnofficialEvent`, `unofficialEvents`**. The ids are CubeManager's
+  catalogue refs:
+  - big cubes `888` `999` `1010` `1111` `1212`: random moves, 120–200, lengths
+    backed by a measured mixing check (`docs/unofficial-design.md` §5.1);
+  - `222bf` `666bf` `777bf`: the sighted scramble plus a uniformly random
+    orientation, by the `333bf`/`444bf`/`555bf` rule;
+  - `pyrambf` `minxbf`: the WCA scramble, unchanged. The Pyraminx's frame is fixed
+    by its axial pieces, and a WCA Megaminx scramble is already uniformly oriented
+    (measured: 60 orientations, χ² 57.5 on 59 df);
+  - `mirror` `axis` `fisher` `windmill` `ghost` `mastermorphix`: the `333` scramble,
+    with a new quality value, **`random-state-mechanism`**: uniform over the hidden
+    3x3x3, not over the centre orientations these puzzles show.
+- **`drawUnofficialScramble`** with views:
+  - **Cube nets** at any size.
+  - **Pyraminx and Megaminx nets** for the blindfolded variants.
+  - A **convex-piece geometry engine** that draws a shape mod as two isometric
+    views, painted in an exact back-to-front order taken from the cut planes (an
+    *a priori* BSP), checked against a z-buffer in the tests.
+  - A flat **height map** for the Mirror Cube.
+  - Mirror, Fisher and Mastermorphix are drawn. **Axis, Windmill and Ghost are
+    not**, because no source gives their construction, and a guessed picture
+    would mislead a scramble checker.
+- `AlgorithmSyntaxError`, `ScrambleSyntaxError` and `InvalidColorError` are
+  re-exported from the new entries, because each entry is a self-contained file
+  and `instanceof` against another entry's copy does not match.
+
+### Fixed
+
+- **No redundant move where the 3x3x3 solver's two phases meet.** Phase 1's last
+  move and phase 2's first could turn the same face (`R2 R'`), or the same face
+  through its opposite (`R2 L2 R'`). Measured before the fix in about one scramble
+  in ten (13–22 of 300) of `333`, `333oh`, `333bf` and `333fm`, and so also
+  `333mbf` and the new shape mods. Phase 2 now reads phase 1's moves as history.
+  After the fix: 0 of 300 for each. `move-count.test.ts` now allows zero redundant
+  moves for the whole family (it allowed one, for this seam).
+- ⚠️ **Seeded scrambles: only the ones that had a seam change.** On 300 common
+  seeds, 28 `333` scrambles changed and 272 are identical (the drawn state is the
+  same; only the join moves). Mean length 23.13 → 23.19 tokens, maximum 27, with
+  no measurable time cost. A consumer that stored a seed and expects the old text
+  back should regenerate.
+
 ### ⚠️ Compile-visible: two unions grew
 
 `WcaEventId` gained `'fto'`, and `Notation` gained `'fto'` (so `BespokeNotation` did
@@ -54,6 +109,15 @@ Measured, not asserted: with comments and tsup's chunk hashes stripped, the buil
 `dist/index.d.ts` (plus its types chunk) differs from `0.14.1`'s in exactly three
 lines — `WcaEventId`, `Notation` and `ScrambleErrorReason`, each only *gaining*
 members. `dist/draw/index.d.ts` is unchanged.
+
+The unofficial entries added nothing to that surface: the main entry still has the
+same 49 exports and 51 declarations, now split across more `.d.ts` chunk files
+because four entries share them (`./draw`: 12 exports and 20 declarations, also
+unchanged). `isImplementedEvent()` answers `false` for every unofficial id. Adding
+them left `dist/index.js` byte-identical; its only other code change is the `333` fix.
+`./draw` gained two internal seams (`parseCubeNetMoves` with a caller-built error, and
+a structural `imageToSvg`) so the unofficial drawers reuse the cube net and the
+serializer instead of copying them.
 
 ### How it was checked
 
@@ -96,12 +160,16 @@ Measured with `gzip -9` on both builds (`0.14.1` from the registry tarball):
 
 | | `0.14.1` | `0.15.0` | change |
 |---|---|---|---|
-| `dist/index.js` | 234,137 B / 50,935 B gzip | 274,808 B / 60,557 B gzip | +40,671 B (+17.4%) / +9,622 B gzip (+18.9%) |
-| `dist/draw/index.js` | 97,132 B / 23,460 B gzip | 104,135 B / 25,088 B gzip | +7,003 B (+7.2%) / +1,628 B gzip (+6.9%) |
+| `dist/index.js` | 234,137 B / 50,935 B gzip | 275,325 B / 60,755 B gzip | +41,188 B (+17.6%) / +9,820 B gzip (+19.3%) |
+| `dist/draw/index.js` | 97,132 B / 23,460 B gzip | 104,303 B / 25,136 B gzip | +7,171 B (+7.4%) / +1,676 B gzip (+7.1%) |
+| `dist/unofficial/index.js` | — | 113,804 B / 25,475 B gzip | new entry |
+| `dist/unofficial/draw/index.js` | — | 80,828 B / 20,634 B gzip | new entry |
 
-The package has one scrambling entry point, so every consumer carries the FTO solver
-whether it scrambles FTO or not — about 9.6 KB gzipped, the symmetry frames included. Its tables are built only on
-first use, so the memory cost is paid only by a process that scrambles an FTO.
+The main entry has one scrambling entry point, so every consumer carries the FTO
+solver whether it scrambles FTO or not — about 9.6 KB gzipped, the symmetry frames
+included; the `333` fix adds 198 B. Its tables are built only on first use, so the
+memory cost is paid only by a process that scrambles an FTO. A WCA-only consumer
+bundles none of the unofficial code.
 
 ### Also
 

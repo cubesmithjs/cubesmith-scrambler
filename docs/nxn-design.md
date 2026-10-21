@@ -7,6 +7,11 @@ fourth (`444`) will when it exists.
 Targets: `generateScramble('555' | '666' | '777')`, shipped since v0.8, plus the
 orientation machinery `333bf` and `555bf` are built on.
 
+Since 0.15.0 the same module also serves the unofficial big cubes `888`–`1212` and
+the blindfolded `222bf`, `666bf` and `777bf`, unchanged, through
+`@cubesmith/scrambler/unofficial`. Their lengths and the mixing measurement behind
+them are in [unofficial-design.md](./unofficial-design.md) §5.1.
+
 ---
 
 ## 1. Overview

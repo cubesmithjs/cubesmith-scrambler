@@ -37,8 +37,8 @@ import type { ColorScheme, ImageShape, ScrambleImage } from './types';
  * — four face-columns `L | F | R | B` across the middle row, `U` above `F`, `D`
  * below it.
  */
-const GAP = 2;
-const CUBIE_SIZE = 10;
+export const GAP = 2;
+export const CUBIE_SIZE = 10;
 const BLACK = '#000000';
 
 /**
@@ -106,7 +106,7 @@ export function cubeNetHeight(size: number): number {
 }
 
 /** The top-left corner of each face's block in the net, from `drawCube` above. */
-function faceOrigin(face: Face, size: number): readonly [number, number] {
+export function faceOrigin(face: Face, size: number): readonly [number, number] {
   const s = size * CUBIE_SIZE;
   switch (face) {
     case 'L':
@@ -208,15 +208,36 @@ export function scrambleToWideMoves(
   scramble: string,
   size: number,
 ): readonly WideMove[] {
+  return parseCubeNetMoves(
+    scramble,
+    size,
+    (construct, detail) => new UnsupportedScrambleError(event, construct, detail),
+  );
+}
+
+/** What a cube-notation scramble may contain that a drawing refuses. */
+export type UnsupportedCubeConstruct = 'slice-move' | 'layer-range' | 'grouping';
+
+/**
+ * The parse behind {@link scrambleToWideMoves}, with the refusal left to the
+ * caller. The unofficial entry draws its big cubes and shape mods through it,
+ * raising its own error type, so this module's `WcaEventId`-typed error never
+ * has to name an event that is not a WCA event.
+ */
+export function parseCubeNetMoves(
+  scramble: string,
+  size: number,
+  unsupported: (construct: UnsupportedCubeConstruct, detail: string) => Error,
+): readonly WideMove[] {
   const algorithm: Algorithm = parseAlgorithm(scramble);
   const moves: WideMove[] = [];
 
   for (const node of algorithm.nodes) {
     if (node.type === 'pause') continue; // A `.` carries no turn.
     if (node.type !== 'move') {
-      throw new UnsupportedScrambleError(event, 'grouping', `a ${node.type}`);
+      throw unsupported('grouping', `a ${node.type}`);
     }
-    const move = moveNodeToWideMove(event, node, size);
+    const move = moveNodeToWideMove(node, size, unsupported);
     // `R4` on a 3x3x3 is the identity — legal notation, and nothing to apply.
     if (move) moves.push(move);
   }
@@ -224,16 +245,15 @@ export function scrambleToWideMoves(
 }
 
 function moveNodeToWideMove(
-  event: WcaEventId,
   node: MoveNode,
   size: number,
+  unsupported: (construct: UnsupportedCubeConstruct, detail: string) => Error,
 ): WideMove | undefined {
   if ((SLICE_FAMILIES as readonly string[]).includes(node.family)) {
-    throw new UnsupportedScrambleError(event, 'slice-move', `the slice move "${node.family}"`);
+    throw unsupported('slice-move', `the slice move "${node.family}"`);
   }
   if (node.outerLayer !== null) {
-    throw new UnsupportedScrambleError(
-      event,
+    throw unsupported(
       'layer-range',
       `the layer range ${node.outerLayer}-${node.innerLayer}${node.family}w`,
     );
@@ -251,7 +271,7 @@ function moveNodeToWideMove(
   }
 
   if (!(FACE_FAMILIES as readonly string[]).includes(node.family)) {
-    throw new UnsupportedScrambleError(event, 'slice-move', `the move family "${node.family}"`);
+    throw unsupported('slice-move', `the move family "${node.family}"`);
   }
   return {
     face: node.family as Face,
@@ -286,7 +306,7 @@ const PAINT_ORDER: readonly Face[] = ['L', 'D', 'B', 'R', 'U', 'F'];
  */
 const slotIndexes = new Map<number, ReadonlyMap<string, number>>();
 
-function slotIndex(size: number): ReadonlyMap<string, number> {
+export function slotIndex(size: number): ReadonlyMap<string, number> {
   const cached = slotIndexes.get(size);
   if (cached) return cached;
 
@@ -329,7 +349,7 @@ function slotIndex(size: number): ReadonlyMap<string, number> {
  */
 const derivedPermutations = new Map<string, readonly number[]>();
 
-function applyMoveForDrawing(state: CubeNxNState, move: WideMove): CubeNxNState {
+export function applyMoveForDrawing(state: CubeNxNState, move: WideMove): CubeNxNState {
   const { facelets, permutations } = modelForSize(state.size);
   const key = `${moveLayerSet(move)}.${move.amount}`;
   let destination = permutations.get(key);
@@ -349,7 +369,7 @@ function applyMoveForDrawing(state: CubeNxNState, move: WideMove): CubeNxNState 
 }
 
 /** `paintCubeFace` — row-major squares at `x + col*cubieSize`, `y + row*cubieSize`. */
-function drawState(state: CubeNxNState, scheme: ColorScheme): readonly ImageShape[] {
+export function drawState(state: CubeNxNState, scheme: ColorScheme): readonly ImageShape[] {
   const { size } = state;
   const { facelets } = modelForSize(size);
   const index = slotIndex(size);

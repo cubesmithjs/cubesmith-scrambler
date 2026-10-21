@@ -35,6 +35,19 @@ stated in that document's §8 rather than smoothed over.
 | `333mbf` | random-state | [333-design.md](./333-design.md) — `count` × `333bf`, one attempt over many cubes |
 | `fto` | random-state | [fto-design.md](./fto-design.md) — official from 2027-01-02; notation and floor provisional until the regulations (§8) |
 
+## Unofficial events (`@cubesmith/scrambler/unofficial`)
+
+Sixteen events the WCA does not hold, behind their own entry point so the WCA
+surface and its claims are untouched. Every convention is labelled as one.
+
+| Events | Method | Document |
+|---|---|---|
+| `888` `999` `1010` `1111` `1212` | random-moves, lengths backed by a mixing measurement | [unofficial-design.md](./unofficial-design.md) §5.1 |
+| `222bf` `666bf` `777bf` | sighted scramble + 4b3a-style orientation | [unofficial-design.md](./unofficial-design.md) §5.2 |
+| `pyrambf` `minxbf` | the WCA scramble, unchanged, and measured to be why | [unofficial-design.md](./unofficial-design.md) §5.3 |
+| `mirror` `axis` `fisher` `windmill` `ghost` `mastermorphix` | `333` scramble, `random-state-mechanism` | [unofficial-design.md](./unofficial-design.md) §5.4 |
+| drawings, including the shape-mod geometry engine | nets, isometric views, a height map | [shape-mod-drawing-design.md](./shape-mod-drawing-design.md) |
+
 ## Cross-cutting
 
 - [notation-design.md](./notation-design.md) — the algorithm-notation layer: parser,
@@ -61,7 +74,7 @@ printed scramble sheet.
 | Gap | Where | Severity |
 |---|---|---|
 | ⚠️ A `444`/`444bf` scramble runs **56–114 tokens, mean 74** against TNoodle's 42–46 | [444-design.md](./444-design.md) §8, §12.8–12.9 | 94–205 (mean 137.5) → 74–172 (119.4) on 2026-08-12 → 59–119 (85.9) → **56–114 (73.8, median 69)** on 2026-08-13, the last two steps being a pairing searched for total word length and a phase-1 route chosen for even wing parity, which decides OLL parity for the whole solve — 23 states in 30 now need no parity pass. **accepted, not outstanding.** Centres (16.1) + hand-off (23.3) = 39.4 already fits TNoodle's whole budget, so the gap is all reduction overhead — every move that can pair a wing unsolves the centres, so pairing runs over ~7-move centre-neutral sequences. The six-wing pruning table *does* build (23.1 s under a 24-fold symmetry fold, against the doc's "minutes to hours") and reads 6.7 where the pairing spends 29.9. 🔴 And **more phases is the wrong lever**: the published eight-phase method (arXiv:1601.05744) runs 67–79 moves, *longer than our median of 69*. Closing it needs **fewer** phases with a coordinate of radius ~20, which nobody has produced. The *state* is uniformly random and unaffected |
-| A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve | [333-design.md](./333-design.md) §8 | ~1 scramble in 20 originally; **4 of 30** on a second sample (2026-08-13). The printed sequence merges one move shorter. Fixing it in the search changes `333` output for every seed; a post-hoc merge would change only the scrambles that have a seam, but interacts with `333fm`'s first/last-move axis restriction and was left alone rather than ridden in on another change |
+| ~~A same-face pair can print at the phase-1 / phase-2 boundary of a 3x3x3 solve~~ | [333-design.md](./333-design.md) §8 "Fixed" | **Fixed 2026-10-21.** It was 20–22 of 300 scrambles per 3x3x3-family event, plus 1–2 with the opposite-face form `R2 L2 R'`. Phase 2 now reads phase 1's moves as history: 0 of 300, and only the scrambles that had a seam changed |
 | ⚠️ The five 3x3x3-family events run **+3 to +5 moves** over TNoodle (`333` 21–26 against 19–20) | [333-design.md](./333-design.md) §8 rough edge 2 | **accepted, not outstanding.** The cause is that the solver takes the first phase-1 solution rather than sweeping several. Measured 2026-08-13: sweeping buys 1.3 moves for ≥10× the time and 2.1 for ≥73×, and still lands at 21.2. A 3x3x3 scramble is on the consuming app's practice-timer hot path |
 | The `minx` 4b3e floor is measured against the identity state, not "solved up to whole-puzzle rotation" | [megaminx-design.md](./megaminx-design.md) §8 | ~`10^-66`; the floor itself is enforced, this is the residual the piece model cannot yet express |
 | Same-face seam at a blindfolded orientation suffix | [nxn-design.md](./nxn-design.md) §8 | cosmetic; deliberately deferred |

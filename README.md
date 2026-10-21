@@ -383,6 +383,43 @@ yet: its two-square net and Lanlan colours are this package's own, and provision
 TNoodle SVG — that would need TNoodle built and its output committed as a fixture.
 See `docs/drawing-design.md`.
 
+### Unofficial events: `@cubesmith/scrambler/unofficial`
+
+Sixteen puzzles the WCA does not hold, behind their own entry point so nothing above
+changes. `isImplementedEvent('888')` is still `false`, and a WCA-only consumer
+bundles none of this.
+
+```ts
+import { generateUnofficialScramble } from '@cubesmith/scrambler/unofficial';
+import { drawUnofficialScramble } from '@cubesmith/scrambler/unofficial/draw';
+
+const big = await generateUnofficialScramble('888');
+big.quality;                           // 'random-moves'
+big.moves.split(' ').length;           // 120
+
+(await generateUnofficialScramble('fisher')).quality;  // 'random-state-mechanism'
+
+drawUnofficialScramble('888', big.moves).width;        // 330 — the cube net at size 8
+drawUnofficialScramble('fisher', "R U R' U'").shapes[0].kind;  // 'polygon' — two isometric views
+drawUnofficialScramble('mirror', 'R U', undefined, { view: 'height-map' }).width;  // 130
+```
+
+| Events | Scramble | Drawing |
+|---|---|---|
+| `888` `999` `1010` `1111` `1212` | random moves, 120–200 | cube net |
+| `222bf` `666bf` `777bf` | sighted scramble + random orientation | cube net |
+| `pyrambf` `minxbf` | the WCA scramble, unchanged | Pyraminx / Megaminx net |
+| `mirror` `fisher` `mastermorphix` | the `333` scramble | isometric views (Mirror: also a height map) |
+| `axis` `windmill` `ghost` | the `333` scramble | none yet: no source for their geometry |
+
+- 🔴 **No regulation exists for these events.** Every length, orientation rule and
+  notation choice is either cited or labelled a CubeSmith convention in
+  `docs/unofficial-design.md`.
+- **`random-state-mechanism`** means a shape-mod scramble is uniform over the hidden
+  3x3x3, not over the centre orientations an Axis or Fisher Cube shows.
+- The ids are the ones the CubeManager event catalogue uses, so a catalogue ref
+  passes straight through. Drawings: `docs/shape-mod-drawing-design.md`.
+
 ## Scramble shape — what the WCA Regulations require beyond "random state"
 
 A scramble is not just the inverse of a random state's solution. Four extra

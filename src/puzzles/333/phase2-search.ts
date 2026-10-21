@@ -9,6 +9,7 @@ import {
   type EndAxisRestrictions,
 } from './search-restrictions';
 import type { CubeState } from './state';
+import { isRedundantAfter } from './redundancy';
 
 /**
  * IDA* over the restricted 10-move G1-preserving set, exactly analogous to
@@ -21,10 +22,18 @@ import type { CubeState } from './state';
  * move. Of the ten moves available, an axis restriction rules out at most
  * four (`U`/`U2`/`U'`/`D`… for `'UD'`, or the two half turns for `'RL'` and
  * `'FB'`), so a conforming solution always exists.
+ *
+ * `context` is the moves already made before phase 2 starts: phase 1's
+ * solution. The search treats it as history, so its first moves can never
+ * merge back into phase 1's last ones (`R2 | R'`, or `R2 L2 | R'` through the
+ * opposite face). See `redundancy.ts`. Ruling out a few opening moves never
+ * leaves the search without an answer; at worst the solution is one move
+ * longer.
  */
 export function phase2Search(
   state: CubeState,
   restrictions: EndAxisRestrictions = NO_END_RESTRICTIONS,
+  context: readonly FaceMove[] = [],
 ): FaceMove[] {
   const start = toPhase2Coordinate(state);
   if (isSolvedPhase2(start)) return [];
@@ -33,7 +42,7 @@ export function phase2Search(
   const path: FaceMove[] = [];
 
   for (;;) {
-    const result = dfs(start, 0, bound, path, restrictions);
+    const result = dfs(start, 0, bound, path, restrictions, context);
     if (result.found) return [...path];
     if (result.nextBound === Infinity) {
       throw new Error('phase2Search: no path to solved found — the input state may not be in G1');
@@ -50,6 +59,7 @@ function dfs(
   bound: number,
   path: FaceMove[],
   restrictions: EndAxisRestrictions,
+  context: readonly FaceMove[],
 ): DfsResult {
   const h = phase2Heuristic(coord.cornerPerm, coord.edge8Perm, coord.udSliceOrder);
   const f = g + h;
@@ -61,7 +71,7 @@ function dfs(
   if (isSolvedPhase2(coord) && !isForbiddenLastMove(lastMove, restrictions)) return { found: true };
 
   for (const move of PHASE2_MOVES) {
-    if (lastMove && lastMove.face === move.face) continue;
+    if (isRedundantAfter(path, context, move)) continue;
     if (g === 0 && isForbiddenFirstMove(move, restrictions)) continue;
 
     const nextCoord: Phase2Coordinate = {
@@ -70,7 +80,7 @@ function dfs(
       udSliceOrder: nextUdSliceOrder(coord.udSliceOrder, move),
     };
     path.push(move);
-    const result = dfs(nextCoord, g + 1, bound, path, restrictions);
+    const result = dfs(nextCoord, g + 1, bound, path, restrictions, context);
     if (result.found) return result;
     if (result.nextBound < minExceeding) minExceeding = result.nextBound;
     path.pop();

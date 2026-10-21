@@ -14,6 +14,8 @@ import {
   validateScramble,
 } from './index';
 import { defaultColorScheme, drawScramble, scrambleImageToSvg } from './draw/index';
+import { generateUnofficialScramble, unofficialEvents } from './unofficial/index';
+import { drawableUnofficialEvents, drawUnofficialScramble } from './unofficial/draw/index';
 
 /**
  * The README, checked against the code.
@@ -339,5 +341,38 @@ describe('the README batch and drawing examples', () => {
     expect(README).toContain('@cubesmith/scrambler/draw');
     // …and that path resolves, which is a fact about `package.json`, not prose.
     expect(PACKAGE_JSON_SOURCE).toContain('"./draw"');
+  });
+});
+
+/** The 0.15.0 unofficial-events section: the unofficial entry points, run rather than described. */
+describe('the README unofficial-events section', () => {
+  it('runs the example, with the exact values the README prints', async () => {
+    const big = await generateUnofficialScramble('888');
+    expect(big.quality).toBe('random-moves');
+    expect(big.moves.split(' ')).toHaveLength(120);
+    expect((await generateUnofficialScramble('fisher')).quality).toBe('random-state-mechanism');
+    expect(drawUnofficialScramble('888', big.moves).width).toBe(330);
+    expect(drawUnofficialScramble('fisher', "R U R' U'").shapes[0]!.kind).toBe('polygon');
+    expect(drawUnofficialScramble('mirror', 'R U', undefined, { view: 'height-map' }).width).toBe(130);
+  });
+
+  it('says "sixteen", lists every event, and marks exactly the undrawn ones', () => {
+    expect(README).toContain('Sixteen puzzles the WCA does not hold');
+    expect(unofficialEvents()).toHaveLength(16);
+    for (const event of unofficialEvents()) expect(README, event).toContain(`\`${event}\``);
+    const undrawn = unofficialEvents().filter((e) => !drawableUnofficialEvents().includes(e));
+    expect(undrawn).toEqual(['axis', 'windmill', 'ghost']);
+    expect(README).toContain('| `axis` `windmill` `ghost` | the `333` scramble | none yet');
+  });
+
+  it('documents both new entry points by the path a consumer imports, and both resolve', () => {
+    expect(README).toContain("from '@cubesmith/scrambler/unofficial'");
+    expect(README).toContain("from '@cubesmith/scrambler/unofficial/draw'");
+    expect(PACKAGE_JSON_SOURCE).toContain('"./unofficial"');
+    expect(PACKAGE_JSON_SOURCE).toContain('"./unofficial/draw"');
+  });
+
+  it('keeps the main entry answering no for an unofficial id, as the section claims', () => {
+    expect(isImplementedEvent('888' as never)).toBe(false);
   });
 });

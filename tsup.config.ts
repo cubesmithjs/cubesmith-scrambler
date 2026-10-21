@@ -10,7 +10,12 @@ export default defineConfig({
   // models; that consumer wants the drawing anyway, and a duplicated model is
   // dead weight rather than a correctness problem — every drawer builds its state
   // from the scramble text, so there is no shared mutable state to split.
-  entry: ['src/index.ts', 'src/draw/index.ts'],
+  //
+  // Four since 0.15.0: `./unofficial` and `./unofficial/draw` serve the non-WCA
+  // events, split for the same two reasons. A WCA-only consumer bundles none of
+  // their code, and the shape-mod geometry engine stays out of every scrambling
+  // entry.
+  entry: ['src/index.ts', 'src/draw/index.ts', 'src/unofficial/index.ts', 'src/unofficial/draw/index.ts'],
   format: ['esm'],
   target: 'es2022',
   dts: true,

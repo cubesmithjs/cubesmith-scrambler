@@ -623,29 +623,36 @@ the registration sites rather than inside `generate333Scramble`, because
 `333bf` calls that function too and its floor has to be checked *after* the
 orientation suffix.
 
-### Current bugs
+### Fixed: the phase-1 / phase-2 seam (2026-10-21)
 
-**A same-face pair can be printed at the phase-1 / phase-2 boundary.**
+Until 2026-10-21 a redundant pair could be printed where the two phases meet.
+Each search pruned a repeated face inside its own path, but neither knew the
+other's moves. So phase 1's last move and phase 2's first could turn the same face
+(`… B2 B' …` in the seed `probe-5` scramble), or the same face through its
+opposite (`R2 L2 R'`, since moves on one axis commute). The scramble is the
+inverse of the solution, so the pair surfaced mid-string. The printed sequence was
+one move longer than the turn it performs, which is the leak
+`core/scramble-shape.ts` §2 warns about.
 
-Each search prunes consecutive same-face moves within itself, but neither knows
-the other's moves, so phase 1's last move and phase 2's first move can turn the
-same face. The scramble is the inverse of the solution, so it surfaces mid-string
-— `… R2 L2 B2 B' L' …` in the seed `probe-5` scramble, where `B2 B'` merges to
-`B`.
-
-- **Impact:** cosmetic on the state, which is uniform either way, but it is
-  exactly the leak `core/scramble-shape.ts` §2 warns about: the printed sequence
-  is one move longer than the algorithm it represents, and a competitor merging
-  it gets a shorter scramble than the sheet shows. Measured at 1 scramble in 20
-  over a 20-seed sample.
-- **Where it applies:** `333`, `333oh`, `333bf`, the inner scramble of `333fm`,
-  and `444`'s 3x3x3 hand-off. Not the padding seams of `333fm`, which are
-  protected by the axis restriction of §5a.
-- **Fix:** seed `phase2Search`'s same-face pruning with phase 1's last move, so
-  the rule spans the boundary. One condition, but it changes `333` output for
-  every seed — a breaking change to seeded scrambles — so it wants its own
-  release note rather than being folded into an unrelated change. Found while
-  implementing §5a; not fixed there.
+- **Measured before the fix** over 300 seeded scrambles each: an adjacent pair in
+  20 of `333`, 13 of `333oh`, 22 of `333bf`, 20 of `333fm`, and the opposite-face
+  form in 1–2 of each. `222` and `444` were clean.
+- **The fix.** `phase2Search` takes phase 1's moves as `context` and prunes with
+  `isRedundantAfter` (`redundancy.ts`): within a run of same-axis moves, no face may
+  repeat, read back through the context. It is the rule `puzzles/nxn/random-moves.ts`
+  already applies to the big cubes, at single-layer granularity. It is an in-search
+  rule, not a post-hoc merge. Phase 1's path and both end-axis restrictions are
+  untouched, so `333fm`'s §5a seams cannot move, which is the interaction the
+  earlier plan to merge after the fact was wary of.
+- **Measured after:** 0 of 300 for every one of those events. On a common seed set
+  of 300 `333` scrambles, **only the 28 that had a seam changed**; the other 272 are
+  identical, because the drawn state is the same and only the join moves. The
+  earlier note that the fix would change "every seed" overstated it. Mean length
+  went from 23.13 to 23.19 tokens (maximum 27, once), at no measurable time cost.
+- **Pinned:** `move-count.test.ts` now allows **zero** redundant moves for all five
+  3x3x3-family events (it allowed one, for this seam), and
+  `puzzles/333/redundancy.test.ts` checks the rule and 100 generated scrambles. Both
+  fail with the fix removed (checked).
 
 ### Rough edges, stated plainly
 
@@ -693,14 +700,7 @@ same face. The scramble is the inverse of the solution, so it surfaces mid-strin
 
 ### Planned improvements
 
-- Close the phase-boundary same-face pair (above), with a release note. Measured
-  again 2026-08-13 while the length gap was being looked at: a post-hoc merge
-  (`puzzles/nxn/cancel.ts` now exists and does exactly this for the 4x4x4)
-  shortened **4 of 30** solutions by one move. It was **not** applied here, because
-  the 3x3x3 solver is reached by seven events and the `333fm` axis restriction of
-  §5a is stated on the solution's first and last move — a merge that emptied a
-  trailing same-axis run could move which axis those land on. Worth doing with that
-  interaction thought through, not as a rider on something else.
+- ~~Close the phase-boundary same-face pair.~~ Done 2026-10-21; see "Fixed" above.
 - Ship serialized pruning tables.
 - ~~Consider a phase-boundary sweep if solution length ever becomes a goal.~~ It
   became a goal, was prototyped, was measured, and was **declined** — see rough

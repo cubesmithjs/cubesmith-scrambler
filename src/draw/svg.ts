@@ -32,6 +32,17 @@ function num(value: number): string {
  * medium instead of by this function.
  */
 export function scrambleImageToSvg(image: ScrambleImage): string {
+  return imageToSvg(image);
+}
+
+/**
+ * The serializer itself, over only the fields it reads. The unofficial entry's
+ * images carry an unofficial event id, so they are not `ScrambleImage`s, and they
+ * serialize through this rather than through a copy of it.
+ */
+export function imageToSvg(
+  image: Pick<ScrambleImage, 'width' | 'height' | 'strokeWidth' | 'shapes'>,
+): string {
   const body = image.shapes.map(shapeToSvg).join('');
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(image.width)} ${num(image.height)}"` +

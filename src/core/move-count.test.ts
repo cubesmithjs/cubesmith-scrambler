@@ -158,7 +158,7 @@ const BANDS: readonly EventBand[] = [
     verdict: 'gap',
     draws: 3,
     size: 3,
-    maxRedundant: 1,
+    maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '21–26 over 30 draws, mean 23.33 — phase 1 9.47, phase 2 13.87',
   },
@@ -169,7 +169,7 @@ const BANDS: readonly EventBand[] = [
     verdict: 'gap',
     draws: 3,
     size: 3,
-    maxRedundant: 1,
+    maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '20–25 over 12 draws — the same solver as 333, with a wider TNoodle band to sit under',
   },
@@ -180,7 +180,7 @@ const BANDS: readonly EventBand[] = [
     verdict: 'gap',
     draws: 3,
     size: 3,
-    maxRedundant: 1,
+    maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '23–26 over 12 draws — 333 plus a 0..2-token orientation suffix',
   },
@@ -191,7 +191,7 @@ const BANDS: readonly EventBand[] = [
     verdict: 'gap',
     draws: 3,
     size: 3,
-    maxRedundant: 1,
+    maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '22–26 over 12 draws — the same scramble as 333bf, drawn count times',
   },
@@ -202,7 +202,7 @@ const BANDS: readonly EventBand[] = [
     verdict: 'gap',
     draws: 3,
     size: 3,
-    maxRedundant: 1,
+    maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
     measured: '27–31 over 12 draws — the six wrapper tokens included, and correct',
   },
@@ -442,11 +442,13 @@ describe('the emitted scramble shape', () => {
 
   /**
    * 🔴 The redundancy allowances above are pinned the same way the bands are: a
-   * non-zero one is a defect with an owner, not a tolerance. The 3x3x3 family's
-   * single allowed redundancy is the seam between phase 1 and phase 2 — each
-   * search prunes a repeated face inside its own path and neither looks across
-   * the join — and the 4x4x4's twenty is `solve.ts` concatenating each phase's
-   * sub-solution with no merge at all.
+   * non-zero one is a defect with an owner, not a tolerance. The 3x3x3 family
+   * carried one until 2026-10-21: the seam between phase 1 and phase 2, where each
+   * search pruned a repeated face inside its own path and neither looked across
+   * the join (`R2 | R'`, and through the opposite face `R2 L2 | R'`). Phase 2 now
+   * takes phase 1's moves as history (`puzzles/333/redundancy.ts`), and the five
+   * allowances are zero. Every event's allowance is now zero; this guard stays so
+   * that a new one cannot appear without an owner.
    */
   it('allows a redundant move only where a task owns it', () => {
     for (const entry of BANDS.filter((band) => (band.maxRedundant ?? 0) > 0)) {
