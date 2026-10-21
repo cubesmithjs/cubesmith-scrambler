@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Run by hand from the Actions tab, on any branch — including a Dependabot one,
-  # which the job below otherwise skips.
+  # Run by hand from the Actions tab, on any branch.
   workflow_dispatch:
 
 # 🔴 Least privilege for GITHUB_TOKEN (security_audit_plan F-12): a compromised
@@ -14,16 +13,27 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch makes an in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Why the jobs are split (2026-10-21): one job took ~23 minutes, nearly all of it
+# the test suite. The tests now run as four shards in parallel, the typecheck and
+# build alongside them, and a last job merges the shards' results and coverage.
+# This repository is public, so standard runners cost no Actions minutes: running
+# six jobs instead of one makes CI faster at no cost.
+
 jobs:
-  test:
-    # 🔴 Dependabot pull requests do not run CI, to save the account's monthly
-    # Actions minutes (owner decision, 2026-10-21). The branch name is the test,
-    # not the actor, so a human pushing a fix onto a Dependabot branch is skipped
-    # too. A skipped job counts as passing for a required status check, so the PR
-    # stays mergeable. Prove a bump with `npm run ci` locally (or run this
-    # workflow by hand); `main` is tested again on merge, and the publish job
-    # runs the whole suite before anything reaches npm.
-    if: ${{ !startsWith(github.head_ref, 'dependabot/') }}
+  # ---------------------------------------------------------------------------
+  # Typecheck and build, in parallel with the tests. This job also runs the two
+  # bundle tests, which check the BUILT files (the WCA entry carries no drawing or
+  # unofficial code, and so on). They skip when `dist/` does not exist, and the
+  # test shards never build, so this is the one place they run in CI. Before the
+  # split they ran before `npm run build` and so always skipped.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Typecheck, build, bundle checks
     runs-on: ubuntu-latest
     steps:
       # `persist-credentials: false` keeps GITHUB_TOKEN out of the checkout, where
@@ -39,5 +49,77 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run test:coverage
       - run: npm run build
+      - name: Check the built bundles
+        run: npx vitest run src/draw/bundle.test.ts src/unofficial/unofficial-bundle.test.ts
+
+  # ---------------------------------------------------------------------------
+  # The test suite in four shards. `vitest.sequencer.ts` assigns files by their
+  # measured duration (`test-durations.json`), not by count, so the shards finish
+  # together; with Vitest's default hash split the slowest shard ran 13% long.
+  # Splitting by FILE is safe: Vitest isolates every file, so no file depends on
+  # another having run, and a file is never split. Each shard writes a blob report
+  # (results plus coverage) for the merge job.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Run test shard
+        run: npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob
+
+      # `.vitest-reports/` starts with a dot, and upload-artifact skips hidden
+      # files unless told otherwise.
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # One result and one coverage report for the whole suite, as before the split.
+  # Fails if any shard had a failing test.
+  # ---------------------------------------------------------------------------
+  merge:
+    name: Merge test results and coverage
+    if: ${{ !cancelled() }}
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download blob reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: .vitest-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge
+        run: npx vitest run --merge-reports --coverage

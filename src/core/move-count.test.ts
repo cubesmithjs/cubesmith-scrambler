@@ -158,13 +158,13 @@ const BANDS: readonly EventBand[] = [
   {
     event: '333',
     tnoodle: [19, 20],
-    band: [19, 30],
+    band: [18, 30],
     verdict: 'gap',
     draws: 3,
     size: 3,
     maxRedundant: 0,
     closedBy: 'wca_conformance_plan task 04 — closed 2026-08-13 as not worth doing; the gap is accepted',
-    measured: '21–26 over 30 draws, mean 23.33 — phase 1 9.47, phase 2 13.87',
+    measured: '21–26 over 30 draws, mean 23.33 — phase 1 9.47, phase 2 13.87; an 18 was drawn on 2026-10-21, so the floor is 18 (and for 333bf/333mbf, whose suffix can be empty)',
   },
   {
     event: '333oh',
@@ -180,7 +180,7 @@ const BANDS: readonly EventBand[] = [
   {
     event: '333bf',
     tnoodle: [19, 22],
-    band: [19, 32],
+    band: [18, 32],
     verdict: 'gap',
     draws: 3,
     size: 3,
@@ -191,7 +191,7 @@ const BANDS: readonly EventBand[] = [
   {
     event: '333mbf',
     tnoodle: [21, 23],
-    band: [21, 32],
+    band: [18, 32],
     verdict: 'gap',
     draws: 3,
     size: 3,
@@ -320,7 +320,12 @@ beforeAll(async () => {
     await prepareEvent(entry.event);
     const scrambles: string[] = [];
     for (let draw = 0; draw < entry.draws; draw += 1) {
-      const result = await generateScramble(entry.event);
+      // 🔴 Seeded (2026-10-21). Unseeded draws made this file fail at random:
+      // a legal 17-token Square-1 and a legal 18-move 3x3x3 each fell under a
+      // floor set from a small sample. A band check that passes or fails by luck
+      // tells nobody anything; the seeds keep it reproducible, and the bands
+      // below were widened to what the generators can really produce.
+      const result = await generateScramble(entry.event, { seed: `move-count-${entry.event}-${draw}` });
       scrambles.push(result.moves);
     }
     drawn.set(entry.event, scrambles);

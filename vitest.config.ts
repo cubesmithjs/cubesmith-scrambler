@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { DurationShardSequencer } from './vitest.sequencer.ts';
 
 export default defineConfig({
   test: {
@@ -12,6 +13,9 @@ export default defineConfig({
     // itself is tracked by `npm run bench`, not by whether a correctness test
     // times out.
     testTimeout: 180000,
+    // Only consulted with `--shard` (CI): balances the shards by measured
+    // duration instead of by file count. See `vitest.sequencer.ts`.
+    sequence: { sequencer: DurationShardSequencer },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

@@ -1,8 +1,7 @@
 # security_audit_plan F-12 / I-18 — automated dependency and action updates.
-# Grouped so a week's worth of patch bumps is one PR, not twenty.
-# 🔴 These PRs do NOT run CI (`ci.yml` skips `dependabot/*` branches, to save
-# Actions minutes): check a bump with `npm run ci` locally before merging, or run
-# the CI workflow by hand from the Actions tab.
+# Grouped so a week's worth of patch bumps is one PR, not twenty; the CI on
+# every PR is the gate (`ci.yml` runs on pull_request). This repository is
+# public, so those runs cost no Actions minutes.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -10,6 +9,11 @@ updates:
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
     groups:
+      # `vitest` and `@vitest/coverage-v8` must move together: bumped apart, each
+      # PR fails at `npm ci` on the other's peer range (both 5.0.5 PRs did, on
+      # 2026-10-21). Listed first, and with no update-types, so majors are grouped too.
+      vitest:
+        patterns: ['vitest', '@vitest/*']
       npm-minor-and-patch:
         update-types: [minor, patch]
   - package-ecosystem: github-actions

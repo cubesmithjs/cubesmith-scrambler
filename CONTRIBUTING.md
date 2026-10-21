@@ -70,8 +70,8 @@ verification can be agreed before you write the solver. A new puzzle comes with:
 ## Pull requests
 
 - Keep a pull request to one change. Write a commit message that says what changed and why.
-- `npm run ci` must pass. CI runs it again on every pull request (Dependabot's are skipped
-  to save Actions minutes, and the maintainer checks those locally).
+- `npm run ci` must pass. CI runs the same checks on every pull request, with the tests
+  split across four parallel jobs.
 - A known limitation belongs in the puzzle's design document (§8), stated plainly.
 
 ## Reporting a bug
