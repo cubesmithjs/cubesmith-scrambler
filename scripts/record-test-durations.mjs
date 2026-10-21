@@ -28,15 +28,29 @@ if (caches.length === 0) {
   process.exit(1);
 }
 
+/**
+ * `[path, durationMs]` for the test project (named `''`), from either cache
+ * format Vitest has used. The benchmark run is a separate project and is skipped.
+ */
+function* entries(cache) {
+  if (cache.projects) {
+    // Vitest 5: { version, projects: { [name]: { files: { [path]: { duration } } } } }
+    for (const [path, { duration }] of Object.entries(cache.projects['']?.files ?? {})) {
+      yield [path, duration];
+    }
+    return;
+  }
+  // Vitest 4: { results: [[`${project}:${path}`, { duration }], ...] }
+  for (const [key, { duration }] of cache.results ?? []) {
+    if (key.startsWith(':')) yield [key.slice(1), duration];
+  }
+}
+
 const durations = {};
-for (const cache of caches) {
-  const { results } = JSON.parse(readFileSync(cache, 'utf8'));
-  // Stored as `[key, { duration, failed }]` pairs; an object is accepted too.
-  const entries = Array.isArray(results) ? results : Object.entries(results);
-  for (const [key, { duration }] of entries) {
-    const file = key.slice(key.indexOf(':') + 1);
-    if (!file.endsWith('.test.ts') || !existsSync(join(root, file))) continue;
-    durations[file] = Math.round(duration / 100) / 10;
+for (const file of caches) {
+  for (const [path, duration] of entries(JSON.parse(readFileSync(file, 'utf8')))) {
+    if (!path.endsWith('.test.ts') || !existsSync(join(root, path))) continue;
+    durations[path] = Math.round(duration / 100) / 10;
   }
 }
 

@@ -80,7 +80,12 @@ jobs:
 
       - run: npm ci
       - name: Run test shard
-        run: npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob
+        # The blob path is explicit: Vitest 5 moved the default from `.vitest-reports/`
+        # to `.vitest/blob/`, which would have left the upload below empty.
+        run: >-
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4
+          --reporter=default --reporter=blob
+          --outputFile.blob=.vitest-reports/blob-${{ matrix.shard }}.json
 
       # `.vitest-reports/` starts with a dot, and upload-artifact skips hidden
       # files unless told otherwise.
@@ -122,4 +127,4 @@ jobs:
           merge-multiple: true
 
       - name: Merge
-        run: npx vitest run --merge-reports --coverage
+        run: npx vitest run --merge-reports=.vitest-reports --coverage

@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
 import { generate333Scramble } from './solve';
 
@@ -18,7 +18,9 @@ describe('generate333Scramble — steady state (tables already built)', () => {
   // calls measure only search time, not the one-off build cost above.
   generate333Scramble(random);
 
-  bench('generate333Scramble', () => {
-    generate333Scramble(random);
+  test('generate333Scramble', async ({ bench }) => {
+    await bench('generate333Scramble', () => {
+      generate333Scramble(random);
+    }).run();
   });
 });

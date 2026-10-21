@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
 import { generateClockScramble } from './solve';
 
@@ -11,7 +11,9 @@ describe('generateClockScramble', () => {
   const random = createRandomSource('clock-bench-warmup');
   generateClockScramble(random);
 
-  bench('generateClockScramble', () => {
-    generateClockScramble(random);
+  test('generateClockScramble', async ({ bench }) => {
+    await bench('generateClockScramble', () => {
+      generateClockScramble(random);
+    }).run();
   });
 });

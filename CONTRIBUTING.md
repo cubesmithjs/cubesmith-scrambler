@@ -6,7 +6,8 @@ short on purpose; the reasoning behind each rule is in [`docs/`](./docs/).
 
 ## Getting started
 
-You need Node.js 22 (what CI uses; the published package supports Node 18 and later).
+You need Node.js 22.12 or later (Vitest 5 requires it, and CI uses Node 22). The published
+package itself supports Node 18 and later.
 
 ```bash
 npm ci

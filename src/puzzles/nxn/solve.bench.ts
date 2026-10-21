@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
 import { generateCubeNxNScramble, RANDOM_MOVE_CUBES } from './solve';
 
@@ -12,8 +12,10 @@ for (const { event, size, length } of RANDOM_MOVE_CUBES) {
     const random = createRandomSource(`${event}-bench-warmup`);
     generateCubeNxNScramble(random, size, length);
 
-    bench(`${event} (${length} moves)`, () => {
-      generateCubeNxNScramble(random, size, length);
+    test(`${event} (${length} moves)`, async ({ bench }) => {
+      await bench(`${event} (${length} moves)`, () => {
+        generateCubeNxNScramble(random, size, length);
+      }).run();
     });
   });
 }

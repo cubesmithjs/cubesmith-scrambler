@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 import { createRandomSource } from '../../random/random-source';
 import { phase1Solutions } from './phase1-search';
 import { phase2Search } from './phase2-search';
@@ -37,20 +37,28 @@ describe('square-1 table construction', () => {
   // Each of these is memoised, so the benchmark reports the *warm* cost. The
   // cold cost is stated above; measuring it here would report only the first
   // iteration and average it away.
-  bench('move tables (warm)', () => {
-    phase2MoveTables();
+  test('move tables (warm)', async ({ bench }) => {
+    await bench('move tables (warm)', () => {
+      phase2MoveTables();
+    }).run();
   });
 
-  bench('pruning table (warm)', () => {
-    phase2CornerPruning();
+  test('pruning table (warm)', async ({ bench }) => {
+    await bench('pruning table (warm)', () => {
+      phase2CornerPruning();
+    }).run();
   });
 
-  bench('backward table (warm)', () => {
-    phase2BackwardTable();
+  test('backward table (warm)', async ({ bench }) => {
+    await bench('backward table (warm)', () => {
+      phase2BackwardTable();
+    }).run();
   });
 
-  bench('phase-1 distance table (warm)', () => {
-    phase1Table();
+  test('phase-1 distance table (warm)', async ({ bench }) => {
+    await bench('phase-1 distance table (warm)', () => {
+      phase1Table();
+    }).run();
   });
 });
 
@@ -58,8 +66,10 @@ describe('square-1 phases', () => {
   const states = Array.from({ length: 16 }, () => randomSquare1State(random));
   let at = 0;
 
-  bench('phase 1 only, first ending', () => {
-    phase1Solutions(states[at++ % states.length]!);
+  test('phase 1 only, first ending', async ({ bench }) => {
+    await bench('phase 1 only, first ending', () => {
+      phase1Solutions(states[at++ % states.length]!);
+    }).run();
   });
 
   const openings = states.map((state) => {
@@ -68,13 +78,15 @@ describe('square-1 phases', () => {
   });
   let opening = 0;
 
-  bench('phase 2 only, optimal', () => {
-    try {
-      phase2Search(openings[opening++ % openings.length]!, { nodeBudget: 5_000_000 });
-    } catch {
-      // A budget-exceeded state is part of the distribution being measured, not
-      // an error: the solver's answer to one is to try a different ending.
-    }
+  test('phase 2 only, optimal', async ({ bench }) => {
+    await bench('phase 2 only, optimal', () => {
+      try {
+        phase2Search(openings[opening++ % openings.length]!, { nodeBudget: 5_000_000 });
+      } catch {
+        // A budget-exceeded state is part of the distribution being measured, not
+        // an error: the solver's answer to one is to try a different ending.
+      }
+    }).run();
   });
 });
 
@@ -83,7 +95,9 @@ describe('square-1 solve', () => {
   // outlier that swamps the rest.
   solveSquare1(warmup);
 
-  bench('solve a uniformly random state', () => {
-    solveSquare1(randomSquare1State(random));
+  test('solve a uniformly random state', async ({ bench }) => {
+    await bench('solve a uniformly random state', () => {
+      solveSquare1(randomSquare1State(random));
+    }).run();
   });
 });

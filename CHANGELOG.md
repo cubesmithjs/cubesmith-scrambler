@@ -173,6 +173,13 @@ bundles none of the unofficial code.
 
 ### Also
 
+- **Toolchain** (development only): Vitest 5, `@vitest/coverage-v8` 5, tsup 9 and
+  TypeScript 6.0.3. The published JavaScript is byte-identical to the previous
+  toolchain's build, and the type declarations export the same names with the same
+  declarations (`dist/draw/index.d.ts` now imports `WcaEventId` from the main entry's
+  declarations rather than a shared chunk). TypeScript 7 typechecks the package
+  cleanly, but tsup 9.0.0 cannot build declarations with it yet (egoist/tsup#1405).
+  The benchmarks moved to Vitest 5's `bench` test fixture.
 - `prepare-event.test.ts`'s first-scramble check now measures **CPU time**, not
   wall time. With FTO's tables building in parallel workers, the first `333mbf`
   scramble after a prepare measured 4.4 s of wall time in the full coverage run
